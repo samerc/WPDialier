@@ -10,6 +10,7 @@ import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.draw.clip
@@ -21,6 +22,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -28,6 +30,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -46,7 +49,8 @@ import com.fancyshark.wpdialer.ui.ContactTile
 import com.fancyshark.wpdialer.ui.Metro
 import kotlinx.coroutines.launch
 
-@Composable
+@androidx.compose.runtime.Composable
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 fun HistoryPage(
     items: List<HistoryItem>,
     accent: Color,
@@ -54,8 +58,10 @@ fun HistoryPage(
     onText: (String) -> Unit,
     onSave: (String) -> Unit,
     onProfile: (String) -> Unit,
-    onDelete: (HistoryItem) -> Unit,
+    onDelete: (List<HistoryItem>) -> Unit,
     onBlock: (String) -> Unit,
+    onDetails: (HistoryItem) -> Unit,
+    onAddSpeedDial: (String) -> Unit,
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     if (items.isEmpty()) {
@@ -68,34 +74,113 @@ fun HistoryPage(
         )
         return
     }
+    // WP 8.1 groups consecutive calls with the same number and type: "(2)".
+    val groups = remember(items) {
+        val out = mutableListOf<MutableList<HistoryItem>>()
+        items.forEach { item ->
+            val last = out.lastOrNull()?.firstOrNull()
+            if (last != null && last.type == item.type &&
+                last.number.filter(Char::isDigit) == item.number.filter(Char::isDigit)
+            ) {
+                out.last() += item
+            } else {
+                out += mutableListOf(item)
+            }
+        }
+        out
+    }
     var expandedId by remember { mutableStateOf<Long?>(null) }
+    var menuForId by remember { mutableStateOf<Long?>(null) }
     LazyColumn(Modifier.fillMaxSize(), contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 20.dp, end = 20.dp, top = 6.dp, bottom = 20.dp)) {
-        items(items.size, key = { items[it].id }) { i ->
-            val item = items[i]
+        items(groups.size, key = { groups[it].first().id }) { i ->
+            val group = groups[i]
+            val item = group.first()
             val missed = item.type == android.provider.CallLog.Calls.MISSED_TYPE
             val expanded = expandedId == item.id
             Column(
                 Modifier
                     .fillMaxWidth()
-                    .clickable { expandedId = if (expanded) null else item.id }
+                    .combinedClickable(
+                        onClick = { expandedId = if (expanded) null else item.id },
+                        onLongClick = { menuForId = item.id },
+                    )
                     .padding(vertical = 9.dp),
             ) {
-                Text(
-                    item.name?.takeIf { it.isNotBlank() }
-                        ?: item.number.takeIf { it.isNotBlank() }?.let { Repo.pretty(context, it) }
-                        ?: "unknown",
-                    color = if (missed) accent else Metro.Foreground,
-                    fontSize = 27.sp,
-                    fontWeight = FontWeight.Light,
-                    maxLines = 1,
-                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                )
-                Text(
-                    "${Repo.historyTypeLabel(item.type)}, ${Repo.relativeTime(item.date)}",
-                    color = Metro.Subtle,
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Light,
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        val label = item.name?.takeIf { it.isNotBlank() }
+                            ?: item.number.takeIf { it.isNotBlank() }
+                                ?.let { Repo.pretty(context, it) }
+                            ?: "unknown"
+                        Text(
+                            if (group.size > 1) "$label (${group.size})" else label,
+                            color = if (missed) accent else Metro.Foreground,
+                            fontSize = 27.sp,
+                            fontWeight = FontWeight.Light,
+                            maxLines = 1,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            "${
+                                Repo.historyTypeLabel(item.type).removeSuffix(" call")
+                                    .replaceFirstChar { it.uppercase() }
+                            }, ${Repo.historyWhen(item.date)}",
+                            color = Metro.Subtle,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Light,
+                        )
+                    }
+                    if (item.number.isNotBlank()) {
+                        Box(
+                            Modifier
+                                .size(42.dp)
+                                .clip(CircleShape)
+                                .border(2.dp, Metro.Foreground, CircleShape)
+                                .clickable { onCall(item.number) },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            androidx.compose.material3.Icon(
+                                Icons.Filled.Phone,
+                                contentDescription = "call",
+                                tint = Metro.Foreground,
+                                modifier = Modifier.size(18.dp),
+                            )
+                        }
+                    }
+                }
+                // WP-style white context menu on long-press.
+                Box {
+                    androidx.compose.material3.MaterialTheme(
+                        colorScheme = androidx.compose.material3.lightColorScheme(),
+                    ) {
+                        androidx.compose.material3.DropdownMenu(
+                            expanded = menuForId == item.id,
+                            onDismissRequest = { menuForId = null },
+                        ) {
+                            listOf(
+                                "details" to { onDetails(item) },
+                                "delete" to { onDelete(group.toList()) },
+                                "add to speed dial" to { onAddSpeedDial(item.number) },
+                                "block" to { onBlock(item.number) },
+                            ).forEach { (label, action) ->
+                                androidx.compose.material3.DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            label,
+                                            color = Color.Black,
+                                            fontSize = 17.sp,
+                                            fontWeight = FontWeight.Light,
+                                        )
+                                    },
+                                    onClick = {
+                                        menuForId = null
+                                        action()
+                                    },
+                                )
+                            }
+                        }
+                    }
+                }
                 if (expanded) {
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(18.dp),
@@ -127,7 +212,7 @@ fun HistoryPage(
                             "delete", accent,
                         ) {
                             expandedId = null
-                            onDelete(item)
+                            onDelete(group.toList())
                         }
                         if (item.number.isNotBlank()) {
                             HistoryAction(
@@ -183,17 +268,93 @@ private fun HistoryAction(
     }
 }
 
+/** WP 8.1 call details: every call with this number, with durations. */
+@Composable
+fun CallDetailsScreen(
+    number: String,
+    name: String?,
+    history: List<HistoryItem>,
+    accent: Color,
+    onCall: (String) -> Unit,
+    onText: (String) -> Unit,
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val digits = number.filter(Char::isDigit)
+    val entries = remember(history, number) {
+        history.filter { it.number.filter(Char::isDigit) == digits }
+    }
+    Column(
+        Modifier
+            .fillMaxSize()
+            .padding(horizontal = 20.dp),
+    ) {
+        Text(
+            "PHONE",
+            color = Metro.Foreground,
+            fontSize = 15.sp,
+            modifier = Modifier.padding(top = 18.dp),
+        )
+        Text("details", color = Metro.Foreground, fontSize = 48.sp, fontWeight = FontWeight.Light)
+        Spacer(Modifier.height(10.dp))
+        Text(
+            name?.takeIf { it.isNotBlank() } ?: Repo.pretty(context, number),
+            color = Metro.Foreground,
+            fontSize = 26.sp,
+            fontWeight = FontWeight.Light,
+            maxLines = 1,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+        )
+        if (!name.isNullOrBlank()) {
+            Text(Repo.pretty(context, number), color = accent, fontSize = 15.sp)
+        }
+        Spacer(Modifier.height(12.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
+            HistoryAction(Icons.Filled.Phone, "call", accent) { onCall(number) }
+            HistoryAction(Icons.AutoMirrored.Filled.Message, "text", accent) { onText(number) }
+        }
+        Spacer(Modifier.height(14.dp))
+        LazyColumn(Modifier.fillMaxSize()) {
+            items(entries.size, key = { entries[it].id }) { i ->
+                val e = entries[i]
+                Column(Modifier.padding(vertical = 7.dp)) {
+                    Text(
+                        Repo.wpTime(e.date),
+                        color = Metro.Foreground,
+                        fontSize = 21.sp,
+                        fontWeight = FontWeight.Light,
+                    )
+                    Text(
+                        Repo.historyTypeLabel(e.type).removeSuffix(" call")
+                            .replaceFirstChar { it.uppercase() } +
+                            if (e.duration > 0) {
+                                "  ·  Duration ${Repo.formatDuration(e.duration)}"
+                            } else "",
+                        color = Metro.Subtle,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Light,
+                    )
+                }
+            }
+        }
+    }
+}
+
 /** WP 8.1-style speed dial: starred contacts as large accent tiles. */
 @Composable
 fun SpeedDialPage(
     contacts: List<ContactItem>,
     accent: Color,
     onOpen: (ContactItem) -> Unit,
+    onCallNumber: (String) -> Unit,
+    onRemoveNumber: (String) -> Unit,
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val numbers by com.fancyshark.wpdialer.data.AppPrefs.speedDialNumbers
+        .collectAsState()
     val starred = contacts.filter { it.starred }
-    if (starred.isEmpty()) {
+    if (starred.isEmpty() && numbers.isEmpty()) {
         Text(
-            "Pin favorites here from a contact's profile.",
+            "Pin favorites from a contact's profile, or long-press a history entry and choose \"add to speed dial\".",
             color = Metro.Subtle,
             fontSize = 20.sp,
             fontWeight = FontWeight.Light,
@@ -208,6 +369,36 @@ fun SpeedDialPage(
         ),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
+        // Plain numbers added via history "add to speed dial".
+        items(numbers.size, key = { "num_" + numbers[it] }) { i ->
+            val number = numbers[i]
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onCallNumber(number) },
+            ) {
+                Box(Modifier.size(40.dp).background(accent))
+                Text(
+                    Repo.pretty(context, number),
+                    color = Metro.Foreground,
+                    fontSize = 23.sp,
+                    fontWeight = FontWeight.Light,
+                    modifier = Modifier.weight(1f).padding(start = 12.dp),
+                )
+                Text(
+                    "✕",
+                    color = Metro.Subtle,
+                    fontSize = 18.sp,
+                    modifier = Modifier
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                        ) { onRemoveNumber(number) }
+                        .padding(8.dp),
+                )
+            }
+        }
         items(starred.chunked(2).size) { rowIndex ->
             val row = starred.chunked(2)[rowIndex]
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

@@ -89,6 +89,7 @@ sealed interface Screen {
     data class Contact(val id: Long) : Screen
     data class EditContact(val id: Long) : Screen
     data class NewContact(val initialNumber: String = "") : Screen
+    data class CallDetails(val number: String, val name: String?) : Screen
     data object Search : Screen
     data object Settings : Screen
 }
@@ -261,7 +262,7 @@ class MainActivity : ComponentActivity() {
         val backStack = remember { mutableStateListOf<Screen>(Screen.Home) }
         val uiScope = androidx.compose.runtime.rememberCoroutineScope()
         var confirmClearHistory by remember { mutableStateOf(false) }
-        var confirmDeleteItem by remember { mutableStateOf<HistoryItem?>(null) }
+        var confirmDeleteGroup by remember { mutableStateOf<List<HistoryItem>?>(null) }
         fun push(screen: Screen) = backStack.add(screen)
         fun popAndRefresh() {
             if (backStack.size > 1) backStack.removeAt(backStack.lastIndex)
@@ -324,18 +325,32 @@ class MainActivity : ComponentActivity() {
                                                     else push(Screen.NewContact(number))
                                                 }
                                             },
-                                            onDelete = { item -> confirmDeleteItem = item },
+                                            onDelete = { group -> confirmDeleteGroup = group },
                                             onBlock = { number ->
                                                 uiScope.launch {
                                                     Repo.blockNumber(this@MainActivity, number)
                                                 }
                                             },
+                                            onDetails = { item ->
+                                                push(Screen.CallDetails(item.number, item.name))
+                                            },
+                                            onAddSpeedDial = { number ->
+                                                com.fancyshark.wpdialer.data.AppPrefs
+                                                    .addSpeedDial(this@MainActivity, number)
+                                            },
                                         )
                                     },
                                     "speed dial" to {
-                                        SpeedDialPage(contacts, accent.color) {
-                                            push(Screen.Contact(it.id))
-                                        }
+                                        SpeedDialPage(
+                                            contacts = contacts,
+                                            accent = accent.color,
+                                            onOpen = { push(Screen.Contact(it.id)) },
+                                            onCallNumber = { placeCall(it) },
+                                            onRemoveNumber = {
+                                                com.fancyshark.wpdialer.data.AppPrefs
+                                                    .removeSpeedDial(this@MainActivity, it)
+                                            },
+                                        )
                                     },
                                     "people" to {
                                         PeoplePage(contacts, accent.color) {
@@ -396,6 +411,15 @@ class MainActivity : ComponentActivity() {
                             onDone = { popAndRefresh() },
                         )
 
+                        is Screen.CallDetails -> com.fancyshark.wpdialer.screens.CallDetailsScreen(
+                            number = top.number,
+                            name = top.name,
+                            history = history,
+                            accent = accent.color,
+                            onCall = { placeCall(it) },
+                            onText = { sendText(it) },
+                        )
+
                         Screen.Search -> SearchScreen(contacts, accent.color) {
                             push(Screen.Contact(it.id))
                         }
@@ -408,8 +432,9 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                confirmDeleteItem?.let { item ->
-                    BackHandler { confirmDeleteItem = null }
+                confirmDeleteGroup?.let { group ->
+                    val item = group.first()
+                    BackHandler { confirmDeleteGroup = null }
                     Box(
                         Modifier
                             .fillMaxSize()
@@ -417,11 +442,11 @@ class MainActivity : ComponentActivity() {
                             .clickable(
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = null,
-                            ) { confirmDeleteItem = null },
+                            ) { confirmDeleteGroup = null },
                     ) {
                         Column(Modifier.align(Alignment.Center).padding(horizontal = 32.dp)) {
                             Text(
-                                "delete this call?",
+                                if (group.size > 1) "delete ${group.size} calls?" else "delete this call?",
                                 color = Metro.Foreground,
                                 fontSize = 26.sp,
                                 fontWeight = FontWeight.Light,
@@ -443,14 +468,14 @@ class MainActivity : ComponentActivity() {
                                     fill = Metro.Red,
                                     modifier = Modifier.weight(1f),
                                 ) {
-                                    confirmDeleteItem = null
+                                    confirmDeleteGroup = null
                                     lifecycleScope.launch {
-                                        Repo.deleteHistoryItem(this@MainActivity, item.id)
+                                        Repo.deleteHistoryItems(this@MainActivity, group.map { it.id })
                                         refreshTick.value += 1
                                     }
                                 }
                                 MetroButton("cancel", modifier = Modifier.weight(1f)) {
-                                    confirmDeleteItem = null
+                                    confirmDeleteGroup = null
                                 }
                             }
                         }

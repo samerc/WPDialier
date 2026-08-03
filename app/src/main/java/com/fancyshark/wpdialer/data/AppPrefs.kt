@@ -27,6 +27,13 @@ object AppPrefs {
     private val _tilt = MutableStateFlow(true)
     val tilt: StateFlow<Boolean> = _tilt
 
+    /** true = "2 hours ago" style; false = WP "Sat 01:06" style. */
+    private val _relativeTimes = MutableStateFlow(false)
+    val relativeTimes: StateFlow<Boolean> = _relativeTimes
+
+    private val _speedDialNumbers = MutableStateFlow<List<String>>(emptyList())
+    val speedDialNumbers: StateFlow<List<String>> = _speedDialNumbers
+
     private fun prefs(context: Context) =
         context.getSharedPreferences("wp", Context.MODE_PRIVATE)
 
@@ -39,6 +46,28 @@ object AppPrefs {
         _globalSim.value = p.getString("sim_global", null)
         _light.value = p.getBoolean("theme_light", false)
         _tilt.value = p.getBoolean("tilt", true)
+        _relativeTimes.value = p.getBoolean("relative_times", false)
+        _speedDialNumbers.value = p.getString("speed_dial", null)
+            ?.split(SEPARATOR)?.filter { it.isNotBlank() } ?: emptyList()
+    }
+
+    fun setRelativeTimes(context: Context, on: Boolean) {
+        _relativeTimes.value = on
+        prefs(context).edit().putBoolean("relative_times", on).apply()
+    }
+
+    fun addSpeedDial(context: Context, number: String) {
+        if (number.isBlank() || number in _speedDialNumbers.value) return
+        setSpeedDial(context, _speedDialNumbers.value + number)
+    }
+
+    fun removeSpeedDial(context: Context, number: String) {
+        setSpeedDial(context, _speedDialNumbers.value - number)
+    }
+
+    private fun setSpeedDial(context: Context, numbers: List<String>) {
+        _speedDialNumbers.value = numbers
+        prefs(context).edit().putString("speed_dial", numbers.joinToString(SEPARATOR)).apply()
     }
 
     fun setRejectMessages(context: Context, messages: List<String>) {

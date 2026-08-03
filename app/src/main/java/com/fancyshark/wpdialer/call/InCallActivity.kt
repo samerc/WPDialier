@@ -285,7 +285,9 @@ private fun ActiveScreen(
         value = Repo.lookupCaller(context2, secondNumber)
     }
 
-    Column(Modifier.fillMaxSize().padding(24.dp)) {
+    Column(Modifier.fillMaxSize()) {
+        // WP 8.1 places the caller info on a chrome-gray panel.
+        Column(Modifier.fillMaxWidth().background(Metro.Key).padding(24.dp)) {
         Text("PHONE", color = Metro.Foreground, fontSize = 15.sp, letterSpacing = 2.sp)
         Spacer(Modifier.height(28.dp))
         Text(statusLine, color = accent, fontSize = 19.sp, fontWeight = FontWeight.Normal)
@@ -341,7 +343,9 @@ private fun ActiveScreen(
                 }
             }
         }
+        }
         Spacer(Modifier.weight(1f))
+        Column(Modifier.padding(horizontal = 24.dp)) {
 
         if (showKeypad) {
             DtmfPad()
@@ -393,6 +397,7 @@ private fun ActiveScreen(
             ) { showKeypad = !showKeypad }
         }
         Spacer(Modifier.height(16.dp))
+        }
     }
 }
 

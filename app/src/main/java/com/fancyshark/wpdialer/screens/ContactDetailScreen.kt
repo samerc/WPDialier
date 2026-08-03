@@ -311,7 +311,7 @@ private fun ContactDetailBody(
                             fontWeight = FontWeight.Light,
                         )
                         Text(
-                            Repo.relativeTime(item.date),
+                            Repo.historyWhen(item.date),
                             color = Metro.Subtle,
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Light,

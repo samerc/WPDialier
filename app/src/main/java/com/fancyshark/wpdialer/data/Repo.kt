@@ -37,6 +37,7 @@ data class HistoryItem(
     val name: String?,
     val type: Int,
     val date: Long,
+    val duration: Long = 0,
 )
 
 object Repo {
@@ -154,6 +155,7 @@ object Repo {
                     CallLog.Calls.CACHED_NAME,
                     CallLog.Calls.TYPE,
                     CallLog.Calls.DATE,
+                    CallLog.Calls.DURATION,
                 ),
                 null,
                 null,
@@ -166,6 +168,7 @@ object Repo {
                         name = c.getString(2),
                         type = c.getInt(3),
                         date = c.getLong(4),
+                        duration = c.getLong(5),
                     )
                 }
             }
@@ -374,4 +377,41 @@ object Repo {
         DateUtils.getRelativeTimeSpanString(
             date, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS,
         ).toString().lowercase()
+
+    /** WP-style timestamp: "01:06" today, "Sat 01:06" this week, "Aug 3" older. */
+    fun wpTime(date: Long): String {
+        val now = java.util.Calendar.getInstance()
+        val then = java.util.Calendar.getInstance().apply { timeInMillis = date }
+        val sameDay = now.get(java.util.Calendar.YEAR) == then.get(java.util.Calendar.YEAR) &&
+            now.get(java.util.Calendar.DAY_OF_YEAR) == then.get(java.util.Calendar.DAY_OF_YEAR)
+        val withinWeek = now.timeInMillis - date < 6 * 24 * 3600_000L
+        val pattern = when {
+            sameDay -> "HH:mm"
+            withinWeek -> "EEE HH:mm"
+            else -> "MMM d"
+        }
+        return java.text.SimpleDateFormat(pattern, java.util.Locale.getDefault()).format(date)
+    }
+
+    /** History subline honoring the user's time-format preference. */
+    fun historyWhen(date: Long): String =
+        if (AppPrefs.relativeTimes.value) relativeTime(date) else wpTime(date)
+
+    fun formatDuration(seconds: Long): String {
+        val m = seconds / 60
+        val s = seconds % 60
+        return "%d:%02d".format(m, s)
+    }
+
+    /** Deletes several call log entries (a grouped history row). */
+    suspend fun deleteHistoryItems(context: Context, ids: List<Long>): Boolean =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                context.contentResolver.delete(
+                    CallLog.Calls.CONTENT_URI,
+                    "${CallLog.Calls._ID} IN (${ids.joinToString(",")})",
+                    null,
+                ) > 0
+            }.getOrDefault(false)
+        }
 }

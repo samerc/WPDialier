@@ -41,6 +41,39 @@ import com.fancyshark.wpdialer.ui.MetroTextBox
 import com.fancyshark.wpdialer.ui.WpAccents
 import kotlinx.coroutines.launch
 
+/** The WP settings toggle: On/Off label + bordered track with square thumb. */
+@Composable
+private fun WpToggleRow(checked: Boolean, accent: Color, onChange: (Boolean) -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .padding(top = 8.dp)
+            .clickable { onChange(!checked) },
+    ) {
+        Text(
+            if (checked) "On" else "Off",
+            color = Metro.Foreground,
+            fontSize = 22.sp,
+            fontWeight = FontWeight.Light,
+            modifier = Modifier.width(52.dp),
+        )
+        Box(
+            Modifier
+                .size(width = 58.dp, height = 26.dp)
+                .border(2.dp, Metro.Foreground)
+                .background(if (checked) accent else Color.Transparent),
+        ) {
+            Box(
+                Modifier
+                    .align(if (checked) Alignment.CenterEnd else Alignment.CenterStart)
+                    .padding(3.dp)
+                    .size(width = 18.dp, height = 20.dp)
+                    .background(Metro.Foreground),
+            )
+        }
+    }
+}
+
 @Composable
 fun SettingsScreen(
     accent: Accent,
@@ -263,20 +296,16 @@ fun SettingsScreen(
 
         Spacer(Modifier.height(30.dp))
         val light by AppPrefs.light.collectAsState()
-        Text("Theme", color = Metro.Subtle, fontSize = 16.sp, fontWeight = FontWeight.Light)
-        Row(horizontalArrangement = Arrangement.spacedBy(20.dp), modifier = Modifier.padding(top = 6.dp)) {
-            listOf("dark" to false, "light" to true).forEach { (label, value) ->
-                Text(
-                    label,
-                    color = if (light == value) accent.color else Metro.Subtle,
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.Light,
-                    modifier = Modifier.clickable {
-                        AppPrefs.setLight(context, value)
-                        Metro.light = value
-                    },
-                )
-            }
+        Text(
+            "Light theme",
+            color = accent.color,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.SemiBold,
+            letterSpacing = 1.sp,
+        )
+        WpToggleRow(light, accent.color) {
+            AppPrefs.setLight(context, it)
+            Metro.light = it
         }
 
         Spacer(Modifier.height(30.dp))
@@ -288,17 +317,25 @@ fun SettingsScreen(
             fontWeight = FontWeight.SemiBold,
             letterSpacing = 1.sp,
         )
-        Row(horizontalArrangement = Arrangement.spacedBy(20.dp), modifier = Modifier.padding(top = 6.dp)) {
-            listOf("on" to true, "off" to false).forEach { (label, value) ->
-                Text(
-                    label,
-                    color = if (tilt == value) accent.color else Metro.Subtle,
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.Light,
-                    modifier = Modifier.clickable { AppPrefs.setTilt(context, value) },
-                )
-            }
-        }
+        WpToggleRow(tilt, accent.color) { AppPrefs.setTilt(context, it) }
+
+        Spacer(Modifier.height(30.dp))
+        val relativeTimes by AppPrefs.relativeTimes.collectAsState()
+        Text(
+            "Relative times in history",
+            color = accent.color,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.SemiBold,
+            letterSpacing = 1.sp,
+        )
+        WpToggleRow(relativeTimes, accent.color) { AppPrefs.setRelativeTimes(context, it) }
+        Text(
+            "on: \"2 hours ago\" — off: Windows Phone style \"Sat 01:06\"",
+            color = Metro.Subtle,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Light,
+            modifier = Modifier.padding(top = 6.dp),
+        )
 
         Spacer(Modifier.height(30.dp))
         val replies by AppPrefs.rejectMessages.collectAsState()
