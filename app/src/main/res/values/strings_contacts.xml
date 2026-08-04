@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- ContactDetailScreen.kt -->
+    <string name="contact_edit">edit</string>
+    <string name="contact_pin">pin</string>
+    <string name="contact_unpin">unpin</string>
+    <string name="contact_share">share</string>
+    <string name="contact_share_chooser">share contact</string>
+    <string name="contact_delete">delete</string>
+    <string name="contact_delete_confirm">delete %1$s?</string>
+    <string name="contact_cancel">cancel</string>
+    <string name="contact_profile">profile</string>
+    <string name="contact_no_phone_numbers">no phone numbers</string>
+    <string name="contact_call_label">call %1$s</string>
+    <string name="contact_text_label">text %1$s</string>
+    <string name="contact_email_label">email %1$s</string>
+    <string name="contact_website">website</string>
+    <string name="contact_company">company</string>
+    <string name="contact_nickname">nickname</string>
+    <string name="contact_map_address">map address</string>
+    <string name="contact_preferred_sim">preferred SIM</string>
+    <string name="contact_not_set">not set</string>
+    <string name="contact_ringtone">ringtone</string>
+    <string name="contact_ringtone_default">default</string>
+    <string name="contact_note">note</string>
+    <string name="contact_history">history</string>
+    <string name="contact_preferred_sim_caps">PREFERRED SIM</string>
+    <string name="contact_no_preference">no preference</string>
+
+    <!-- NewContactScreen.kt -->
+    <string name="newcontact_title">NEW %1$s CONTACT</string>
+    <string name="newcontact_name">Name</string>
+    <string name="newcontact_change_photo">change photo</string>
+    <string name="newcontact_save_to">Save to</string>
+    <string name="newcontact_country">Country (for phone numbers)</string>
+    <string name="newcontact_phone">Phone</string>
+    <string name="newcontact_number">Number</string>
+    <string name="newcontact_email">Email</string>
+    <string name="newcontact_email_address">Email address</string>
+    <string name="newcontact_date">Date</string>
+    <string name="newcontact_pick_a_date">Pick a date</string>
+    <string name="newcontact_custom_label">Custom label</string>
+    <string name="newcontact_add_date">add date</string>
+    <string name="newcontact_add_typed">add %1$s</string>
+    <string name="newcontact_address">Address</string>
+    <string name="newcontact_street_city_country">Street, city, country</string>
+    <string name="newcontact_pick_on_map">pick on map</string>
+    <string name="newcontact_locating">locating...</string>
+    <string name="newcontact_use_current_location">use current location</string>
+    <string name="newcontact_note">Note</string>
+    <string name="newcontact_save_failed">couldn\'t save the contact — check the account and try again</string>
+    <string name="newcontact_saving">saving...</string>
+    <string name="newcontact_save">save</string>
+    <string name="newcontact_cancel">cancel</string>
+    <string name="newcontact_save_to_caps">SAVE TO</string>
+    <string name="newcontact_country_caps">COUNTRY</string>
+    <string name="newcontact_search">Search</string>
+    <string name="newcontact_pick_a_location">PICK A LOCATION</string>
+    <string name="newcontact_pin">pin</string>
+    <string name="newcontact_resolving">resolving...</string>
+    <string name="newcontact_use_this_location">use this location</string>
+
+    <!-- EditContactScreen.kt -->
+    <string name="editcontact_title_kind">EDIT %1$s CONTACT</string>
+    <string name="editcontact_title">EDIT CONTACT</string>
+    <string name="editcontact_saved_to">saved to %1$s</string>
+    <string name="editcontact_name">name</string>
+    <string name="editcontact_change_photo">change photo</string>
+    <string name="editcontact_phone_label">phone (%1$s)</string>
+    <string name="editcontact_number">number</string>
+    <string name="editcontact_add_phone">add phone</string>
+    <string name="editcontact_email">email</string>
+    <string name="editcontact_email_address">email address</string>
+    <string name="editcontact_other">other</string>
+    <string name="editcontact_custom_label">custom label</string>
+    <string name="editcontact_add_email">add email</string>
+    <string name="editcontact_date">date</string>
+    <string name="editcontact_pick_a_date">pick a date</string>
+    <string name="editcontact_add_date">add date</string>
+    <string name="editcontact_address">address</string>
+    <string name="editcontact_street_city_country">street, city, country</string>
+    <string name="editcontact_note">note</string>
+    <string name="editcontact_save_failed">couldn\'t save the changes — try again</string>
+    <string name="editcontact_saving">saving...</string>
+    <string name="editcontact_save">save</string>
+    <string name="editcontact_cancel">cancel</string>
+</resources>

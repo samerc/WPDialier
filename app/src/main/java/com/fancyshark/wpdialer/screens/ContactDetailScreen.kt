@@ -37,6 +37,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -71,21 +72,32 @@ fun ContactDetailScreen(
     val d = detail ?: return
     var starred by remember(d.id, d.starred) { mutableStateOf(d.starred) }
     var confirmDelete by remember { mutableStateOf(false) }
+    val shareChooserTitle = stringResource(com.fancyshark.wpdialer.R.string.contact_share_chooser)
 
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
             ContactDetailBody(d, accent, history, onCall, onText, Modifier.weight(1f))
             MetroAppBar(
                 actions = listOf(
-                    AppBarAction(Icons.Filled.Edit, "edit") { onEdit() },
+                    AppBarAction(
+                        Icons.Filled.Edit,
+                        stringResource(com.fancyshark.wpdialer.R.string.contact_edit),
+                    ) { onEdit() },
                     AppBarAction(
                         if (starred) Icons.Filled.Star else Icons.Filled.StarBorder,
-                        if (starred) "unpin" else "pin",
+                        if (starred) {
+                            stringResource(com.fancyshark.wpdialer.R.string.contact_unpin)
+                        } else {
+                            stringResource(com.fancyshark.wpdialer.R.string.contact_pin)
+                        },
                     ) {
                         starred = !starred
                         scope.launch { Repo.setStarred(context, d.id, starred) }
                     },
-                    AppBarAction(Icons.Filled.Share, "share") {
+                    AppBarAction(
+                        Icons.Filled.Share,
+                        stringResource(com.fancyshark.wpdialer.R.string.contact_share),
+                    ) {
                         d.lookupKey?.let { key ->
                             runCatching {
                                 val vcard = android.net.Uri.withAppendedPath(
@@ -97,13 +109,16 @@ fun ContactDetailScreen(
                                         android.content.Intent(android.content.Intent.ACTION_SEND)
                                             .setType("text/x-vcard")
                                             .putExtra(android.content.Intent.EXTRA_STREAM, vcard),
-                                        "share contact",
+                                        shareChooserTitle,
                                     ),
                                 )
                             }
                         }
                     },
-                    AppBarAction(Icons.Filled.Delete, "delete") { confirmDelete = true },
+                    AppBarAction(
+                        Icons.Filled.Delete,
+                        stringResource(com.fancyshark.wpdialer.R.string.contact_delete),
+                    ) { confirmDelete = true },
                 ),
             )
         }
@@ -117,7 +132,10 @@ fun ContactDetailScreen(
             ) {
                 Column(Modifier.align(Alignment.Center).padding(horizontal = 32.dp)) {
                     Text(
-                        "delete ${d.name}?",
+                        stringResource(
+                            com.fancyshark.wpdialer.R.string.contact_delete_confirm,
+                            d.name,
+                        ),
                         color = Metro.Foreground,
                         fontSize = 26.sp,
                         fontWeight = FontWeight.Light,
@@ -127,13 +145,20 @@ fun ContactDetailScreen(
                         horizontalArrangement = androidx.compose.foundation.layout.Arrangement
                             .spacedBy(10.dp),
                     ) {
-                        MetroButton("delete", fill = Metro.Red, modifier = Modifier.weight(1f)) {
+                        MetroButton(
+                            stringResource(com.fancyshark.wpdialer.R.string.contact_delete),
+                            fill = Metro.Red,
+                            modifier = Modifier.weight(1f),
+                        ) {
                             scope.launch {
                                 Repo.deleteContact(context, d.id)
                                 onDeleted()
                             }
                         }
-                        MetroButton("cancel", modifier = Modifier.weight(1f)) {
+                        MetroButton(
+                            stringResource(com.fancyshark.wpdialer.R.string.contact_cancel),
+                            modifier = Modifier.weight(1f),
+                        ) {
                             confirmDelete = false
                         }
                     }
@@ -284,7 +309,7 @@ private fun ContactDetailBody(
                 .padding(horizontal = 20.dp),
         ) {
             Text(
-                "profile",
+                stringResource(com.fancyshark.wpdialer.R.string.contact_profile),
                 color = Metro.Foreground,
                 fontSize = 48.sp,
                 fontWeight = FontWeight.Light,
@@ -307,7 +332,7 @@ private fun ContactDetailBody(
 
             if (d.phones.isEmpty()) {
                 Text(
-                    "no phone numbers",
+                    stringResource(com.fancyshark.wpdialer.R.string.contact_no_phone_numbers),
                     color = Metro.Subtle,
                     fontSize = 17.sp,
                     fontWeight = FontWeight.Light,
@@ -323,7 +348,10 @@ private fun ContactDetailBody(
                 ) {
                     Column(Modifier.weight(1f)) {
                         Text(
-                            "call ${phone.label}",
+                            stringResource(
+                                com.fancyshark.wpdialer.R.string.contact_call_label,
+                                phone.label,
+                            ),
                             color = Metro.Foreground,
                             fontSize = 25.sp,
                             fontWeight = FontWeight.Light,
@@ -332,7 +360,10 @@ private fun ContactDetailBody(
                     }
                     Icon(
                         Icons.AutoMirrored.Filled.Message,
-                        contentDescription = "text ${phone.label}",
+                        contentDescription = stringResource(
+                            com.fancyshark.wpdialer.R.string.contact_text_label,
+                            phone.label,
+                        ),
                         tint = Metro.Foreground,
                         modifier = Modifier
                             .size(40.dp)
@@ -367,7 +398,10 @@ private fun ContactDetailBody(
                 ) {
                     Column(Modifier.weight(1f)) {
                         Text(
-                            "email ${email.label}",
+                            stringResource(
+                                com.fancyshark.wpdialer.R.string.contact_email_label,
+                                email.label,
+                            ),
                             color = Metro.Foreground,
                             fontSize = 25.sp,
                             fontWeight = FontWeight.Light,
@@ -414,7 +448,7 @@ private fun ContactDetailBody(
                         .padding(vertical = 9.dp),
                 ) {
                     Text(
-                        "website",
+                        stringResource(com.fancyshark.wpdialer.R.string.contact_website),
                         color = Metro.Foreground,
                         fontSize = 25.sp,
                         fontWeight = FontWeight.Light,
@@ -426,7 +460,7 @@ private fun ContactDetailBody(
             if (d.organization != null) {
                 Column(Modifier.fillMaxWidth().padding(vertical = 9.dp)) {
                     Text(
-                        "company",
+                        stringResource(com.fancyshark.wpdialer.R.string.contact_company),
                         color = Metro.Foreground,
                         fontSize = 25.sp,
                         fontWeight = FontWeight.Light,
@@ -438,7 +472,7 @@ private fun ContactDetailBody(
             if (d.nickname != null) {
                 Column(Modifier.fillMaxWidth().padding(vertical = 9.dp)) {
                     Text(
-                        "nickname",
+                        stringResource(com.fancyshark.wpdialer.R.string.contact_nickname),
                         color = Metro.Foreground,
                         fontSize = 25.sp,
                         fontWeight = FontWeight.Light,
@@ -485,7 +519,7 @@ private fun ContactDetailBody(
                         .padding(vertical = 9.dp),
                 ) {
                     Text(
-                        "map address",
+                        stringResource(com.fancyshark.wpdialer.R.string.contact_map_address),
                         color = Metro.Foreground,
                         fontSize = 25.sp,
                         fontWeight = FontWeight.Light,
@@ -502,13 +536,14 @@ private fun ContactDetailBody(
                         .padding(vertical = 9.dp),
                 ) {
                     Text(
-                        "preferred SIM",
+                        stringResource(com.fancyshark.wpdialer.R.string.contact_preferred_sim),
                         color = Metro.Foreground,
                         fontSize = 25.sp,
                         fontWeight = FontWeight.Light,
                     )
                     Text(
-                        simOptions.firstOrNull { it.flat == simPref }?.label ?: "not set",
+                        simOptions.firstOrNull { it.flat == simPref }?.label
+                            ?: stringResource(com.fancyshark.wpdialer.R.string.contact_not_set),
                         color = accent,
                         fontSize = 15.sp,
                     )
@@ -519,14 +554,16 @@ private fun ContactDetailBody(
             androidx.compose.runtime.LaunchedEffect(d.id) {
                 ringtoneUri = Repo.contactRingtone(context, d.id)
             }
-            val ringtoneTitle = remember(ringtoneUri) {
+            val ringtoneDefaultTitle =
+                stringResource(com.fancyshark.wpdialer.R.string.contact_ringtone_default)
+            val ringtoneTitle = remember(ringtoneUri, ringtoneDefaultTitle) {
                 ringtoneUri?.let { uri ->
                     runCatching {
                         android.media.RingtoneManager
                             .getRingtone(context, android.net.Uri.parse(uri))
                             ?.getTitle(context)
                     }.getOrNull()
-                } ?: "default"
+                } ?: ringtoneDefaultTitle
             }
             val ringtoneScope = androidx.compose.runtime.rememberCoroutineScope()
             val ringtonePicker = androidx.activity.compose.rememberLauncherForActivityResult(
@@ -541,6 +578,8 @@ private fun ContactDetailBody(
                     ringtoneScope.launch { Repo.setContactRingtone(context, d.id, uri) }
                 }
             }
+            val ringtonePickerTitle =
+                stringResource(com.fancyshark.wpdialer.R.string.contact_ringtone)
             Column(
                 Modifier
                     .fillMaxWidth()
@@ -556,7 +595,7 @@ private fun ContactDetailBody(
                                     )
                                     .putExtra(
                                         android.media.RingtoneManager.EXTRA_RINGTONE_TITLE,
-                                        "ringtone",
+                                        ringtonePickerTitle,
                                     )
                                     .putExtra(
                                         android.media.RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT,
@@ -572,7 +611,7 @@ private fun ContactDetailBody(
                     .padding(vertical = 9.dp),
             ) {
                 Text(
-                    "ringtone",
+                    stringResource(com.fancyshark.wpdialer.R.string.contact_ringtone),
                     color = Metro.Foreground,
                     fontSize = 25.sp,
                     fontWeight = FontWeight.Light,
@@ -583,7 +622,7 @@ private fun ContactDetailBody(
             if (!d.note.isNullOrBlank()) {
                 Spacer(Modifier.height(16.dp))
                 Text(
-                    "note",
+                    stringResource(com.fancyshark.wpdialer.R.string.contact_note),
                     color = Metro.Foreground,
                     fontSize = 30.sp,
                     fontWeight = FontWeight.Light,
@@ -600,7 +639,7 @@ private fun ContactDetailBody(
             if (personHistory.isNotEmpty()) {
                 Spacer(Modifier.height(16.dp))
                 Text(
-                    "history",
+                    stringResource(com.fancyshark.wpdialer.R.string.contact_history),
                     color = Metro.Foreground,
                     fontSize = 30.sp,
                     fontWeight = FontWeight.Light,
@@ -608,7 +647,7 @@ private fun ContactDetailBody(
                 personHistory.forEach { item ->
                     Column(Modifier.padding(vertical = 6.dp)) {
                         Text(
-                            Repo.historyTypeLabel(item.type),
+                            Repo.historyTypeLabel(context, item.type),
                             color = Metro.Foreground,
                             fontSize = 19.sp,
                             fontWeight = FontWeight.Light,
@@ -669,14 +708,19 @@ private fun ContactDetailBody(
             ) {
                 Column(Modifier.align(Alignment.Center).padding(horizontal = 32.dp)) {
                     Text(
-                        "PREFERRED SIM",
+                        stringResource(com.fancyshark.wpdialer.R.string.contact_preferred_sim_caps),
                         color = Metro.Foreground,
                         fontSize = 16.sp,
                         fontWeight = FontWeight.SemiBold,
                         letterSpacing = 1.sp,
                         modifier = Modifier.padding(bottom = 14.dp),
                     )
-                    (listOf<Pair<String, String?>>("no preference" to null) +
+                    (
+                        listOf<Pair<String, String?>>(
+                            stringResource(
+                                com.fancyshark.wpdialer.R.string.contact_no_preference,
+                            ) to null,
+                        ) +
                         simOptions.map { it.label to it.flat }
                         ).forEach { (label, flat) ->
                         val selected = simPref == flat

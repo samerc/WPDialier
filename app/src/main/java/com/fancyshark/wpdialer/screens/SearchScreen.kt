@@ -26,6 +26,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -59,7 +60,7 @@ fun SearchScreen(
 
     Column(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
         Text(
-            "SEARCH",
+            stringResource(com.fancyshark.wpdialer.R.string.search_title),
             color = Metro.Foreground,
             fontSize = 15.sp,
             letterSpacing = 2.sp,
@@ -72,7 +73,11 @@ fun SearchScreen(
                 .padding(horizontal = 10.dp, vertical = 10.dp),
         ) {
             if (query.isEmpty()) {
-                Text("search people", color = Metro.Subtle, fontSize = 18.sp)
+                Text(
+                    stringResource(com.fancyshark.wpdialer.R.string.search_hint),
+                    color = Metro.Subtle,
+                    fontSize = 18.sp,
+                )
             }
             BasicTextField(
                 value = query,

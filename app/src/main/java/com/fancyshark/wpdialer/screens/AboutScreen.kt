@@ -14,9 +14,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.fancyshark.wpdialer.R
 import com.fancyshark.wpdialer.ui.Accent
 import com.fancyshark.wpdialer.ui.Metro
 
@@ -39,14 +41,14 @@ fun AboutScreen(accent: Accent) {
             .padding(horizontal = 20.dp),
     ) {
         Text(
-            "SETTINGS",
+            stringResource(R.string.about_header),
             color = Metro.Foreground,
             fontSize = 15.sp,
             letterSpacing = 2.sp,
             modifier = Modifier.padding(top = 18.dp),
         )
         Text(
-            "about",
+            stringResource(R.string.about_title),
             color = Metro.Foreground,
             fontSize = 48.sp,
             fontWeight = FontWeight.Light,
@@ -54,13 +56,13 @@ fun AboutScreen(accent: Accent) {
         Spacer(Modifier.height(30.dp))
 
         Text(
-            "Dialer 8",
+            stringResource(R.string.about_app_name),
             color = accent.color,
             fontSize = 40.sp,
             fontWeight = FontWeight.Light,
         )
         Text(
-            "a Windows Phone styled dialer",
+            stringResource(R.string.about_tagline),
             color = Metro.Subtle,
             fontSize = 16.sp,
             fontWeight = FontWeight.Light,
@@ -69,7 +71,7 @@ fun AboutScreen(accent: Accent) {
 
         Spacer(Modifier.height(30.dp))
         Text(
-            "version",
+            stringResource(R.string.about_version),
             color = Metro.Foreground,
             fontSize = 25.sp,
             fontWeight = FontWeight.Light,
@@ -77,6 +79,7 @@ fun AboutScreen(accent: Accent) {
         Text(version, color = accent.color, fontSize = 15.sp)
 
         Spacer(Modifier.height(22.dp))
+        val feedbackSubject = stringResource(R.string.about_feedback_subject)
         Column(
             Modifier
                 .fillMaxWidth()
@@ -90,7 +93,7 @@ fun AboutScreen(accent: Accent) {
                                 ),
                             ).putExtra(
                                 android.content.Intent.EXTRA_SUBJECT,
-                                "Dialer 8 feedback",
+                                feedbackSubject,
                             ),
                         )
                     }
@@ -98,7 +101,7 @@ fun AboutScreen(accent: Accent) {
                 .padding(vertical = 4.dp),
         ) {
             Text(
-                "contact",
+                stringResource(R.string.about_contact),
                 color = Metro.Foreground,
                 fontSize = 25.sp,
                 fontWeight = FontWeight.Light,
@@ -123,13 +126,13 @@ fun AboutScreen(accent: Accent) {
                 .padding(vertical = 4.dp),
         ) {
             Text(
-                "privacy policy",
+                stringResource(R.string.about_privacy),
                 color = Metro.Foreground,
                 fontSize = 25.sp,
                 fontWeight = FontWeight.Light,
             )
             Text(
-                "everything stays on your phone — read the policy",
+                stringResource(R.string.about_privacy_hint),
                 color = accent.color,
                 fontSize = 15.sp,
             )

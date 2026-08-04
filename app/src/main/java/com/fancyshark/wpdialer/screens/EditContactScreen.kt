@@ -41,6 +41,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
@@ -103,9 +104,12 @@ fun EditContactScreen(
 
     Column(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
         val title = if (edited.raws.size == 1) {
-            "EDIT ${edited.raws.first().account.kindLabel.uppercase()} CONTACT"
+            stringResource(
+                com.fancyshark.wpdialer.R.string.editcontact_title_kind,
+                edited.raws.first().account.kindLabel.uppercase(),
+            )
         } else {
-            "EDIT CONTACT"
+            stringResource(com.fancyshark.wpdialer.R.string.editcontact_title)
         }
         Text(
             title,
@@ -124,14 +128,21 @@ fun EditContactScreen(
                 Spacer(Modifier.height(14.dp))
                 if (edited.raws.size > 1) {
                     Text(
-                        "saved to ${raw.account.fullLabel}",
+                        stringResource(
+                            com.fancyshark.wpdialer.R.string.editcontact_saved_to,
+                            raw.account.fullLabel,
+                        ),
                         color = accent,
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Normal,
                     )
                     Spacer(Modifier.height(8.dp))
                 }
-                Text("name", color = Metro.Subtle, fontSize = 14.sp)
+                Text(
+                    stringResource(com.fancyshark.wpdialer.R.string.editcontact_name),
+                    color = Metro.Subtle,
+                    fontSize = 14.sp,
+                )
                 Spacer(Modifier.height(4.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     MetroTextBox(
@@ -140,7 +151,9 @@ fun EditContactScreen(
                             updateRaw(rawIndex) { it.copy(name = newName) }
                         },
                         accent = accent,
-                        placeholder = "name",
+                        placeholder = stringResource(
+                            com.fancyshark.wpdialer.R.string.editcontact_name,
+                        ),
                         keyboardOptions = KeyboardOptions(
                             capitalization = KeyboardCapitalization.Words,
                         ),
@@ -168,7 +181,9 @@ fun EditContactScreen(
                         if (preview != null) {
                             Image(
                                 preview,
-                                contentDescription = "change photo",
+                                contentDescription = stringResource(
+                                    com.fancyshark.wpdialer.R.string.editcontact_change_photo,
+                                ),
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier.size(76.dp),
                             )
@@ -184,7 +199,12 @@ fun EditContactScreen(
                 }
 
                 raw.phones.forEachIndexed { phoneIndex, phone ->
-                    EditFieldLabel("phone (${phone.label})")
+                    EditFieldLabel(
+                        stringResource(
+                            com.fancyshark.wpdialer.R.string.editcontact_phone_label,
+                            phone.label,
+                        ),
+                    )
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         MetroTextBox(
                             value = phone.number,
@@ -198,7 +218,9 @@ fun EditContactScreen(
                                 }
                             },
                             accent = accent,
-                            placeholder = "number",
+                            placeholder = stringResource(
+                                com.fancyshark.wpdialer.R.string.editcontact_number,
+                            ),
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
                             modifier = Modifier.weight(1f),
                         )
@@ -209,14 +231,19 @@ fun EditContactScreen(
                         }
                     }
                 }
-                EditAddLink("add phone", accent) {
+                EditAddLink(
+                    stringResource(com.fancyshark.wpdialer.R.string.editcontact_add_phone),
+                    accent,
+                ) {
                     updateRaw(rawIndex) { r ->
                         r.copy(phones = r.phones + EditPhone(null, "", "mobile"))
                     }
                 }
 
                 raw.emails.forEachIndexed { emailIndex, email ->
-                    EditFieldLabel("email")
+                    EditFieldLabel(
+                        stringResource(com.fancyshark.wpdialer.R.string.editcontact_email),
+                    )
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         MetroTextBox(
                             value = email.address,
@@ -230,14 +257,19 @@ fun EditContactScreen(
                                 }
                             },
                             accent = accent,
-                            placeholder = "email address",
+                            placeholder = stringResource(
+                                com.fancyshark.wpdialer.R.string.editcontact_email_address,
+                            ),
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                             modifier = Modifier.weight(1f),
                         )
                         Spacer(Modifier.width(8.dp))
                         WpDropdown(
                             current = ContactEditor.EMAIL_TYPES
-                                .firstOrNull { it.second == email.type }?.first ?: "other",
+                                .firstOrNull { it.second == email.type }?.first
+                                ?: stringResource(
+                                    com.fancyshark.wpdialer.R.string.editcontact_other,
+                                ),
                             options = ContactEditor.EMAIL_TYPES.map { it.first },
                             onSelect = { t ->
                                 updateRaw(rawIndex) { r ->
@@ -272,18 +304,25 @@ fun EditContactScreen(
                                 }
                             },
                             accent = accent,
-                            placeholder = "custom label",
+                            placeholder = stringResource(
+                                com.fancyshark.wpdialer.R.string.editcontact_custom_label,
+                            ),
                         )
                     }
                 }
-                EditAddLink("add email", accent) {
+                EditAddLink(
+                    stringResource(com.fancyshark.wpdialer.R.string.editcontact_add_email),
+                    accent,
+                ) {
                     updateRaw(rawIndex) { r ->
                         r.copy(emails = r.emails + EditEmail(null, "", Email.TYPE_HOME))
                     }
                 }
 
                 raw.events.forEachIndexed { eventIndex, event ->
-                    EditFieldLabel("date")
+                    EditFieldLabel(
+                        stringResource(com.fancyshark.wpdialer.R.string.editcontact_date),
+                    )
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(
                             Modifier
@@ -318,7 +357,11 @@ fun EditContactScreen(
                                 .padding(horizontal = 10.dp, vertical = 12.dp),
                         ) {
                             Text(
-                                event.startDate.ifEmpty { "pick a date" },
+                                event.startDate.ifEmpty {
+                                    stringResource(
+                                        com.fancyshark.wpdialer.R.string.editcontact_pick_a_date,
+                                    )
+                                },
                                 color = if (event.startDate.isEmpty()) Metro.Subtle else Metro.Foreground,
                                 fontSize = 18.sp,
                             )
@@ -326,7 +369,10 @@ fun EditContactScreen(
                         Spacer(Modifier.width(8.dp))
                         WpDropdown(
                             current = ContactEditor.EVENT_TYPES
-                                .firstOrNull { it.second == event.type }?.first ?: "other",
+                                .firstOrNull { it.second == event.type }?.first
+                                ?: stringResource(
+                                    com.fancyshark.wpdialer.R.string.editcontact_other,
+                                ),
                             options = ContactEditor.EVENT_TYPES.map { it.first },
                             onSelect = { t ->
                                 updateRaw(rawIndex) { r ->
@@ -361,37 +407,50 @@ fun EditContactScreen(
                                 }
                             },
                             accent = accent,
-                            placeholder = "custom label",
+                            placeholder = stringResource(
+                                com.fancyshark.wpdialer.R.string.editcontact_custom_label,
+                            ),
                         )
                     }
                 }
-                EditAddLink("add date", accent) {
+                EditAddLink(
+                    stringResource(com.fancyshark.wpdialer.R.string.editcontact_add_date),
+                    accent,
+                ) {
                     updateRaw(rawIndex) { r ->
                         r.copy(events = r.events + EditEvent(null, "", Event.TYPE_BIRTHDAY))
                     }
                 }
 
-                EditFieldLabel("address")
+                EditFieldLabel(
+                    stringResource(com.fancyshark.wpdialer.R.string.editcontact_address),
+                )
                 MetroTextBox(
                     value = raw.address,
                     onValueChange = { newAddress ->
                         updateRaw(rawIndex) { it.copy(address = newAddress) }
                     },
                     accent = accent,
-                    placeholder = "street, city, country",
+                    placeholder = stringResource(
+                        com.fancyshark.wpdialer.R.string.editcontact_street_city_country,
+                    ),
                     keyboardOptions = KeyboardOptions(
                         capitalization = KeyboardCapitalization.Sentences,
                     ),
                 )
 
-                EditFieldLabel("note")
+                EditFieldLabel(
+                    stringResource(com.fancyshark.wpdialer.R.string.editcontact_note),
+                )
                 MetroTextBox(
                     value = raw.note,
                     onValueChange = { newNote ->
                         updateRaw(rawIndex) { it.copy(note = newNote) }
                     },
                     accent = accent,
-                    placeholder = "note",
+                    placeholder = stringResource(
+                        com.fancyshark.wpdialer.R.string.editcontact_note,
+                    ),
                     singleLine = false,
                     minLines = 2,
                     keyboardOptions = KeyboardOptions(
@@ -404,7 +463,7 @@ fun EditContactScreen(
         }
         if (saveFailed) {
             Text(
-                "couldn't save the changes — try again",
+                stringResource(com.fancyshark.wpdialer.R.string.editcontact_save_failed),
                 color = Metro.Red,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Light,
@@ -416,7 +475,11 @@ fun EditContactScreen(
             modifier = Modifier.padding(vertical = 14.dp),
         ) {
             MetroButton(
-                if (saving) "saving..." else "save",
+                if (saving) {
+                    stringResource(com.fancyshark.wpdialer.R.string.editcontact_saving)
+                } else {
+                    stringResource(com.fancyshark.wpdialer.R.string.editcontact_save)
+                },
                 fill = accent,
                 enabled = !saving,
                 modifier = Modifier.weight(1f),
@@ -433,7 +496,10 @@ fun EditContactScreen(
                     }
                 }
             }
-            MetroButton("cancel", modifier = Modifier.weight(1f)) { onDone() }
+            MetroButton(
+                stringResource(com.fancyshark.wpdialer.R.string.editcontact_cancel),
+                modifier = Modifier.weight(1f),
+            ) { onDone() }
         }
     }
 }

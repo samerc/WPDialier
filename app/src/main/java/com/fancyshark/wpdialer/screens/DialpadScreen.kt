@@ -37,6 +37,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -173,7 +174,7 @@ fun DialpadScreen(
                 ) {
                     Icon(
                         Icons.AutoMirrored.Filled.Backspace,
-                        contentDescription = "delete",
+                        contentDescription = stringResource(com.fancyshark.wpdialer.R.string.dialpad_delete),
                         tint = Metro.Foreground,
                         modifier = Modifier.size(26.dp),
                     )
@@ -285,7 +286,7 @@ private fun CallTile(accent: Color, modifier: Modifier = Modifier, onClick: () -
         contentAlignment = Alignment.Center,
     ) {
         Text(
-            "call",
+            stringResource(com.fancyshark.wpdialer.R.string.dialpad_call),
             color = if (pressed) Metro.Background else Color.White,
             fontSize = 16.sp,
         )
@@ -314,12 +315,12 @@ private fun SaveTile(accent: Color, modifier: Modifier = Modifier, onClick: () -
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Icon(
                 Icons.Filled.Save,
-                contentDescription = "save",
+                contentDescription = stringResource(com.fancyshark.wpdialer.R.string.dialpad_save),
                 tint = Metro.Foreground,
                 modifier = Modifier.size(20.dp),
             )
             Text(
-                "save",
+                stringResource(com.fancyshark.wpdialer.R.string.dialpad_save),
                 color = Metro.Foreground,
                 fontSize = 11.sp,
                 modifier = Modifier.padding(top = 2.dp),

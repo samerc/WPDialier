@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- HomePages.kt -->
+    <string name="home_history_empty">To make a call, tap an icon below.</string>
+    <string name="home_unknown">unknown</string>
+    <string name="home_history_subtitle">%1$s, %2$s</string>
+    <string name="home_details">details</string>
+    <string name="home_delete">delete</string>
+    <string name="home_add_to_speed_dial">add to speed dial</string>
+    <string name="home_block">block</string>
+    <string name="home_call">call</string>
+    <string name="home_text">text</string>
+    <string name="home_save">save</string>
+    <string name="home_profile">profile</string>
+    <string name="home_details_app_header">PHONE</string>
+    <string name="home_details_duration">"  ·  Duration %1$s"</string>
+    <string name="home_speed_dial_empty">Pin favorites from a contact\'s profile, or long-press a history entry and choose \"add to speed dial\".</string>
+    <string name="home_no_contacts">no contacts</string>
+
+    <!-- SearchScreen.kt -->
+    <string name="search_title">SEARCH</string>
+    <string name="search_hint">search people</string>
+
+    <!-- DialpadScreen.kt -->
+    <string name="dialpad_delete">delete</string>
+    <string name="dialpad_call">call</string>
+    <string name="dialpad_save">save</string>
+</resources>

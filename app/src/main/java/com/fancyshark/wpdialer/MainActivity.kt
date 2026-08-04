@@ -50,6 +50,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -296,7 +297,7 @@ class MainActivity : ComponentActivity() {
             placeCall(number)
         } else {
             android.widget.Toast.makeText(
-                this, "no voicemail number set up on this SIM", android.widget.Toast.LENGTH_SHORT,
+                this, getString(R.string.main_toast_no_voicemail), android.widget.Toast.LENGTH_SHORT,
             ).show()
         }
     }
@@ -326,7 +327,7 @@ class MainActivity : ComponentActivity() {
                 .padding(vertical = 8.dp),
             contentAlignment = Alignment.Center,
         ) {
-            Text("tap to return to call", color = Color.White, fontSize = 14.sp)
+            Text(stringResource(R.string.main_return_to_call), color = Color.White, fontSize = 14.sp)
         }
     }
 
@@ -389,10 +390,10 @@ class MainActivity : ComponentActivity() {
                         Screen.Home -> Column(Modifier.fillMaxSize()) {
                             ReturnToCallBanner(accent.color)
                             Pivot(
-                                title = "PHONE",
+                                title = stringResource(R.string.main_pivot_title),
                                 modifier = Modifier.weight(1f),
                                 pages = listOf<Pair<String, @Composable () -> Unit>>(
-                                    "history" to {
+                                    stringResource(R.string.main_page_history) to {
                                         HistoryPage(
                                             items = history,
                                             accent = accent.color,
@@ -421,7 +422,7 @@ class MainActivity : ComponentActivity() {
                                             },
                                         )
                                     },
-                                    "speed dial" to {
+                                    stringResource(R.string.main_page_speed_dial) to {
                                         SpeedDialPage(
                                             contacts = contacts,
                                             accent = accent.color,
@@ -433,7 +434,7 @@ class MainActivity : ComponentActivity() {
                                             },
                                         )
                                     },
-                                    "people" to {
+                                    stringResource(R.string.main_page_people) to {
                                         PeoplePage(contacts, accent.color) {
                                             push(Screen.Contact(it.id))
                                         }
@@ -442,22 +443,22 @@ class MainActivity : ComponentActivity() {
                             )
                             MetroAppBar(
                                 actions = listOf(
-                                    AppBarAction(Icons.Filled.Voicemail, "voicemail") {
+                                    AppBarAction(Icons.Filled.Voicemail, stringResource(R.string.main_action_voicemail)) {
                                         callVoicemail()
                                     },
-                                    AppBarAction(Icons.Filled.Dialpad, "keypad") {
+                                    AppBarAction(Icons.Filled.Dialpad, stringResource(R.string.main_action_keypad)) {
                                         push(Screen.Dialpad(""))
                                     },
-                                    AppBarAction(Icons.Filled.Search, "search") {
+                                    AppBarAction(Icons.Filled.Search, stringResource(R.string.main_action_search)) {
                                         push(Screen.Search)
                                     },
-                                    AppBarAction(Icons.Filled.Add, "new") {
+                                    AppBarAction(Icons.Filled.Add, stringResource(R.string.main_action_new)) {
                                         push(Screen.NewContact())
                                     },
                                 ),
                                 menu = listOf(
-                                    "settings" to { push(Screen.Settings) },
-                                    "delete all history" to { confirmClearHistory = true },
+                                    stringResource(R.string.main_menu_settings) to { push(Screen.Settings) },
+                                    stringResource(R.string.main_menu_delete_all_history) to { confirmClearHistory = true },
                                 ),
                             )
                         }
@@ -530,7 +531,11 @@ class MainActivity : ComponentActivity() {
                     ) {
                         Column(Modifier.align(Alignment.Center).padding(horizontal = 32.dp)) {
                             Text(
-                                if (group.size > 1) "delete ${group.size} calls?" else "delete this call?",
+                                if (group.size > 1) {
+                                    stringResource(R.string.main_confirm_delete_calls, group.size)
+                                } else {
+                                    stringResource(R.string.main_confirm_delete_call)
+                                },
                                 color = Metro.Foreground,
                                 fontSize = 26.sp,
                                 fontWeight = FontWeight.Light,
@@ -548,7 +553,7 @@ class MainActivity : ComponentActivity() {
                                     .Arrangement.spacedBy(10.dp),
                             ) {
                                 MetroButton(
-                                    "delete",
+                                    stringResource(R.string.main_button_delete),
                                     fill = Metro.Red,
                                     modifier = Modifier.weight(1f),
                                 ) {
@@ -558,7 +563,7 @@ class MainActivity : ComponentActivity() {
                                         refreshTick.value += 1
                                     }
                                 }
-                                MetroButton("cancel", modifier = Modifier.weight(1f)) {
+                                MetroButton(stringResource(R.string.main_button_cancel), modifier = Modifier.weight(1f)) {
                                     confirmDeleteGroup = null
                                 }
                             }
@@ -579,13 +584,13 @@ class MainActivity : ComponentActivity() {
                     ) {
                         Column(Modifier.align(Alignment.Center).padding(horizontal = 32.dp)) {
                             Text(
-                                "delete all call history?",
+                                stringResource(R.string.main_confirm_delete_all_history),
                                 color = Metro.Foreground,
                                 fontSize = 26.sp,
                                 fontWeight = FontWeight.Light,
                             )
                             Text(
-                                "this can't be undone",
+                                stringResource(R.string.main_confirm_cant_undo),
                                 color = Metro.Subtle,
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.Light,
@@ -596,7 +601,7 @@ class MainActivity : ComponentActivity() {
                                     .Arrangement.spacedBy(10.dp),
                             ) {
                                 MetroButton(
-                                    "delete",
+                                    stringResource(R.string.main_button_delete),
                                     fill = Metro.Red,
                                     modifier = Modifier.weight(1f),
                                 ) {
@@ -606,7 +611,7 @@ class MainActivity : ComponentActivity() {
                                         refreshTick.value += 1
                                     }
                                 }
-                                MetroButton("cancel", modifier = Modifier.weight(1f)) {
+                                MetroButton(stringResource(R.string.main_button_cancel), modifier = Modifier.weight(1f)) {
                                     confirmClearHistory = false
                                 }
                             }
@@ -659,7 +664,7 @@ class MainActivity : ComponentActivity() {
                     .padding(horizontal = 32.dp),
             ) {
                 Text(
-                    "CHOOSE A SIM",
+                    stringResource(R.string.main_choose_sim_title),
                     color = Metro.Foreground,
                     fontSize = 16.sp,
                     fontWeight = FontWeight.SemiBold,
@@ -697,7 +702,7 @@ class MainActivity : ComponentActivity() {
                                 .background(if (rememberChoice) accent else Color.Transparent),
                         )
                         Text(
-                            "always use for this contact",
+                            stringResource(R.string.main_choose_sim_remember),
                             color = Metro.Foreground,
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Light,

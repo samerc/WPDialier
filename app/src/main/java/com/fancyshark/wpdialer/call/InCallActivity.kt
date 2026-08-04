@@ -47,6 +47,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -150,12 +151,13 @@ private fun InCallRoot(onFinished: () -> Unit) {
     val caller by produceState<Pair<String?, String?>>(null to null, number) {
         value = Repo.lookupCaller(context, number)
     }
-    val displayName = caller.first ?: number.ifBlank { "unknown" }
+    val unknownLabel = stringResource(com.fancyshark.wpdialer.R.string.call_unknown)
+    val displayName = caller.first ?: number.ifBlank { unknownLabel }
     // The call object vanishes on disconnect before the ended screen shows —
     // keep the last caller name so it doesn't fall back to "unknown".
-    var lastKnownName by remember { mutableStateOf("unknown") }
+    var lastKnownName by remember { mutableStateOf(unknownLabel) }
     LaunchedEffect(displayName, call) {
-        if (call != null && displayName != "unknown") lastKnownName = displayName
+        if (call != null && displayName != unknownLabel) lastKnownName = displayName
     }
 
     Box(
@@ -191,10 +193,20 @@ private fun EndedScreen(name: String, onFinished: () -> Unit) {
         onFinished()
     }
     Column(Modifier.fillMaxSize().padding(24.dp)) {
-        Text("PHONE", color = Metro.Foreground, fontSize = 15.sp, letterSpacing = 2.sp)
+        Text(
+            stringResource(com.fancyshark.wpdialer.R.string.call_app_title),
+            color = Metro.Foreground,
+            fontSize = 15.sp,
+            letterSpacing = 2.sp,
+        )
         Spacer(Modifier.height(24.dp))
         Text(name, color = Metro.Foreground, fontSize = 40.sp, fontWeight = FontWeight.Light)
-        Text("call ended", color = Metro.Subtle, fontSize = 18.sp, fontWeight = FontWeight.Light)
+        Text(
+            stringResource(com.fancyshark.wpdialer.R.string.call_ended),
+            color = Metro.Subtle,
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Light,
+        )
     }
 }
 
@@ -211,10 +223,15 @@ private fun IncomingScreen(
     }
 
     Column(Modifier.fillMaxSize().padding(24.dp)) {
-        Text("PHONE", color = Metro.Foreground, fontSize = 15.sp, letterSpacing = 2.sp)
+        Text(
+            stringResource(com.fancyshark.wpdialer.R.string.call_app_title),
+            color = Metro.Foreground,
+            fontSize = 15.sp,
+            letterSpacing = 2.sp,
+        )
         Spacer(Modifier.height(6.dp))
         Text(
-            "incoming call",
+            stringResource(com.fancyshark.wpdialer.R.string.call_incoming),
             color = Metro.Subtle,
             fontSize = 17.sp,
             fontWeight = FontWeight.Light,
@@ -229,7 +246,10 @@ private fun IncomingScreen(
                 Spacer(Modifier.height(24.dp))
             }
             Text(
-                contactName ?: number.ifBlank { "unknown" },
+                contactName
+                    ?: number.ifBlank {
+                        stringResource(com.fancyshark.wpdialer.R.string.call_unknown)
+                    },
                 color = Metro.Foreground,
                 fontSize = if ((contactName ?: number).length > 14) 38.sp else 48.sp,
                 fontWeight = FontWeight.Light,
@@ -277,18 +297,22 @@ private fun IncomingScreen(
         }
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             MetroButton(
-                "answer",
+                stringResource(com.fancyshark.wpdialer.R.string.call_answer),
                 fill = accent,
                 modifier = Modifier.weight(1f),
             ) { CallManager.answer() }
             MetroButton(
-                "ignore",
+                stringResource(com.fancyshark.wpdialer.R.string.call_ignore),
                 modifier = Modifier.weight(1f),
             ) { CallManager.reject() }
         }
         Spacer(Modifier.height(10.dp))
         Text(
-            if (showReplies) "hide text replies" else "text reply",
+            if (showReplies) {
+                stringResource(com.fancyshark.wpdialer.R.string.call_hide_text_replies)
+            } else {
+                stringResource(com.fancyshark.wpdialer.R.string.call_text_reply)
+            },
             color = Metro.Subtle,
             fontSize = 17.sp,
             fontWeight = FontWeight.Light,
@@ -331,8 +355,9 @@ private fun ActiveScreen(
     }
     val connectTime = call?.details?.connectTimeMillis ?: 0L
     val statusLine = when (state) {
-        Call.STATE_DIALING, Call.STATE_CONNECTING -> "calling..."
-        Call.STATE_HOLDING -> "on hold"
+        Call.STATE_DIALING, Call.STATE_CONNECTING ->
+            stringResource(com.fancyshark.wpdialer.R.string.call_calling)
+        Call.STATE_HOLDING -> stringResource(com.fancyshark.wpdialer.R.string.call_on_hold)
         Call.STATE_ACTIVE -> {
             if (connectTime > 0) formatDuration((now - connectTime) / 1000) else "00:00"
         }
@@ -350,7 +375,12 @@ private fun ActiveScreen(
     Column(Modifier.fillMaxSize()) {
         // WP 8.1 places the caller info on a chrome-gray panel.
         Column(Modifier.fillMaxWidth().background(Metro.Key).padding(24.dp)) {
-        Text("PHONE", color = Metro.Foreground, fontSize = 15.sp, letterSpacing = 2.sp)
+        Text(
+            stringResource(com.fancyshark.wpdialer.R.string.call_app_title),
+            color = Metro.Foreground,
+            fontSize = 15.sp,
+            letterSpacing = 2.sp,
+        )
         Spacer(Modifier.height(28.dp))
         Text(statusLine, color = accent, fontSize = 19.sp, fontWeight = FontWeight.Normal)
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -400,13 +430,16 @@ private fun ActiveScreen(
                     .padding(12.dp),
             ) {
                 Text(
-                    "incoming call",
+                    stringResource(com.fancyshark.wpdialer.R.string.call_incoming),
                     color = Metro.Subtle,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Light,
                 )
                 Text(
-                    secondCaller.first ?: secondNumber.ifBlank { "unknown" },
+                    secondCaller.first
+                        ?: secondNumber.ifBlank {
+                            stringResource(com.fancyshark.wpdialer.R.string.call_unknown)
+                        },
                     color = Metro.Foreground,
                     fontSize = 26.sp,
                     fontWeight = FontWeight.Light,
@@ -415,11 +448,14 @@ private fun ActiveScreen(
                 Spacer(Modifier.height(10.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     MetroButton(
-                        "answer & hold",
+                        stringResource(com.fancyshark.wpdialer.R.string.call_answer_and_hold),
                         fill = accent,
                         modifier = Modifier.weight(1f),
                     ) { CallManager.answerWaiting() }
-                    MetroButton("ignore", modifier = Modifier.weight(1f)) {
+                    MetroButton(
+                        stringResource(com.fancyshark.wpdialer.R.string.call_ignore),
+                        modifier = Modifier.weight(1f),
+                    ) {
                         CallManager.rejectWaiting()
                     }
                 }
@@ -434,15 +470,21 @@ private fun ActiveScreen(
         } else {
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 IconTile(
-                    Icons.AutoMirrored.Filled.VolumeUp, "speaker", speakerOn, accent,
+                    Icons.AutoMirrored.Filled.VolumeUp,
+                    stringResource(com.fancyshark.wpdialer.R.string.call_speaker),
+                    speakerOn, accent,
                     modifier = Modifier.weight(1f),
                 ) { CallManager.setSpeaker(!speakerOn) }
                 IconTile(
-                    Icons.Filled.MicOff, "mute", muted, accent,
+                    Icons.Filled.MicOff,
+                    stringResource(com.fancyshark.wpdialer.R.string.call_mute),
+                    muted, accent,
                     modifier = Modifier.weight(1f),
                 ) { CallManager.setMuted(!muted) }
                 IconTile(
-                    Icons.Filled.Bluetooth, "Bluetooth", bluetoothOn, accent,
+                    Icons.Filled.Bluetooth,
+                    stringResource(com.fancyshark.wpdialer.R.string.call_bluetooth),
+                    bluetoothOn, accent,
                     enabled = bluetoothAvailable,
                     modifier = Modifier.weight(1f),
                 ) { CallManager.setBluetooth(!bluetoothOn) }
@@ -451,21 +493,29 @@ private fun ActiveScreen(
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 val context = androidx.compose.ui.platform.LocalContext.current
                 IconTile(
-                    Icons.Filled.Pause, "hold", held, accent,
+                    Icons.Filled.Pause,
+                    stringResource(com.fancyshark.wpdialer.R.string.call_hold),
+                    held, accent,
                     modifier = Modifier.weight(1f),
                 ) { CallManager.setHold(!held) }
                 if (secondCall != null && secondState == Call.STATE_HOLDING) {
                     IconTile(
-                        Icons.Filled.SwapCalls, "swap", false, accent,
+                        Icons.Filled.SwapCalls,
+                        stringResource(com.fancyshark.wpdialer.R.string.call_swap),
+                        false, accent,
                         modifier = Modifier.weight(1f),
                     ) { CallManager.swap() }
                     IconTile(
-                        Icons.Filled.CallMerge, "merge", false, accent,
+                        Icons.Filled.CallMerge,
+                        stringResource(com.fancyshark.wpdialer.R.string.call_merge),
+                        false, accent,
                         modifier = Modifier.weight(1f),
                     ) { CallManager.merge() }
                 } else {
                     IconTile(
-                        Icons.Filled.Add, "add call", false, accent,
+                        Icons.Filled.Add,
+                        stringResource(com.fancyshark.wpdialer.R.string.call_add_call),
+                        false, accent,
                         modifier = Modifier.weight(1f),
                     ) {
                         // Open the dialpad to dial the second call; telecom
@@ -486,11 +536,17 @@ private fun ActiveScreen(
         }
         Spacer(Modifier.height(6.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            MetroButton("end call", fill = accent, modifier = Modifier.weight(2f).height(64.dp)) {
+            MetroButton(
+                stringResource(com.fancyshark.wpdialer.R.string.call_end_call),
+                fill = accent,
+                modifier = Modifier.weight(2f).height(64.dp),
+            ) {
                 CallManager.hangup()
             }
             IconTile(
-                Icons.Filled.Dialpad, "keypad", showKeypad, accent,
+                Icons.Filled.Dialpad,
+                stringResource(com.fancyshark.wpdialer.R.string.call_keypad),
+                showKeypad, accent,
                 modifier = Modifier.weight(1f),
             ) { showKeypad = !showKeypad }
         }

@@ -47,6 +47,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
@@ -134,7 +135,10 @@ fun NewContactScreen(
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
             Text(
-                "NEW ${chosen.kindLabel.uppercase()} CONTACT",
+                stringResource(
+                    com.fancyshark.wpdialer.R.string.newcontact_title,
+                    chosen.kindLabel.uppercase(),
+                ),
                 color = Metro.Foreground,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.SemiBold,
@@ -153,7 +157,9 @@ fun NewContactScreen(
                         name,
                         { name = it },
                         accent,
-                        placeholder = "Name",
+                        placeholder = stringResource(
+                            com.fancyshark.wpdialer.R.string.newcontact_name,
+                        ),
                         textSize = 23.sp,
                         keyboardOptions = KeyboardOptions(
                             capitalization = KeyboardCapitalization.Words,
@@ -172,7 +178,9 @@ fun NewContactScreen(
                         if (preview != null) {
                             Image(
                                 preview,
-                                contentDescription = "change photo",
+                                contentDescription = stringResource(
+                                    com.fancyshark.wpdialer.R.string.newcontact_change_photo,
+                                ),
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier.size(76.dp),
                             )
@@ -187,14 +195,14 @@ fun NewContactScreen(
                     }
                 }
 
-                FieldLabel("Save to")
+                FieldLabel(stringResource(com.fancyshark.wpdialer.R.string.newcontact_save_to))
                 MetroSelector(
                     primary = chosen.kindLabel,
                     secondary = chosen.name,
                     accent = accent,
                 ) { showAccountPicker = true }
 
-                FieldLabel("Country (for phone numbers)")
+                FieldLabel(stringResource(com.fancyshark.wpdialer.R.string.newcontact_country))
                 MetroSelector(
                     primary = region?.label ?: regionCode,
                     secondary = null,
@@ -202,24 +210,28 @@ fun NewContactScreen(
                 ) { showCountryPicker = true }
 
                 TypedSection(
-                    title = "Phone",
+                    title = stringResource(com.fancyshark.wpdialer.R.string.newcontact_phone),
                     entries = phones,
                     typeLabels = ContactEditor.PHONE_TYPES.map { it.first },
                     accent = accent,
                     keyboardType = KeyboardType.Phone,
-                    placeholder = "Number",
+                    placeholder = stringResource(
+                        com.fancyshark.wpdialer.R.string.newcontact_number,
+                    ),
                 )
                 TypedSection(
-                    title = "Email",
+                    title = stringResource(com.fancyshark.wpdialer.R.string.newcontact_email),
                     entries = emails,
                     typeLabels = ContactEditor.EMAIL_TYPES.map { it.first },
                     accent = accent,
                     keyboardType = KeyboardType.Email,
-                    placeholder = "Email address",
+                    placeholder = stringResource(
+                        com.fancyshark.wpdialer.R.string.newcontact_email_address,
+                    ),
                 )
 
                 events.forEachIndexed { i, entry ->
-                    FieldLabel("Date")
+                    FieldLabel(stringResource(com.fancyshark.wpdialer.R.string.newcontact_date))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(
                             Modifier
@@ -242,7 +254,11 @@ fun NewContactScreen(
                                 .padding(horizontal = 10.dp, vertical = 12.dp),
                         ) {
                             Text(
-                                entry.value.ifEmpty { "Pick a date" },
+                                entry.value.ifEmpty {
+                                    stringResource(
+                                        com.fancyshark.wpdialer.R.string.newcontact_pick_a_date,
+                                    )
+                                },
                                 color = if (entry.value.isEmpty()) Metro.Subtle else Metro.Foreground,
                                 fontSize = 18.sp,
                             )
@@ -262,26 +278,42 @@ fun NewContactScreen(
                             entry.customLabel,
                             { events[i] = entry.copy(customLabel = it) },
                             accent,
-                            placeholder = "Custom label",
+                            placeholder = stringResource(
+                                com.fancyshark.wpdialer.R.string.newcontact_custom_label,
+                            ),
                         )
                     }
                 }
-                AddLink("add date", accent) { events.add(TypedEntry("", 0)) }
+                AddLink(
+                    stringResource(com.fancyshark.wpdialer.R.string.newcontact_add_date),
+                    accent,
+                ) { events.add(TypedEntry("", 0)) }
 
-                FieldLabel("Address")
+                FieldLabel(stringResource(com.fancyshark.wpdialer.R.string.newcontact_address))
                 MetroTextBox(
                     address,
                     { address = it },
                     accent,
-                    placeholder = "Street, city, country",
+                    placeholder = stringResource(
+                        com.fancyshark.wpdialer.R.string.newcontact_street_city_country,
+                    ),
                     keyboardOptions = KeyboardOptions(
                         capitalization = KeyboardCapitalization.Sentences,
                     ),
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-                    AddLink("pick on map", accent) { showMapPicker = true }
                     AddLink(
-                        if (locating) "locating..." else "use current location",
+                        stringResource(com.fancyshark.wpdialer.R.string.newcontact_pick_on_map),
+                        accent,
+                    ) { showMapPicker = true }
+                    AddLink(
+                        if (locating) {
+                            stringResource(com.fancyshark.wpdialer.R.string.newcontact_locating)
+                        } else {
+                            stringResource(
+                                com.fancyshark.wpdialer.R.string.newcontact_use_current_location,
+                            )
+                        },
                         accent,
                     ) {
                         if (!locating) {
@@ -312,12 +344,14 @@ fun NewContactScreen(
                     }
                 }
 
-                FieldLabel("Note")
+                FieldLabel(stringResource(com.fancyshark.wpdialer.R.string.newcontact_note))
                 MetroTextBox(
                     note,
                     { note = it },
                     accent,
-                    placeholder = "Note",
+                    placeholder = stringResource(
+                        com.fancyshark.wpdialer.R.string.newcontact_note,
+                    ),
                     singleLine = false,
                     minLines = 3,
                     keyboardOptions = KeyboardOptions(
@@ -329,7 +363,7 @@ fun NewContactScreen(
             }
             if (saveFailed) {
                 Text(
-                    "couldn't save the contact — check the account and try again",
+                    stringResource(com.fancyshark.wpdialer.R.string.newcontact_save_failed),
                     color = Metro.Red,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Light,
@@ -341,7 +375,11 @@ fun NewContactScreen(
                 modifier = Modifier.padding(vertical = 14.dp),
             ) {
                 MetroButton(
-                    if (saving) "saving..." else "save",
+                    if (saving) {
+                        stringResource(com.fancyshark.wpdialer.R.string.newcontact_saving)
+                    } else {
+                        stringResource(com.fancyshark.wpdialer.R.string.newcontact_save)
+                    },
                     fill = accent,
                     enabled = !saving &&
                         (name.isNotBlank() || phones.any { it.value.isNotBlank() }),
@@ -388,13 +426,19 @@ fun NewContactScreen(
                         }
                     }
                 }
-                MetroButton("cancel", modifier = Modifier.weight(1f)) { onDone() }
+                MetroButton(
+                    stringResource(com.fancyshark.wpdialer.R.string.newcontact_cancel),
+                    modifier = Modifier.weight(1f),
+                ) { onDone() }
             }
         }
 
         if (showAccountPicker) {
             BackHandler { showAccountPicker = false }
-            FullScreenPicker(title = "SAVE TO", onDismiss = { showAccountPicker = false }) {
+            FullScreenPicker(
+                title = stringResource(com.fancyshark.wpdialer.R.string.newcontact_save_to_caps),
+                onDismiss = { showAccountPicker = false },
+            ) {
                 accounts.forEach { account ->
                     val selected = account == chosen
                     Column(
@@ -441,10 +485,17 @@ fun NewContactScreen(
             BackHandler { showCountryPicker = false }
             var query by remember { mutableStateOf("") }
             FullScreenPicker(
-                title = "COUNTRY",
+                title = stringResource(com.fancyshark.wpdialer.R.string.newcontact_country_caps),
                 onDismiss = { showCountryPicker = false },
                 header = {
-                    MetroTextBox(query, { query = it }, accent, placeholder = "Search")
+                    MetroTextBox(
+                        query,
+                        { query = it },
+                        accent,
+                        placeholder = stringResource(
+                            com.fancyshark.wpdialer.R.string.newcontact_search,
+                        ),
+                    )
                     Spacer(Modifier.height(10.dp))
                 },
             ) {
@@ -516,7 +567,7 @@ private fun MapPinPicker(
             modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp),
         ) {
             Text(
-                "PICK A LOCATION",
+                stringResource(com.fancyshark.wpdialer.R.string.newcontact_pick_a_location),
                 color = Metro.Foreground,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.SemiBold,
@@ -542,7 +593,9 @@ private fun MapPinPicker(
             )
             androidx.compose.material3.Icon(
                 androidx.compose.material.icons.Icons.Filled.Place,
-                contentDescription = "pin",
+                contentDescription = stringResource(
+                    com.fancyshark.wpdialer.R.string.newcontact_pin,
+                ),
                 tint = accent,
                 modifier = Modifier
                     .align(Alignment.Center)
@@ -555,7 +608,11 @@ private fun MapPinPicker(
             modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp),
         ) {
             MetroButton(
-                if (resolving) "resolving..." else "use this location",
+                if (resolving) {
+                    stringResource(com.fancyshark.wpdialer.R.string.newcontact_resolving)
+                } else {
+                    stringResource(com.fancyshark.wpdialer.R.string.newcontact_use_this_location)
+                },
                 fill = accent,
                 enabled = !resolving,
                 modifier = Modifier.weight(1f),
@@ -569,7 +626,10 @@ private fun MapPinPicker(
                     onPicked(addr)
                 }
             }
-            MetroButton("cancel", modifier = Modifier.weight(1f)) { onCancel() }
+            MetroButton(
+                stringResource(com.fancyshark.wpdialer.R.string.newcontact_cancel),
+                modifier = Modifier.weight(1f),
+            ) { onCancel() }
         }
     }
 }
@@ -730,11 +790,16 @@ private fun TypedSection(
                 entry.customLabel,
                 { entries[i] = entry.copy(customLabel = it) },
                 accent,
-                placeholder = "Custom label",
+                placeholder = stringResource(
+                    com.fancyshark.wpdialer.R.string.newcontact_custom_label,
+                ),
             )
         }
     }
-    AddLink("add ${title.lowercase()}", accent) { entries.add(TypedEntry("", 0)) }
+    AddLink(
+        stringResource(com.fancyshark.wpdialer.R.string.newcontact_add_typed, title.lowercase()),
+        accent,
+    ) { entries.add(TypedEntry("", 0)) }
 }
 
 /** WP-style dropdown: white select box that opens a menu of options. */

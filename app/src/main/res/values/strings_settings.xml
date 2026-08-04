@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Settings screen -->
+    <string name="settings_toggle_on">On</string>
+    <string name="settings_toggle_off">Off</string>
+    <string name="settings_header">SETTINGS</string>
+    <string name="settings_title">phone</string>
+    <string name="settings_accent_title">Accent color</string>
+    <string name="settings_haptic_title">Haptic feedback</string>
+    <string name="settings_haptic_hint">vibrate on keypad taps — automatically off in battery saver</string>
+    <string name="settings_font_title">Font</string>
+    <string name="settings_font_selawik">Selawik (Windows Phone)</string>
+    <string name="settings_font_system">system font</string>
+    <string name="settings_default_apps_title">Default apps</string>
+    <string name="settings_default_dialer_yes">this app is your default phone app</string>
+    <string name="settings_default_dialer_prompt">to answer calls with the Metro screen, make this your default phone app</string>
+    <string name="settings_default_dialer_button">set as default phone app</string>
+    <string name="settings_google_disabled_title">Google phone app</string>
+    <string name="settings_google_disabled_body">Google\'s phone app is disabled, so only this app handles calls. If you ever uninstall this app, re-enable it first so your phone keeps a dialer.</string>
+    <string name="settings_google_app_info_button">open Google Phone app info</string>
+    <string name="settings_dup_notif_title">Duplicate call notifications</string>
+    <string name="settings_dup_notif_body">Google\'s phone app posts its own call notifications even when it isn\'t the default dialer. Turn its notifications off to see only this app\'s.</string>
+    <string name="settings_dup_notif_button">open Google Phone notification settings</string>
+    <string name="settings_dup_notif_locked_hint">On some phones (OnePlus, OPPO...) those toggles are locked. If so, open the app info page below and tap \"Disable\" — this app fully replaces Google\'s phone app, and you can re-enable it there anytime.</string>
+    <string name="settings_light_theme_title">Light theme</string>
+    <string name="settings_tilt_title">Tile tilt effect</string>
+    <string name="settings_relative_times_title">Relative times in history</string>
+    <string name="settings_relative_times_hint">on: \"2 hours ago\" — off: Windows Phone style \"Sat 01:06\"</string>
+    <string name="settings_text_replies_title">Text replies (decline with message)</string>
+    <string name="settings_new_reply_placeholder">New reply</string>
+    <string name="settings_add_reply_button">add reply</string>
+    <string name="settings_default_sim_title">Default SIM for calls</string>
+    <string name="settings_sim_always_ask">always ask</string>
+    <string name="settings_blocked_title">Blocked numbers</string>
+    <string name="settings_blocked_none">none — block numbers from the history list</string>
+    <string name="settings_unblock">unblock</string>
+    <string name="settings_about_title">About</string>
+    <string name="settings_about_link">about this app</string>
+
+    <!-- About screen -->
+    <string name="about_header">SETTINGS</string>
+    <string name="about_title">about</string>
+    <string name="about_app_name">Dialer 8</string>
+    <string name="about_tagline">a Windows Phone styled dialer</string>
+    <string name="about_version">version</string>
+    <string name="about_feedback_subject">Dialer 8 feedback</string>
+    <string name="about_contact">contact</string>
+    <string name="about_privacy">privacy policy</string>
+    <string name="about_privacy_hint">everything stays on your phone — read the policy</string>
+</resources>

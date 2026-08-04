@@ -89,7 +89,8 @@ class WpInCallService : InCallService() {
     }
 
     private fun postOngoingNotification(call: Call) {
-        val number = call.details.handle?.schemeSpecificPart ?: "unknown"
+        val number = call.details.handle?.schemeSpecificPart
+            ?: getString(com.fancyshark.wpdialer.R.string.call_unknown)
         val s = scope ?: run {
             postOngoingNotificationNow(number)
             return
@@ -108,7 +109,9 @@ class WpInCallService : InCallService() {
         val nm = getSystemService(NotificationManager::class.java)
         nm.createNotificationChannel(
             NotificationChannel(
-                ONGOING_CHANNEL_ID, "Ongoing calls", NotificationManager.IMPORTANCE_LOW,
+                ONGOING_CHANNEL_ID,
+                getString(com.fancyshark.wpdialer.R.string.notif_channel_ongoing),
+                NotificationManager.IMPORTANCE_LOW,
             ),
         )
         val open = PendingIntent.getActivity(
@@ -177,7 +180,9 @@ class WpInCallService : InCallService() {
         val nm = getSystemService(NotificationManager::class.java)
         nm.createNotificationChannel(
             NotificationChannel(
-                MISSED_CHANNEL_ID, "Missed calls", NotificationManager.IMPORTANCE_DEFAULT,
+                MISSED_CHANNEL_ID,
+                getString(com.fancyshark.wpdialer.R.string.notif_channel_missed),
+                NotificationManager.IMPORTANCE_DEFAULT,
             ),
         )
         val number = call.details.handle?.schemeSpecificPart ?: return
@@ -205,13 +210,25 @@ class WpInCallService : InCallService() {
                 ),
             )
             .setColor(com.fancyshark.wpdialer.ui.AccentStore.accent.value.color.toArgb())
-            .setContentTitle("Missed call")
+            .setContentTitle(getString(com.fancyshark.wpdialer.R.string.notif_missed_call))
             .setContentText(number)
             .setCategory(Notification.CATEGORY_MISSED_CALL)
             .setContentIntent(open)
             .setAutoCancel(true)
-            .addAction(Notification.Action.Builder(null, "call back", callBack).build())
-            .addAction(Notification.Action.Builder(null, "text", text).build())
+            .addAction(
+                Notification.Action.Builder(
+                    null,
+                    getString(com.fancyshark.wpdialer.R.string.notif_call_back),
+                    callBack,
+                ).build(),
+            )
+            .addAction(
+                Notification.Action.Builder(
+                    null,
+                    getString(com.fancyshark.wpdialer.R.string.notif_text),
+                    text,
+                ).build(),
+            )
             .build()
         runCatching { nm.notify(number.hashCode(), notification) }
     }
@@ -229,7 +246,8 @@ class WpInCallService : InCallService() {
     }
 
     private fun postIncomingNotification(call: Call) {
-        val number = call.details.handle?.schemeSpecificPart ?: "unknown"
+        val number = call.details.handle?.schemeSpecificPart
+            ?: getString(com.fancyshark.wpdialer.R.string.call_unknown)
         val s = scope ?: run {
             postIncomingNotificationNow(number, number, null)
             return
@@ -260,8 +278,11 @@ class WpInCallService : InCallService() {
     ) {
         val nm = getSystemService(NotificationManager::class.java)
         nm.createNotificationChannel(
-            NotificationChannel(CHANNEL_ID, "Incoming calls", NotificationManager.IMPORTANCE_HIGH)
-                .apply { setSound(null, null) },
+            NotificationChannel(
+                CHANNEL_ID,
+                getString(com.fancyshark.wpdialer.R.string.notif_channel_incoming),
+                NotificationManager.IMPORTANCE_HIGH,
+            ).apply { setSound(null, null) },
         )
         val fullScreen = PendingIntent.getActivity(
             this, 1,
@@ -288,7 +309,11 @@ class WpInCallService : InCallService() {
         views.setTextViewText(com.fancyshark.wpdialer.R.id.caller_name, display)
         views.setTextViewText(
             com.fancyshark.wpdialer.R.id.caller_number,
-            if (display != number) number else "incoming call",
+            if (display != number) {
+                number
+            } else {
+                getString(com.fancyshark.wpdialer.R.string.notif_incoming_call)
+            },
         )
         if (photo != null) {
             views.setImageViewBitmap(com.fancyshark.wpdialer.R.id.caller_photo, photo)

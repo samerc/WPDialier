@@ -25,6 +25,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import com.fancyshark.wpdialer.R
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -51,7 +53,11 @@ private fun WpToggleRow(checked: Boolean, accent: Color, onChange: (Boolean) -> 
             .clickable { onChange(!checked) },
     ) {
         Text(
-            if (checked) "On" else "Off",
+            if (checked) {
+                stringResource(R.string.settings_toggle_on)
+            } else {
+                stringResource(R.string.settings_toggle_off)
+            },
             color = Metro.Foreground,
             fontSize = 22.sp,
             fontWeight = FontWeight.Light,
@@ -89,14 +95,14 @@ fun SettingsScreen(
             .padding(horizontal = 20.dp),
     ) {
         Text(
-            "SETTINGS",
+            stringResource(R.string.settings_header),
             color = Metro.Foreground,
             fontSize = 15.sp,
             letterSpacing = 2.sp,
             modifier = Modifier.padding(top = 18.dp),
         )
         Text(
-            "phone",
+            stringResource(R.string.settings_title),
             color = Metro.Foreground,
             fontSize = 48.sp,
             fontWeight = FontWeight.Light,
@@ -104,7 +110,7 @@ fun SettingsScreen(
         Spacer(Modifier.height(18.dp))
 
         Text(
-            "Accent color",
+            stringResource(R.string.settings_accent_title),
             color = accent.color,
             fontSize = 14.sp,
             fontWeight = FontWeight.SemiBold,
@@ -140,7 +146,7 @@ fun SettingsScreen(
         Spacer(Modifier.height(30.dp))
         val haptics by Haptics.enabled.collectAsState()
         Text(
-            "Haptic feedback",
+            stringResource(R.string.settings_haptic_title),
             color = accent.color,
             fontSize = 14.sp,
             fontWeight = FontWeight.SemiBold,
@@ -153,7 +159,11 @@ fun SettingsScreen(
                 .clickable { Haptics.set(context, !haptics) },
         ) {
             Text(
-                if (haptics) "On" else "Off",
+                if (haptics) {
+                    stringResource(R.string.settings_toggle_on)
+                } else {
+                    stringResource(R.string.settings_toggle_off)
+                },
                 color = Metro.Foreground,
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Light,
@@ -176,7 +186,7 @@ fun SettingsScreen(
             }
         }
         Text(
-            "vibrate on keypad taps — automatically off in battery saver",
+            stringResource(R.string.settings_haptic_hint),
             color = Metro.Subtle,
             fontSize = 13.sp,
             fontWeight = FontWeight.Light,
@@ -206,15 +216,15 @@ fun SettingsScreen(
         Spacer(Modifier.height(30.dp))
         val selawik by FontStore.selawik.collectAsState()
         Text(
-            "Font",
+            stringResource(R.string.settings_font_title),
             color = accent.color,
             fontSize = 14.sp,
             fontWeight = FontWeight.SemiBold,
             letterSpacing = 1.sp,
         )
         listOf(
-            "Selawik (Windows Phone)" to true,
-            "system font" to false,
+            stringResource(R.string.settings_font_selawik) to true,
+            stringResource(R.string.settings_font_system) to false,
         ).forEach { (label, value) ->
             Text(
                 label,
@@ -230,7 +240,7 @@ fun SettingsScreen(
 
         Spacer(Modifier.height(30.dp))
         Text(
-            "Default apps",
+            stringResource(R.string.settings_default_apps_title),
             color = accent.color,
             fontSize = 14.sp,
             fontWeight = FontWeight.SemiBold,
@@ -239,20 +249,23 @@ fun SettingsScreen(
         )
         if (isDefaultDialer) {
             Text(
-                "this app is your default phone app",
+                stringResource(R.string.settings_default_dialer_yes),
                 color = Metro.Foreground,
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Light,
             )
         } else {
             Text(
-                "to answer calls with the Metro screen, make this your default phone app",
+                stringResource(R.string.settings_default_dialer_prompt),
                 color = Metro.Foreground,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Light,
                 modifier = Modifier.padding(bottom = 12.dp),
             )
-            MetroButton("set as default phone app", modifier = Modifier.fillMaxWidth()) {
+            MetroButton(
+                stringResource(R.string.settings_default_dialer_button),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
                 onRequestDefault()
             }
         }
@@ -269,21 +282,21 @@ fun SettingsScreen(
         if (googleDialerEnabled == false) {
             Spacer(Modifier.height(30.dp))
             Text(
-                "Google phone app",
+                stringResource(R.string.settings_google_disabled_title),
                 color = accent.color,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.SemiBold,
                 letterSpacing = 1.sp,
             )
             Text(
-                "Google's phone app is disabled, so only this app handles calls. If you ever uninstall this app, re-enable it first so your phone keeps a dialer.",
+                stringResource(R.string.settings_google_disabled_body),
                 color = Metro.Foreground,
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Light,
                 modifier = Modifier.padding(top = 6.dp, bottom = 10.dp),
             )
             MetroButton(
-                "open Google Phone app info",
+                stringResource(R.string.settings_google_app_info_button),
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 runCatching {
@@ -299,21 +312,21 @@ fun SettingsScreen(
         if (googleDialerEnabled == true) {
             Spacer(Modifier.height(30.dp))
             Text(
-                "Duplicate call notifications",
+                stringResource(R.string.settings_dup_notif_title),
                 color = accent.color,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.SemiBold,
                 letterSpacing = 1.sp,
             )
             Text(
-                "Google's phone app posts its own call notifications even when it isn't the default dialer. Turn its notifications off to see only this app's.",
+                stringResource(R.string.settings_dup_notif_body),
                 color = Metro.Foreground,
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Light,
                 modifier = Modifier.padding(top = 6.dp, bottom = 10.dp),
             )
             MetroButton(
-                "open Google Phone notification settings",
+                stringResource(R.string.settings_dup_notif_button),
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 runCatching {
@@ -328,14 +341,14 @@ fun SettingsScreen(
                 }
             }
             Text(
-                "On some phones (OnePlus, OPPO...) those toggles are locked. If so, open the app info page below and tap \"Disable\" — this app fully replaces Google's phone app, and you can re-enable it there anytime.",
+                stringResource(R.string.settings_dup_notif_locked_hint),
                 color = Metro.Subtle,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Light,
                 modifier = Modifier.padding(top = 12.dp, bottom = 10.dp),
             )
             MetroButton(
-                "open Google Phone app info",
+                stringResource(R.string.settings_google_app_info_button),
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 runCatching {
@@ -352,7 +365,7 @@ fun SettingsScreen(
         Spacer(Modifier.height(30.dp))
         val light by AppPrefs.light.collectAsState()
         Text(
-            "Light theme",
+            stringResource(R.string.settings_light_theme_title),
             color = accent.color,
             fontSize = 14.sp,
             fontWeight = FontWeight.SemiBold,
@@ -366,7 +379,7 @@ fun SettingsScreen(
         Spacer(Modifier.height(30.dp))
         val tilt by AppPrefs.tilt.collectAsState()
         Text(
-            "Tile tilt effect",
+            stringResource(R.string.settings_tilt_title),
             color = accent.color,
             fontSize = 14.sp,
             fontWeight = FontWeight.SemiBold,
@@ -377,7 +390,7 @@ fun SettingsScreen(
         Spacer(Modifier.height(30.dp))
         val relativeTimes by AppPrefs.relativeTimes.collectAsState()
         Text(
-            "Relative times in history",
+            stringResource(R.string.settings_relative_times_title),
             color = accent.color,
             fontSize = 14.sp,
             fontWeight = FontWeight.SemiBold,
@@ -385,7 +398,7 @@ fun SettingsScreen(
         )
         WpToggleRow(relativeTimes, accent.color) { AppPrefs.setRelativeTimes(context, it) }
         Text(
-            "on: \"2 hours ago\" — off: Windows Phone style \"Sat 01:06\"",
+            stringResource(R.string.settings_relative_times_hint),
             color = Metro.Subtle,
             fontSize = 13.sp,
             fontWeight = FontWeight.Light,
@@ -398,7 +411,7 @@ fun SettingsScreen(
             androidx.compose.runtime.mutableStateOf("")
         }
         Text(
-            "Text replies (decline with message)",
+            stringResource(R.string.settings_text_replies_title),
             color = accent.color,
             fontSize = 14.sp,
             fontWeight = FontWeight.SemiBold,
@@ -430,9 +443,17 @@ fun SettingsScreen(
             }
         }
         Spacer(Modifier.height(6.dp))
-        MetroTextBox(newReply, { newReply = it }, accent.color, placeholder = "New reply")
+        MetroTextBox(
+            newReply,
+            { newReply = it },
+            accent.color,
+            placeholder = stringResource(R.string.settings_new_reply_placeholder),
+        )
         Spacer(Modifier.height(8.dp))
-        MetroButton("add reply", enabled = newReply.isNotBlank()) {
+        MetroButton(
+            stringResource(R.string.settings_add_reply_button),
+            enabled = newReply.isNotBlank(),
+        ) {
             AppPrefs.setRejectMessages(context, replies + newReply.trim())
             newReply = ""
         }
@@ -442,14 +463,16 @@ fun SettingsScreen(
             Spacer(Modifier.height(30.dp))
             val globalSim by AppPrefs.globalSim.collectAsState()
             Text(
-                "Default SIM for calls",
+                stringResource(R.string.settings_default_sim_title),
                 color = accent.color,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.SemiBold,
                 letterSpacing = 1.sp,
                 modifier = Modifier.padding(bottom = 4.dp),
             )
-            (listOf<Pair<String, String?>>("always ask" to null) +
+            (listOf<Pair<String, String?>>(
+                stringResource(R.string.settings_sim_always_ask) to null,
+            ) +
                 sims.map { it.label to it.flat }
                 ).forEach { (label, flat) ->
                 Text(
@@ -476,7 +499,7 @@ fun SettingsScreen(
         }
         val settingsScope = androidx.compose.runtime.rememberCoroutineScope()
         Text(
-            "Blocked numbers",
+            stringResource(R.string.settings_blocked_title),
             color = accent.color,
             fontSize = 14.sp,
             fontWeight = FontWeight.SemiBold,
@@ -485,7 +508,7 @@ fun SettingsScreen(
         )
         if (blocked.isEmpty()) {
             Text(
-                "none — block numbers from the history list",
+                stringResource(R.string.settings_blocked_none),
                 color = Metro.Foreground,
                 fontSize = 17.sp,
                 fontWeight = FontWeight.Light,
@@ -504,7 +527,7 @@ fun SettingsScreen(
                     modifier = Modifier.weight(1f),
                 )
                 Text(
-                    "unblock",
+                    stringResource(R.string.settings_unblock),
                     color = accent.color,
                     fontSize = 16.sp,
                     modifier = Modifier.clickable {
@@ -519,13 +542,13 @@ fun SettingsScreen(
 
         Spacer(Modifier.height(30.dp))
         Text(
-            "About",
+            stringResource(R.string.settings_about_title),
             color = accent.color,
             fontSize = 14.sp,
             fontWeight = FontWeight.SemiBold,
         )
         Text(
-            "about this app",
+            stringResource(R.string.settings_about_link),
             color = Metro.Foreground,
             fontSize = 22.sp,
             fontWeight = FontWeight.Light,

@@ -39,6 +39,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -66,7 +67,7 @@ fun HistoryPage(
     val context = androidx.compose.ui.platform.LocalContext.current
     if (items.isEmpty()) {
         Text(
-            "To make a call, tap an icon below.",
+            stringResource(com.fancyshark.wpdialer.R.string.home_history_empty),
             color = Metro.Subtle,
             fontSize = 20.sp,
             fontWeight = FontWeight.Light,
@@ -111,7 +112,7 @@ fun HistoryPage(
                         val label = item.name?.takeIf { it.isNotBlank() }
                             ?: item.number.takeIf { it.isNotBlank() }
                                 ?.let { Repo.pretty(context, it) }
-                            ?: "unknown"
+                            ?: stringResource(com.fancyshark.wpdialer.R.string.home_unknown)
                         Text(
                             if (group.size > 1) "$label (${group.size})" else label,
                             color = if (missed) accent else Metro.Foreground,
@@ -121,10 +122,11 @@ fun HistoryPage(
                             overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                         )
                         Text(
-                            "${
-                                Repo.historyTypeLabel(item.type).removeSuffix(" call")
-                                    .replaceFirstChar { it.uppercase() }
-                            }, ${Repo.historyWhen(item.date)}",
+                            stringResource(
+                                com.fancyshark.wpdialer.R.string.home_history_subtitle,
+                                Repo.historyTypeShort(context, item.type),
+                                Repo.historyWhen(item.date),
+                            ),
                             color = Metro.Subtle,
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Light,
@@ -141,7 +143,7 @@ fun HistoryPage(
                         ) {
                             androidx.compose.material3.Icon(
                                 Icons.Filled.Phone,
-                                contentDescription = "call",
+                                contentDescription = stringResource(com.fancyshark.wpdialer.R.string.home_call),
                                 tint = Metro.Foreground,
                                 modifier = Modifier.size(18.dp),
                             )
@@ -158,10 +160,10 @@ fun HistoryPage(
                             onDismissRequest = { menuForId = null },
                         ) {
                             listOf(
-                                "details" to { onDetails(item) },
-                                "delete" to { onDelete(group.toList()) },
-                                "add to speed dial" to { onAddSpeedDial(item.number) },
-                                "block" to { onBlock(item.number) },
+                                stringResource(com.fancyshark.wpdialer.R.string.home_details) to { onDetails(item) },
+                                stringResource(com.fancyshark.wpdialer.R.string.home_delete) to { onDelete(group.toList()) },
+                                stringResource(com.fancyshark.wpdialer.R.string.home_add_to_speed_dial) to { onAddSpeedDial(item.number) },
+                                stringResource(com.fancyshark.wpdialer.R.string.home_block) to { onBlock(item.number) },
                             ).forEach { (label, action) ->
                                 androidx.compose.material3.DropdownMenuItem(
                                     text = {
@@ -189,27 +191,27 @@ fun HistoryPage(
                         if (item.number.isNotBlank()) {
                             HistoryAction(
                                 Icons.Filled.Phone,
-                                "call", accent,
+                                stringResource(com.fancyshark.wpdialer.R.string.home_call), accent,
                             ) { onCall(item.number) }
                             HistoryAction(
                                 Icons.AutoMirrored.Filled.Message,
-                                "text", accent,
+                                stringResource(com.fancyshark.wpdialer.R.string.home_text), accent,
                             ) { onText(item.number) }
                             if (item.name.isNullOrBlank()) {
                                 HistoryAction(
                                     Icons.Filled.PersonAdd,
-                                    "save", accent,
+                                    stringResource(com.fancyshark.wpdialer.R.string.home_save), accent,
                                 ) { onSave(item.number) }
                             } else {
                                 HistoryAction(
                                     Icons.Filled.Person,
-                                    "profile", accent,
+                                    stringResource(com.fancyshark.wpdialer.R.string.home_profile), accent,
                                 ) { onProfile(item.number) }
                             }
                         }
                         HistoryAction(
                             Icons.Filled.Delete,
-                            "delete", accent,
+                            stringResource(com.fancyshark.wpdialer.R.string.home_delete), accent,
                         ) {
                             expandedId = null
                             onDelete(group.toList())
@@ -217,7 +219,7 @@ fun HistoryPage(
                         if (item.number.isNotBlank()) {
                             HistoryAction(
                                 Icons.Filled.Block,
-                                "block", accent,
+                                stringResource(com.fancyshark.wpdialer.R.string.home_block), accent,
                             ) {
                                 expandedId = null
                                 onBlock(item.number)
@@ -289,12 +291,17 @@ fun CallDetailsScreen(
             .padding(horizontal = 20.dp),
     ) {
         Text(
-            "PHONE",
+            stringResource(com.fancyshark.wpdialer.R.string.home_details_app_header),
             color = Metro.Foreground,
             fontSize = 15.sp,
             modifier = Modifier.padding(top = 18.dp),
         )
-        Text("details", color = Metro.Foreground, fontSize = 48.sp, fontWeight = FontWeight.Light)
+        Text(
+            stringResource(com.fancyshark.wpdialer.R.string.home_details),
+            color = Metro.Foreground,
+            fontSize = 48.sp,
+            fontWeight = FontWeight.Light,
+        )
         Spacer(Modifier.height(10.dp))
         Text(
             name?.takeIf { it.isNotBlank() } ?: Repo.pretty(context, number),
@@ -309,8 +316,14 @@ fun CallDetailsScreen(
         }
         Spacer(Modifier.height(12.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
-            HistoryAction(Icons.Filled.Phone, "call", accent) { onCall(number) }
-            HistoryAction(Icons.AutoMirrored.Filled.Message, "text", accent) { onText(number) }
+            HistoryAction(
+                Icons.Filled.Phone,
+                stringResource(com.fancyshark.wpdialer.R.string.home_call), accent,
+            ) { onCall(number) }
+            HistoryAction(
+                Icons.AutoMirrored.Filled.Message,
+                stringResource(com.fancyshark.wpdialer.R.string.home_text), accent,
+            ) { onText(number) }
         }
         Spacer(Modifier.height(14.dp))
         LazyColumn(Modifier.fillMaxSize()) {
@@ -324,10 +337,12 @@ fun CallDetailsScreen(
                         fontWeight = FontWeight.Light,
                     )
                     Text(
-                        Repo.historyTypeLabel(e.type).removeSuffix(" call")
-                            .replaceFirstChar { it.uppercase() } +
+                        Repo.historyTypeShort(context, e.type) +
                             if (e.duration > 0) {
-                                "  ·  Duration ${Repo.formatDuration(e.duration)}"
+                                stringResource(
+                                    com.fancyshark.wpdialer.R.string.home_details_duration,
+                                    Repo.formatDuration(e.duration),
+                                )
                             } else "",
                         color = Metro.Subtle,
                         fontSize = 14.sp,
@@ -354,7 +369,7 @@ fun SpeedDialPage(
     val starred = contacts.filter { it.starred }
     if (starred.isEmpty() && numbers.isEmpty()) {
         Text(
-            "Pin favorites from a contact's profile, or long-press a history entry and choose \"add to speed dial\".",
+            stringResource(com.fancyshark.wpdialer.R.string.home_speed_dial_empty),
             color = Metro.Subtle,
             fontSize = 20.sp,
             fontWeight = FontWeight.Light,
@@ -451,7 +466,7 @@ fun PeoplePage(
 ) {
     if (contacts.isEmpty()) {
         Text(
-            "no contacts",
+            stringResource(com.fancyshark.wpdialer.R.string.home_no_contacts),
             color = Metro.Subtle,
             fontSize = 18.sp,
             fontWeight = FontWeight.Light,

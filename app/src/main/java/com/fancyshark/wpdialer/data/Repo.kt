@@ -260,7 +260,7 @@ object Repo {
                             ContactsContract.CommonDataKinds.Event.CONTENT_ITEM_TYPE ->
                                 if (value != null) {
                                     events += ContactEvent(
-                                        eventTypeLabel(c.getInt(3), c.getString(4)),
+                                        eventTypeLabel(context, c.getInt(3), c.getString(4)),
                                         formatEventDate(value),
                                     )
                                 }
@@ -289,7 +289,10 @@ object Repo {
                                     appActions += ContactAppAction(
                                         c.getLong(0),
                                         mimetype,
-                                        c.getString(3)?.takeIf { it.isNotBlank() } ?: "app",
+                                        c.getString(3)?.takeIf { it.isNotBlank() }
+                                            ?: context.getString(
+                                                com.fancyshark.wpdialer.R.string.data_app_fallback,
+                                            ),
                                         label,
                                         value,
                                         c.getString(6),
@@ -339,7 +342,10 @@ object Repo {
                             appActions += ContactAppAction(
                                 c.getLong(0),
                                 mimetype,
-                                c.getString(3)?.takeIf { it.isNotBlank() } ?: "app",
+                                c.getString(3)?.takeIf { it.isNotBlank() }
+                                            ?: context.getString(
+                                                com.fancyshark.wpdialer.R.string.data_app_fallback,
+                                            ),
                                 label,
                                 c.getString(2),
                                 c.getString(5),
@@ -401,29 +407,31 @@ object Repo {
     private val NOTE_EVENT_LINE =
         Regex("""([^=]+?)\s*=\s*(\d{4}-\d{2}-\d{2})(?:[T ][\d:.]+\s*(?:[+-]\d{2}:?\d{2}|Z)?)?""")
 
-    private fun eventTypeLabel(type: Int, custom: String?): String = when (type) {
-        ContactsContract.CommonDataKinds.Event.TYPE_ANNIVERSARY -> "anniversary"
-        ContactsContract.CommonDataKinds.Event.TYPE_BIRTHDAY -> "birthday"
-        ContactsContract.CommonDataKinds.Event.TYPE_CUSTOM ->
-            custom?.takeIf { it.isNotBlank() }?.lowercase() ?: "date"
-        else -> "date"
-    }
+    private fun eventTypeLabel(context: Context, type: Int, custom: String?): String =
+        when (type) {
+            ContactsContract.CommonDataKinds.Event.TYPE_ANNIVERSARY ->
+                context.getString(com.fancyshark.wpdialer.R.string.data_event_anniversary)
+            ContactsContract.CommonDataKinds.Event.TYPE_BIRTHDAY ->
+                context.getString(com.fancyshark.wpdialer.R.string.data_event_birthday)
+            ContactsContract.CommonDataKinds.Event.TYPE_CUSTOM ->
+                custom?.takeIf { it.isNotBlank() }?.lowercase()
+                    ?: context.getString(com.fancyshark.wpdialer.R.string.data_event_date)
+            else -> context.getString(com.fancyshark.wpdialer.R.string.data_event_date)
+        }
 
-    private val MONTHS = arrayOf(
-        "January", "February", "March", "April", "May", "June",
-        "July", "August", "September", "October", "November", "December",
-    )
+    private fun monthName(month: Int): String =
+        java.text.DateFormatSymbols().months.getOrNull(month - 1) ?: month.toString()
 
     /** "1987-05-22" -> "May 22, 1987"; "--05-22" (yearless) -> "May 22". */
     private fun formatEventDate(raw: String): String {
         Regex("""^--(\d{2})-(\d{2})""").find(raw.trim())?.let { m ->
             val month = m.groupValues[1].toInt()
-            if (month in 1..12) return "${MONTHS[month - 1]} ${m.groupValues[2].toInt()}"
+            if (month in 1..12) return "${monthName(month)} ${m.groupValues[2].toInt()}"
         }
         Regex("""(\d{4})-(\d{2})-(\d{2})""").find(raw)?.let { m ->
             val month = m.groupValues[2].toInt()
             if (month in 1..12) {
-                return "${MONTHS[month - 1]} ${m.groupValues[3].toInt()}, ${m.groupValues[1]}"
+                return "${monthName(month)} ${m.groupValues[3].toInt()}, ${m.groupValues[1]}"
             }
         }
         return raw
@@ -648,15 +656,30 @@ object Repo {
             }.getOrNull()
         }
 
-    fun historyTypeLabel(type: Int): String = when (type) {
-        CallLog.Calls.INCOMING_TYPE -> "incoming call"
-        CallLog.Calls.OUTGOING_TYPE -> "outgoing call"
-        CallLog.Calls.MISSED_TYPE -> "missed call"
-        CallLog.Calls.REJECTED_TYPE -> "declined call"
-        CallLog.Calls.VOICEMAIL_TYPE -> "voicemail"
-        CallLog.Calls.BLOCKED_TYPE -> "blocked call"
-        else -> "call"
-    }
+    fun historyTypeLabel(context: Context, type: Int): String = context.getString(
+        when (type) {
+            CallLog.Calls.INCOMING_TYPE -> com.fancyshark.wpdialer.R.string.data_call_incoming
+            CallLog.Calls.OUTGOING_TYPE -> com.fancyshark.wpdialer.R.string.data_call_outgoing
+            CallLog.Calls.MISSED_TYPE -> com.fancyshark.wpdialer.R.string.data_call_missed
+            CallLog.Calls.REJECTED_TYPE -> com.fancyshark.wpdialer.R.string.data_call_declined
+            CallLog.Calls.VOICEMAIL_TYPE -> com.fancyshark.wpdialer.R.string.data_call_voicemail
+            CallLog.Calls.BLOCKED_TYPE -> com.fancyshark.wpdialer.R.string.data_call_blocked
+            else -> com.fancyshark.wpdialer.R.string.data_call_generic
+        },
+    )
+
+    /** Short capitalized form for history sublines ("Outgoing, Sat 01:06"). */
+    fun historyTypeShort(context: Context, type: Int): String = context.getString(
+        when (type) {
+            CallLog.Calls.INCOMING_TYPE -> com.fancyshark.wpdialer.R.string.data_call_incoming_short
+            CallLog.Calls.OUTGOING_TYPE -> com.fancyshark.wpdialer.R.string.data_call_outgoing_short
+            CallLog.Calls.MISSED_TYPE -> com.fancyshark.wpdialer.R.string.data_call_missed_short
+            CallLog.Calls.REJECTED_TYPE -> com.fancyshark.wpdialer.R.string.data_call_declined_short
+            CallLog.Calls.VOICEMAIL_TYPE -> com.fancyshark.wpdialer.R.string.data_call_voicemail_short
+            CallLog.Calls.BLOCKED_TYPE -> com.fancyshark.wpdialer.R.string.data_call_blocked_short
+            else -> com.fancyshark.wpdialer.R.string.data_call_generic_short
+        },
+    )
 
     fun relativeTime(date: Long): String =
         DateUtils.getRelativeTimeSpanString(

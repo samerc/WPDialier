@@ -51,7 +51,7 @@
         android:padding="11dp"
         android:src="@drawable/ic_wp_decline"
         android:background="@drawable/bg_wp_decline"
-        android:contentDescription="decline" />
+        android:contentDescription="@string/notif_decline" />
 
     <ImageView
         android:id="@+id/btn_answer"
@@ -61,5 +61,5 @@
         android:padding="10dp"
         android:src="@drawable/ic_wp_answer"
         android:background="@drawable/bg_wp_answer"
-        android:contentDescription="answer" />
+        android:contentDescription="@string/notif_answer" />
 </LinearLayout>
