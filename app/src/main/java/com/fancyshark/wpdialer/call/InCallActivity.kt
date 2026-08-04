@@ -388,7 +388,7 @@ private fun ActiveScreen(
         }
         Spacer(Modifier.height(6.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            MetroButton("end call", fill = accent, modifier = Modifier.weight(2f)) {
+            MetroButton("end call", fill = accent, modifier = Modifier.weight(2f).height(64.dp)) {
                 CallManager.hangup()
             }
             IconTile(

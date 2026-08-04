@@ -4,6 +4,7 @@ import android.media.AudioManager
 import android.media.ToneGenerator
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -19,6 +20,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Backspace
+import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -37,7 +39,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.fancyshark.wpdialer.ui.Haptics
 import com.fancyshark.wpdialer.ui.Metro
-import com.fancyshark.wpdialer.ui.MetroButton
 import com.fancyshark.wpdialer.ui.metroTilt
 
 private val KEYS = listOf(
@@ -144,16 +145,75 @@ fun DialpadScreen(
             }
         }
 
-        Spacer(Modifier.height(14.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            MetroButton("call", modifier = Modifier.weight(1f)) {
+        Spacer(Modifier.height(5.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+            CallTile(accent, modifier = Modifier.weight(2f)) {
                 if (number.isNotBlank()) onCall(number)
             }
-            MetroButton("save", modifier = Modifier.weight(1f)) {
+            SaveTile(accent, modifier = Modifier.weight(1f)) {
                 if (number.isNotBlank()) onSave(number)
             }
         }
         Spacer(Modifier.height(12.dp))
+    }
+}
+
+/** WP 8.1 keypad call button: accent-filled tile spanning two key columns. */
+@Composable
+private fun CallTile(accent: Color, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val tiltOn by com.fancyshark.wpdialer.data.AppPrefs.tilt.collectAsState()
+    Box(
+        modifier
+            .metroTilt(tiltOn)
+            .height(64.dp)
+            .background(if (pressed) Metro.Foreground else accent)
+            .clickable(
+                interactionSource = interaction,
+                indication = null,
+            ) { onClick() },
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            "call",
+            color = if (pressed) Metro.Background else Color.White,
+            fontSize = 16.sp,
+        )
+    }
+}
+
+/** WP 8.1 keypad save button: gray key tile with icon and small label. */
+@Composable
+private fun SaveTile(accent: Color, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val tiltOn by com.fancyshark.wpdialer.data.AppPrefs.tilt.collectAsState()
+    Box(
+        modifier
+            .metroTilt(tiltOn)
+            .height(64.dp)
+            .background(if (pressed) accent else Metro.Key)
+            .clickable(
+                interactionSource = interaction,
+                indication = null,
+            ) { onClick() },
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(
+                Icons.Filled.Save,
+                contentDescription = "save",
+                tint = Metro.Foreground,
+                modifier = Modifier.size(20.dp),
+            )
+            Text(
+                "save",
+                color = Metro.Foreground,
+                fontSize = 11.sp,
+                modifier = Modifier.padding(top = 2.dp),
+            )
+        }
     }
 }
 

@@ -1,5 +1,6 @@
 ﻿package com.fancyshark.wpdialer.screens
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -34,11 +35,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.fancyshark.wpdialer.data.ContactAppAction
 import com.fancyshark.wpdialer.data.ContactDetail
 import com.fancyshark.wpdialer.data.HistoryItem
 import com.fancyshark.wpdialer.data.Repo
@@ -143,6 +146,58 @@ fun ContactDetailScreen(
 private fun normalized(number: String): String =
     number.filter { it.isDigit() }.takeLast(9)
 
+/** The registering app's launcher icon, falling back to its initial. */
+@Composable
+private fun AppActionIcon(accountType: String?, app: String, onClick: () -> Unit) {
+    val context = LocalContext.current
+    val icon = remember(accountType) {
+        accountType?.let { pkg ->
+            runCatching {
+                val drawable = context.packageManager.getApplicationIcon(pkg)
+                val bmp = android.graphics.Bitmap.createBitmap(
+                    96, 96, android.graphics.Bitmap.Config.ARGB_8888,
+                )
+                val canvas = android.graphics.Canvas(bmp)
+                drawable.setBounds(0, 0, 96, 96)
+                drawable.draw(canvas)
+                bmp.asImageBitmap()
+            }.getOrNull()
+        }
+    }
+    Box(
+        Modifier
+            .size(40.dp)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+            ) { onClick() }
+            .padding(7.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (icon != null) {
+            Image(icon, contentDescription = app, modifier = Modifier.fillMaxSize())
+        } else {
+            Text(app.take(1).uppercase(), color = Metro.Foreground, fontSize = 16.sp)
+        }
+    }
+}
+
+/** Digits key of an app action's target number, or null if it isn't one. */
+private fun actionDigits(a: com.fancyshark.wpdialer.data.ContactAppAction): String? {
+    val digits = (a.data1 ?: a.label).substringBefore('@').filter { it.isDigit() }
+    return if (digits.length >= 5) digits.takeLast(9) else null
+}
+
+/** "Voice call +961 70 996 669" -> "voice call". */
+private fun shortActionLabel(a: com.fancyshark.wpdialer.data.ContactAppAction): String {
+    val stripped = a.label
+        .replace(Regex("""\+?\d[\d\s()\-]{3,}"""), "")
+        .trim()
+        .trim(',')
+        .trim()
+    return stripped.ifEmpty { a.label }.lowercase()
+}
+
 @Composable
 private fun ContactDetailBody(
     d: ContactDetail,
@@ -162,6 +217,52 @@ private fun ContactDetailBody(
         history.filter { normalized(it.number) in contactNumbers }.take(15)
     }
 
+    // Fold app actions into the phone/email rows they target; the rest stay
+    // as standalone rows.
+    var appChooser by remember { mutableStateOf<Pair<String, List<ContactAppAction>>?>(null) }
+    val (phoneActions, emailActions, standaloneActions) = remember(d) {
+        val byPhone = mutableMapOf<String, MutableList<ContactAppAction>>()
+        val byEmail = mutableMapOf<String, MutableList<ContactAppAction>>()
+        val rest = mutableListOf<ContactAppAction>()
+        val phoneKeys = contactNumbers.toSet()
+        val mailKeys = d.emails.map { it.address.lowercase() }.toSet()
+        d.appActions.forEach { a ->
+            val digits = actionDigits(a)
+            val mail = a.data1?.lowercase()?.takeIf { it in mailKeys }
+            when {
+                digits != null && digits in phoneKeys ->
+                    byPhone.getOrPut(digits) { mutableListOf() } += a
+                mail != null -> byEmail.getOrPut(mail) { mutableListOf() } += a
+                else -> rest += a
+            }
+        }
+        Triple(byPhone, byEmail, rest)
+    }
+
+    fun launchAction(a: ContactAppAction) {
+        runCatching {
+            context.startActivity(
+                android.content.Intent(android.content.Intent.ACTION_VIEW)
+                    .setDataAndType(
+                        android.content.ContentUris.withAppendedId(
+                            android.provider.ContactsContract.Data.CONTENT_URI,
+                            a.dataId,
+                        ),
+                        a.mimetype,
+                    ),
+            )
+        }
+    }
+
+    @Composable
+    fun AppIcons(actions: List<ContactAppAction>) {
+        actions.groupBy { it.app }.forEach { (app, list) ->
+            AppActionIcon(list.first().accountType, app) {
+                if (list.size == 1) launchAction(list[0]) else appChooser = app to list
+            }
+        }
+    }
+
     Box(modifier.fillMaxWidth()) {
         Column(
             Modifier
@@ -170,22 +271,25 @@ private fun ContactDetailBody(
                 .padding(horizontal = 20.dp),
         ) {
             Text(
-                d.name.uppercase(),
-                color = Metro.Foreground,
-                fontSize = 15.sp,
-                letterSpacing = 1.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(top = 18.dp),
-            )
-            Text(
                 "profile",
                 color = Metro.Foreground,
                 fontSize = 48.sp,
                 fontWeight = FontWeight.Light,
+                modifier = Modifier.padding(top = 18.dp),
             )
             Spacer(Modifier.height(14.dp))
-            ContactTile(d.name, d.photoUri, accent, 96.dp)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                ContactTile(d.name, d.photoUri, accent, 96.dp)
+                Text(
+                    d.name,
+                    color = Metro.Foreground,
+                    fontSize = 30.sp,
+                    fontWeight = FontWeight.Light,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(start = 16.dp),
+                )
+            }
             Spacer(Modifier.height(22.dp))
 
             if (d.phones.isEmpty()) {
@@ -225,6 +329,127 @@ private fun ContactDetailBody(
                             ) { onText(phone.number) }
                             .padding(8.dp),
                     )
+                    AppIcons(phoneActions[normalized(phone.number)].orEmpty())
+                }
+            }
+
+            d.emails.forEach { email ->
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            runCatching {
+                                context.startActivity(
+                                    android.content.Intent(
+                                        android.content.Intent.ACTION_SENDTO,
+                                        android.net.Uri.parse(
+                                            "mailto:${android.net.Uri.encode(email.address)}",
+                                        ),
+                                    ),
+                                )
+                            }
+                        }
+                        .padding(vertical = 9.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            "email ${email.label}",
+                            color = Metro.Foreground,
+                            fontSize = 25.sp,
+                            fontWeight = FontWeight.Light,
+                        )
+                        Text(email.address, color = accent, fontSize = 15.sp)
+                    }
+                    AppIcons(emailActions[email.address.lowercase()].orEmpty())
+                }
+            }
+
+            d.events.forEach { event ->
+                Column(Modifier.fillMaxWidth().padding(vertical = 9.dp)) {
+                    Text(
+                        event.label,
+                        color = Metro.Foreground,
+                        fontSize = 25.sp,
+                        fontWeight = FontWeight.Light,
+                    )
+                    Text(event.date, color = accent, fontSize = 15.sp)
+                }
+            }
+
+            d.websites.forEach { site ->
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            runCatching {
+                                val url = if (site.startsWith("http://") ||
+                                    site.startsWith("https://")
+                                ) {
+                                    site
+                                } else {
+                                    "https://$site"
+                                }
+                                context.startActivity(
+                                    android.content.Intent(
+                                        android.content.Intent.ACTION_VIEW,
+                                        android.net.Uri.parse(url),
+                                    ),
+                                )
+                            }
+                        }
+                        .padding(vertical = 9.dp),
+                ) {
+                    Text(
+                        "website",
+                        color = Metro.Foreground,
+                        fontSize = 25.sp,
+                        fontWeight = FontWeight.Light,
+                    )
+                    Text(site, color = accent, fontSize = 15.sp)
+                }
+            }
+
+            if (d.organization != null) {
+                Column(Modifier.fillMaxWidth().padding(vertical = 9.dp)) {
+                    Text(
+                        "company",
+                        color = Metro.Foreground,
+                        fontSize = 25.sp,
+                        fontWeight = FontWeight.Light,
+                    )
+                    Text(d.organization, color = accent, fontSize = 15.sp)
+                }
+            }
+
+            if (d.nickname != null) {
+                Column(Modifier.fillMaxWidth().padding(vertical = 9.dp)) {
+                    Text(
+                        "nickname",
+                        color = Metro.Foreground,
+                        fontSize = 25.sp,
+                        fontWeight = FontWeight.Light,
+                    )
+                    Text(d.nickname, color = accent, fontSize = 15.sp)
+                }
+            }
+
+            standaloneActions.forEach { action ->
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable { launchAction(action) }
+                        .padding(vertical = 9.dp),
+                ) {
+                    Text(
+                        action.label,
+                        color = Metro.Foreground,
+                        fontSize = 25.sp,
+                        fontWeight = FontWeight.Light,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(action.app, color = accent, fontSize = 15.sp)
                 }
             }
 
@@ -320,6 +545,41 @@ private fun ContactDetailBody(
                 }
             }
             Spacer(Modifier.height(24.dp))
+        }
+
+        appChooser?.let { (app, actions) ->
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(Metro.Background.copy(alpha = 0.96f))
+                    .clickable { appChooser = null },
+            ) {
+                Column(Modifier.align(Alignment.Center).padding(horizontal = 32.dp)) {
+                    Text(
+                        app.uppercase(),
+                        color = Metro.Foreground,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        letterSpacing = 1.sp,
+                        modifier = Modifier.padding(bottom = 14.dp),
+                    )
+                    actions.forEach { action ->
+                        Text(
+                            shortActionLabel(action),
+                            color = Metro.Foreground,
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.Light,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    launchAction(action)
+                                    appChooser = null
+                                }
+                                .padding(vertical = 10.dp),
+                        )
+                    }
+                }
+            }
         }
 
         if (showSimChooser) {

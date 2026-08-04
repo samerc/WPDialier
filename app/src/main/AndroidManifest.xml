@@ -16,6 +16,14 @@
 
     <queries>
         <package android:name="com.google.android.dialer" />
+        <!-- Apps whose icons we show on contact app-action rows -->
+        <package android:name="com.whatsapp" />
+        <package android:name="com.whatsapp.w4b" />
+        <package android:name="org.telegram.messenger" />
+        <package android:name="org.thoughtcrime.securesms" />
+        <package android:name="com.google.android.apps.tachyon" />
+        <package android:name="com.viber.voip" />
+        <package android:name="com.skype.raider" />
     </queries>
 
     <application
