@@ -233,6 +233,20 @@ class WpInCallService : InCallService() {
         getSystemService(NotificationManager::class.java).cancel(NOTIFICATION_ID)
     }
 
+    /**
+     * While our own incoming-call UI is in front, the incoming notification
+     * would double up as a heads-up banner on top of it — hide it, and
+     * repost if the user navigates away mid-ring.
+     */
+    fun onInCallUiVisibility(visible: Boolean) {
+        val ringing = when {
+            CallManager.state.value == Call.STATE_RINGING -> CallManager.call.value
+            CallManager.secondState.value == Call.STATE_RINGING -> CallManager.secondCall.value
+            else -> null
+        } ?: return
+        if (visible) cancelIncomingNotification() else postIncomingNotification(ringing)
+    }
+
     companion object {
         private const val CHANNEL_ID = "incoming_calls"
         private const val MISSED_CHANNEL_ID = "missed_calls"

@@ -90,6 +90,16 @@ class InCallActivity : ComponentActivity() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        (CallManager.service as? WpInCallService)?.onInCallUiVisibility(true)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        (CallManager.service as? WpInCallService)?.onInCallUiVisibility(false)
+    }
+
     // Flip/keypad phones: the call key answers a ringing call, the end key
     // hangs up (fallback — most devices route ENDCALL through telecom), and
     // hardware digits send DTMF during the call.
@@ -141,6 +151,12 @@ private fun InCallRoot(onFinished: () -> Unit) {
         value = Repo.lookupCaller(context, number)
     }
     val displayName = caller.first ?: number.ifBlank { "unknown" }
+    // The call object vanishes on disconnect before the ended screen shows —
+    // keep the last caller name so it doesn't fall back to "unknown".
+    var lastKnownName by remember { mutableStateOf("unknown") }
+    LaunchedEffect(displayName, call) {
+        if (call != null && displayName != "unknown") lastKnownName = displayName
+    }
 
     Box(
         Modifier
@@ -151,7 +167,7 @@ private fun InCallRoot(onFinished: () -> Unit) {
     ) {
         when {
             call == null || state == Call.STATE_DISCONNECTED -> {
-                EndedScreen(displayName, onFinished)
+                EndedScreen(if (call == null) lastKnownName else displayName, onFinished)
             }
             state == Call.STATE_RINGING -> {
                 IncomingScreen(
