@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- In-call UI (InCallActivity) -->
+    <string name="call_app_title">TÉLÉPHONE</string>
+    <string name="call_unknown">inconnu</string>
+    <string name="call_ended">appel terminé</string>
+    <string name="call_incoming">appel entrant</string>
+    <string name="call_answer">répondre</string>
+    <string name="call_ignore">ignorer</string>
+    <string name="call_answer_and_hold">répondre &amp; mettre en attente</string>
+    <string name="call_text_reply">réponse SMS</string>
+    <string name="call_hide_text_replies">masquer les réponses SMS</string>
+    <string name="call_calling">appel en cours...</string>
+    <string name="call_on_hold">en attente</string>
+    <string name="call_speaker">haut-parleur</string>
+    <string name="call_mute">muet</string>
+    <string name="call_bluetooth">Bluetooth</string>
+    <string name="call_hold">attente</string>
+    <string name="call_add_call">ajouter un appel</string>
+    <string name="call_swap">permuter</string>
+    <string name="call_merge">fusionner</string>
+    <string name="call_keypad">clavier</string>
+    <string name="call_end_call">raccrocher</string>
+
+    <!-- Notifications (WpInCallService, notification_incoming.xml) -->
+    <string name="notif_channel_incoming">Appels entrants</string>
+    <string name="notif_channel_ongoing">Appels en cours</string>
+    <string name="notif_channel_missed">Appels manqués</string>
+    <string name="notif_missed_call">Appel manqué</string>
+    <string name="notif_call_back">rappeler</string>
+    <string name="notif_text">SMS</string>
+    <string name="notif_incoming_call">appel entrant</string>
+    <string name="notif_answer">répondre</string>
+    <string name="notif_decline">refuser</string>
+</resources>

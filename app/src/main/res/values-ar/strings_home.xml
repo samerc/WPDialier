@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- HomePages.kt -->
+    <string name="home_history_empty">لإجراء مكالمة، اضغط على أيقونة أدناه.</string>
+    <string name="home_unknown">غير معروف</string>
+    <string name="home_history_subtitle">%1$s، %2$s</string>
+    <string name="home_details">التفاصيل</string>
+    <string name="home_delete">حذف</string>
+    <string name="home_add_to_speed_dial">إضافة إلى الاتصال السريع</string>
+    <string name="home_block">حظر</string>
+    <string name="home_call">اتصال</string>
+    <string name="home_text">رسالة نصية</string>
+    <string name="home_save">حفظ</string>
+    <string name="home_profile">ملف التعريف</string>
+    <string name="home_details_app_header">الهاتف</string>
+    <string name="home_details_duration">"  ·  المدة %1$s"</string>
+    <string name="home_speed_dial_empty">ثبّت المفضلة من ملف تعريف جهة الاتصال، أو اضغط مطولًا على أحد عناصر السجل واختر \"إضافة إلى الاتصال السريع\".</string>
+    <string name="home_no_contacts">لا توجد جهات اتصال</string>
+
+    <!-- SearchScreen.kt -->
+    <string name="search_title">البحث</string>
+    <string name="search_hint">البحث في الأشخاص</string>
+
+    <!-- DialpadScreen.kt -->
+    <string name="dialpad_delete">حذف</string>
+    <string name="dialpad_call">اتصال</string>
+    <string name="dialpad_save">حفظ</string>
+</resources>

@@ -493,12 +493,16 @@ object Repo {
         }
 
     /** Formats a number for display using the device's region. */
-    fun pretty(context: Context, number: String): String =
-        runCatching {
+    fun pretty(context: Context, number: String): String {
+        val formatted = runCatching {
             android.telephony.PhoneNumberUtils.formatNumber(
                 number, Countries.defaultRegionCode(context),
             )
         }.getOrNull() ?: number
+        // LTR-isolate wrapping (LRI/PDI) keeps "+961 3 ..." from being
+        // visually reordered inside RTL (Arabic) text runs.
+        return "⁦$formatted⁩"
+    }
 
     suspend fun clearHistory(context: Context): Boolean = withContext(Dispatchers.IO) {
         runCatching {

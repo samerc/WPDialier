@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Call log entry types (full form) -->
+    <string name="data_call_incoming">مكالمة واردة</string>
+    <string name="data_call_outgoing">مكالمة صادرة</string>
+    <string name="data_call_missed">مكالمة فائتة</string>
+    <string name="data_call_declined">مكالمة مرفوضة</string>
+    <string name="data_call_voicemail">بريد صوتي</string>
+    <string name="data_call_blocked">مكالمة محظورة</string>
+    <string name="data_call_generic">مكالمة</string>
+
+    <!-- Call log entry types (short form for history sublines) -->
+    <string name="data_call_incoming_short">واردة</string>
+    <string name="data_call_outgoing_short">صادرة</string>
+    <string name="data_call_missed_short">فائتة</string>
+    <string name="data_call_declined_short">مرفوضة</string>
+    <string name="data_call_voicemail_short">بريد صوتي</string>
+    <string name="data_call_blocked_short">محظورة</string>
+    <string name="data_call_generic_short">مكالمة</string>
+
+    <!-- Contact event types -->
+    <string name="data_event_birthday">عيد الميلاد</string>
+    <string name="data_event_anniversary">الذكرى السنوية</string>
+    <string name="data_event_date">تاريخ</string>
+
+    <!-- Fallback name for a third-party contact action's app -->
+    <string name="data_app_fallback">تطبيق</string>
+</resources>

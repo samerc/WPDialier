@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Settings screen -->
+    <string name="settings_toggle_on">تشغيل</string>
+    <string name="settings_toggle_off">إيقاف</string>
+    <string name="settings_header">الإعدادات</string>
+    <string name="settings_title">الهاتف</string>
+    <string name="settings_accent_title">لون التمييز</string>
+    <string name="settings_haptic_title">الاهتزاز عند اللمس</string>
+    <string name="settings_haptic_hint">اهتزاز عند الضغط على لوحة الأرقام — يتوقف تلقائيًا في وضع توفير البطارية</string>
+    <string name="settings_font_title">الخط</string>
+    <string name="settings_font_selawik">Selawik ‏(Windows Phone)</string>
+    <string name="settings_font_system">خط النظام</string>
+    <string name="settings_default_apps_title">التطبيقات الافتراضية</string>
+    <string name="settings_default_dialer_yes">هذا التطبيق هو تطبيق الهاتف الافتراضي لديك</string>
+    <string name="settings_default_dialer_prompt">للرد على المكالمات بشاشة مترو، اجعل هذا التطبيق تطبيق الهاتف الافتراضي</string>
+    <string name="settings_default_dialer_button">تعيين كتطبيق الهاتف الافتراضي</string>
+    <string name="settings_google_disabled_title">تطبيق الهاتف من Google</string>
+    <string name="settings_google_disabled_body">تطبيق الهاتف من Google معطّل، لذا يتولى هذا التطبيق وحده المكالمات. إذا ألغيت تثبيت هذا التطبيق يومًا، فأعد تمكينه أولًا ليبقى على هاتفك تطبيق اتصال.</string>
+    <string name="settings_google_app_info_button">فتح معلومات تطبيق هاتف Google</string>
+    <string name="settings_dup_notif_title">إشعارات المكالمات المكررة</string>
+    <string name="settings_dup_notif_body">ينشر تطبيق الهاتف من Google إشعارات مكالمات خاصة به حتى عندما لا يكون تطبيق الاتصال الافتراضي. أوقف إشعاراته لترى إشعارات هذا التطبيق فقط.</string>
+    <string name="settings_dup_notif_button">فتح إعدادات إشعارات هاتف Google</string>
+    <string name="settings_dup_notif_locked_hint">في بعض الهواتف (OnePlus وOPPO...) تكون هذه المفاتيح مقفلة. في هذه الحالة، افتح صفحة معلومات التطبيق أدناه واضغط على \"تعطيل\" — هذا التطبيق يحل تمامًا محل تطبيق الهاتف من Google، ويمكنك إعادة تمكينه هناك في أي وقت.</string>
+    <string name="settings_light_theme_title">السمة الفاتحة</string>
+    <string name="settings_tilt_title">تأثير إمالة المربعات</string>
+    <string name="settings_relative_times_title">الأوقات النسبية في السجل</string>
+    <string name="settings_relative_times_hint">تشغيل: \"قبل ساعتين\" — إيقاف: بنمط Windows Phone ‏\"السبت 01:06\"</string>
+    <string name="settings_text_replies_title">الردود النصية (الرفض برسالة)</string>
+    <string name="settings_new_reply_placeholder">رد جديد</string>
+    <string name="settings_add_reply_button">إضافة رد</string>
+    <string name="settings_default_sim_title">الشريحة الافتراضية للمكالمات</string>
+    <string name="settings_sim_always_ask">السؤال دائمًا</string>
+    <string name="settings_blocked_title">الأرقام المحظورة</string>
+    <string name="settings_blocked_none">لا يوجد — احظر الأرقام من قائمة السجل</string>
+    <string name="settings_unblock">إلغاء الحظر</string>
+    <string name="settings_about_title">حول</string>
+    <string name="settings_about_link">حول هذا التطبيق</string>
+
+    <!-- About screen -->
+    <string name="about_header">الإعدادات</string>
+    <string name="about_title">حول</string>
+    <string name="about_app_name">Dialer 8</string>
+    <string name="about_tagline">تطبيق اتصال بنمط Windows Phone</string>
+    <string name="about_version">الإصدار</string>
+    <string name="about_feedback_subject">ملاحظات حول Dialer 8</string>
+    <string name="about_contact">التواصل</string>
+    <string name="about_privacy">سياسة الخصوصية</string>
+    <string name="about_privacy_hint">كل شيء يبقى على هاتفك — اقرأ السياسة</string>
+</resources>

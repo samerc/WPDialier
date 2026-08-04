@@ -272,9 +272,11 @@ fun Pivot(
             modifier = Modifier.padding(start = 20.dp, top = 18.dp),
         )
         // Headers pan with the page swipe, like a real WP pivot: the current
-        // title sits at the left edge and the others trail off-screen.
+        // title sits at the start edge and the others trail off-screen.
         val titleWidths = remember(pages.size) { IntArray(pages.size) }
         var widthTick by remember { mutableStateOf(0) }
+        val rtl = androidx.compose.ui.platform.LocalLayoutDirection.current ==
+            androidx.compose.ui.unit.LayoutDirection.Rtl
         // Disabled horizontalScroll grants children unbounded width so long
         // titles are never clipped; panning is driven by the offset instead.
         Row(
@@ -287,7 +289,9 @@ fun Pivot(
                     val whole = progress.toInt().coerceIn(0, pages.size - 1)
                     val base = (0 until whole).sumOf { titleWidths[it] }
                     val frac = (progress - whole) * titleWidths.getOrElse(whole) { 0 }
-                    IntOffset(-(base + frac.toInt()), 0)
+                    val pan = base + frac.toInt()
+                    // Mirror the pan for RTL, where titles flow right-to-left.
+                    IntOffset(if (rtl) pan else -pan, 0)
                 },
         ) {
             val accent by AccentStore.accent.collectAsState()

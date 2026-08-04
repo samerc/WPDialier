@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- In-call UI (InCallActivity) -->
+    <string name="call_app_title">الهاتف</string>
+    <string name="call_unknown">غير معروف</string>
+    <string name="call_ended">انتهت المكالمة</string>
+    <string name="call_incoming">مكالمة واردة</string>
+    <string name="call_answer">رد</string>
+    <string name="call_ignore">تجاهل</string>
+    <string name="call_answer_and_hold">رد وانتظار</string>
+    <string name="call_text_reply">رد نصي</string>
+    <string name="call_hide_text_replies">إخفاء الردود النصية</string>
+    <string name="call_calling">جارٍ الاتصال...</string>
+    <string name="call_on_hold">قيد الانتظار</string>
+    <string name="call_speaker">مكبر الصوت</string>
+    <string name="call_mute">كتم</string>
+    <string name="call_bluetooth">بلوتوث</string>
+    <string name="call_hold">انتظار</string>
+    <string name="call_add_call">إضافة مكالمة</string>
+    <string name="call_swap">تبديل</string>
+    <string name="call_merge">دمج</string>
+    <string name="call_keypad">لوحة الأرقام</string>
+    <string name="call_end_call">إنهاء المكالمة</string>
+
+    <!-- Notifications (WpInCallService, notification_incoming.xml) -->
+    <string name="notif_channel_incoming">المكالمات الواردة</string>
+    <string name="notif_channel_ongoing">المكالمات الجارية</string>
+    <string name="notif_channel_missed">المكالمات الفائتة</string>
+    <string name="notif_missed_call">مكالمة فائتة</string>
+    <string name="notif_call_back">معاودة الاتصال</string>
+    <string name="notif_text">رسالة نصية</string>
+    <string name="notif_incoming_call">مكالمة واردة</string>
+    <string name="notif_answer">رد</string>
+    <string name="notif_decline">رفض</string>
+</resources>

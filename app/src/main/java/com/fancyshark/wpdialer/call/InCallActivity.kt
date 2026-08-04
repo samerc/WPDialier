@@ -398,7 +398,12 @@ private fun ActiveScreen(
             )
         }
         if (number.isNotBlank() && name != number) {
-            Text(number, color = Metro.Subtle, fontSize = 18.sp, fontWeight = FontWeight.Light)
+            Text(
+                Repo.pretty(context2, number),
+                color = Metro.Subtle,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Light,
+            )
         }
         // On dual-SIM devices, show which SIM carries this call.
         val simLabel = remember(call) {
@@ -583,32 +588,38 @@ private fun IconTile(
 @Composable
 private fun DtmfPad() {
     val keys = listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "*", "0", "#")
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        keys.chunked(3).forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                row.forEach { key ->
-                    Box(
-                        Modifier
-                            .weight(1f)
-                            .height(56.dp)
-                            .background(Metro.Key)
-                            .pointerInput(key) {
-                                detectTapGestures(
-                                    onPress = {
-                                        CallManager.startDtmf(key[0])
-                                        tryAwaitRelease()
-                                        CallManager.stopDtmf()
-                                    },
-                                )
-                            },
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(
-                            key,
-                            color = Metro.Foreground,
-                            fontSize = 26.sp,
-                            fontWeight = FontWeight.Light,
-                        )
+    // Keypads never mirror in RTL locales.
+    androidx.compose.runtime.CompositionLocalProvider(
+        androidx.compose.ui.platform.LocalLayoutDirection provides
+            androidx.compose.ui.unit.LayoutDirection.Ltr,
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            keys.chunked(3).forEach { row ->
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    row.forEach { key ->
+                        Box(
+                            Modifier
+                                .weight(1f)
+                                .height(56.dp)
+                                .background(Metro.Key)
+                                .pointerInput(key) {
+                                    detectTapGestures(
+                                        onPress = {
+                                            CallManager.startDtmf(key[0])
+                                            tryAwaitRelease()
+                                            CallManager.stopDtmf()
+                                        },
+                                    )
+                                },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                key,
+                                color = Metro.Foreground,
+                                fontSize = 26.sp,
+                                fontWeight = FontWeight.Light,
+                            )
+                        }
                     }
                 }
             }

@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- ContactDetailScreen.kt -->
+    <string name="contact_edit">تحرير</string>
+    <string name="contact_pin">تثبيت</string>
+    <string name="contact_unpin">إلغاء التثبيت</string>
+    <string name="contact_share">مشاركة</string>
+    <string name="contact_share_chooser">مشاركة جهة الاتصال</string>
+    <string name="contact_delete">حذف</string>
+    <string name="contact_delete_confirm">هل تريد حذف %1$s؟</string>
+    <string name="contact_cancel">إلغاء</string>
+    <string name="contact_profile">ملف التعريف</string>
+    <string name="contact_no_phone_numbers">لا توجد أرقام هواتف</string>
+    <string name="contact_call_label">اتصال %1$s</string>
+    <string name="contact_text_label">رسالة نصية %1$s</string>
+    <string name="contact_email_label">بريد إلكتروني %1$s</string>
+    <string name="contact_website">موقع ويب</string>
+    <string name="contact_company">الشركة</string>
+    <string name="contact_nickname">الاسم المستعار</string>
+    <string name="contact_map_address">عرض العنوان على الخريطة</string>
+    <string name="contact_preferred_sim">الشريحة المفضلة</string>
+    <string name="contact_not_set">غير محدد</string>
+    <string name="contact_ringtone">نغمة الرنين</string>
+    <string name="contact_ringtone_default">افتراضية</string>
+    <string name="contact_note">ملاحظة</string>
+    <string name="contact_history">السجل</string>
+    <string name="contact_preferred_sim_caps">الشريحة المفضلة</string>
+    <string name="contact_no_preference">بلا تفضيل</string>
+
+    <!-- NewContactScreen.kt -->
+    <string name="newcontact_title">جهة اتصال %1$s جديدة</string>
+    <string name="newcontact_name">الاسم</string>
+    <string name="newcontact_change_photo">تغيير الصورة</string>
+    <string name="newcontact_save_to">حفظ في</string>
+    <string name="newcontact_country">البلد (لأرقام الهواتف)</string>
+    <string name="newcontact_phone">الهاتف</string>
+    <string name="newcontact_number">الرقم</string>
+    <string name="newcontact_email">البريد الإلكتروني</string>
+    <string name="newcontact_email_address">عنوان البريد الإلكتروني</string>
+    <string name="newcontact_date">التاريخ</string>
+    <string name="newcontact_pick_a_date">اختر تاريخًا</string>
+    <string name="newcontact_custom_label">تسمية مخصصة</string>
+    <string name="newcontact_add_date">إضافة تاريخ</string>
+    <string name="newcontact_add_typed">إضافة %1$s</string>
+    <string name="newcontact_address">العنوان</string>
+    <string name="newcontact_street_city_country">الشارع، المدينة، البلد</string>
+    <string name="newcontact_pick_on_map">اختيار على الخريطة</string>
+    <string name="newcontact_locating">جارٍ تحديد الموقع...</string>
+    <string name="newcontact_use_current_location">استخدام الموقع الحالي</string>
+    <string name="newcontact_note">ملاحظة</string>
+    <string name="newcontact_save_failed">تعذر حفظ جهة الاتصال — تحقق من الحساب وحاول مرة أخرى</string>
+    <string name="newcontact_saving">جارٍ الحفظ...</string>
+    <string name="newcontact_save">حفظ</string>
+    <string name="newcontact_cancel">إلغاء</string>
+    <string name="newcontact_save_to_caps">حفظ في</string>
+    <string name="newcontact_country_caps">البلد</string>
+    <string name="newcontact_search">بحث</string>
+    <string name="newcontact_pick_a_location">اختيار موقع</string>
+    <string name="newcontact_pin">دبوس الموقع</string>
+    <string name="newcontact_resolving">جارٍ تحديد العنوان...</string>
+    <string name="newcontact_use_this_location">استخدام هذا الموقع</string>
+
+    <!-- EditContactScreen.kt -->
+    <string name="editcontact_title_kind">تحرير جهة اتصال %1$s</string>
+    <string name="editcontact_title">تحرير جهة الاتصال</string>
+    <string name="editcontact_saved_to">محفوظة في %1$s</string>
+    <string name="editcontact_name">الاسم</string>
+    <string name="editcontact_change_photo">تغيير الصورة</string>
+    <string name="editcontact_phone_label">الهاتف (%1$s)</string>
+    <string name="editcontact_number">الرقم</string>
+    <string name="editcontact_add_phone">إضافة هاتف</string>
+    <string name="editcontact_email">البريد الإلكتروني</string>
+    <string name="editcontact_email_address">عنوان البريد الإلكتروني</string>
+    <string name="editcontact_other">أخرى</string>
+    <string name="editcontact_custom_label">تسمية مخصصة</string>
+    <string name="editcontact_add_email">إضافة بريد إلكتروني</string>
+    <string name="editcontact_date">التاريخ</string>
+    <string name="editcontact_pick_a_date">اختر تاريخًا</string>
+    <string name="editcontact_add_date">إضافة تاريخ</string>
+    <string name="editcontact_address">العنوان</string>
+    <string name="editcontact_street_city_country">الشارع، المدينة، البلد</string>
+    <string name="editcontact_note">ملاحظة</string>
+    <string name="editcontact_save_failed">تعذر حفظ التغييرات — حاول مرة أخرى</string>
+    <string name="editcontact_saving">جارٍ الحفظ...</string>
+    <string name="editcontact_save">حفظ</string>
+    <string name="editcontact_cancel">إلغاء</string>
+</resources>

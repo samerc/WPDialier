@@ -40,6 +40,7 @@
             android:fontFamily="@font/selawk"
             android:textSize="13sp"
             android:textColor="@color/wp_notif_secondary"
+            android:textDirection="ltr"
             android:singleLine="true" />
     </LinearLayout>
 

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Call log entry types (full form) -->
+    <string name="data_call_incoming">appel entrant</string>
+    <string name="data_call_outgoing">appel sortant</string>
+    <string name="data_call_missed">appel manqué</string>
+    <string name="data_call_declined">appel refusé</string>
+    <string name="data_call_voicemail">messagerie vocale</string>
+    <string name="data_call_blocked">appel bloqué</string>
+    <string name="data_call_generic">appel</string>
+
+    <!-- Call log entry types (short form for history sublines) -->
+    <string name="data_call_incoming_short">Entrant</string>
+    <string name="data_call_outgoing_short">Sortant</string>
+    <string name="data_call_missed_short">Manqué</string>
+    <string name="data_call_declined_short">Refusé</string>
+    <string name="data_call_voicemail_short">Messagerie</string>
+    <string name="data_call_blocked_short">Bloqué</string>
+    <string name="data_call_generic_short">Appel</string>
+
+    <!-- Contact event types -->
+    <string name="data_event_birthday">anniversaire</string>
+    <string name="data_event_anniversary">anniversaire de mariage</string>
+    <string name="data_event_date">date</string>
+
+    <!-- Fallback name for a third-party contact action's app -->
+    <string name="data_app_fallback">application</string>
+</resources>

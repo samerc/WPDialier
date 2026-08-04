@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Settings screen -->
+    <string name="settings_toggle_on">Activé</string>
+    <string name="settings_toggle_off">Désactivé</string>
+    <string name="settings_header">PARAMÈTRES</string>
+    <string name="settings_title">téléphone</string>
+    <string name="settings_accent_title">Couleur d\'accentuation</string>
+    <string name="settings_haptic_title">Retour haptique</string>
+    <string name="settings_haptic_hint">vibrer lors des appuis sur le clavier — désactivé automatiquement en économiseur de batterie</string>
+    <string name="settings_font_title">Police</string>
+    <string name="settings_font_selawik">Selawik (Windows Phone)</string>
+    <string name="settings_font_system">police système</string>
+    <string name="settings_default_apps_title">Applications par défaut</string>
+    <string name="settings_default_dialer_yes">cette application est votre application téléphone par défaut</string>
+    <string name="settings_default_dialer_prompt">pour répondre aux appels avec l\'écran Metro, définissez cette application comme application téléphone par défaut</string>
+    <string name="settings_default_dialer_button">définir comme application téléphone par défaut</string>
+    <string name="settings_google_disabled_title">Application téléphone Google</string>
+    <string name="settings_google_disabled_body">L\'application téléphone de Google est désactivée, donc seule cette application gère les appels. Si vous désinstallez un jour cette application, réactivez-la d\'abord pour que votre téléphone garde un composeur.</string>
+    <string name="settings_google_app_info_button">ouvrir les infos de l\'application Téléphone Google</string>
+    <string name="settings_dup_notif_title">Notifications d\'appel en double</string>
+    <string name="settings_dup_notif_body">L\'application téléphone de Google publie ses propres notifications d\'appel même quand elle n\'est pas le composeur par défaut. Désactivez ses notifications pour ne voir que celles de cette application.</string>
+    <string name="settings_dup_notif_button">ouvrir les paramètres de notification de Téléphone Google</string>
+    <string name="settings_dup_notif_locked_hint">Sur certains téléphones (OnePlus, OPPO...), ces options sont verrouillées. Dans ce cas, ouvrez la page d\'infos de l\'application ci-dessous et appuyez sur « Désactiver » — cette application remplace entièrement l\'application téléphone de Google, et vous pouvez la réactiver à tout moment.</string>
+    <string name="settings_light_theme_title">Thème clair</string>
+    <string name="settings_tilt_title">Effet d\'inclinaison des tuiles</string>
+    <string name="settings_relative_times_title">Heures relatives dans l\'historique</string>
+    <string name="settings_relative_times_hint">activé : « il y a 2 heures » — désactivé : style Windows Phone « sam. 01:06 »</string>
+    <string name="settings_text_replies_title">Réponses par SMS (refuser avec un message)</string>
+    <string name="settings_new_reply_placeholder">Nouvelle réponse</string>
+    <string name="settings_add_reply_button">ajouter une réponse</string>
+    <string name="settings_default_sim_title">SIM par défaut pour les appels</string>
+    <string name="settings_sim_always_ask">toujours demander</string>
+    <string name="settings_blocked_title">Numéros bloqués</string>
+    <string name="settings_blocked_none">aucun — bloquez des numéros depuis l\'historique</string>
+    <string name="settings_unblock">débloquer</string>
+    <string name="settings_about_title">À propos</string>
+    <string name="settings_about_link">à propos de cette application</string>
+
+    <!-- About screen -->
+    <string name="about_header">PARAMÈTRES</string>
+    <string name="about_title">à propos</string>
+    <string name="about_app_name">Dialer 8</string>
+    <string name="about_tagline">un composeur au style Windows Phone</string>
+    <string name="about_version">version</string>
+    <string name="about_feedback_subject">Commentaires sur Dialer 8</string>
+    <string name="about_contact">contact</string>
+    <string name="about_privacy">politique de confidentialité</string>
+    <string name="about_privacy_hint">tout reste sur votre téléphone — lire la politique</string>
+</resources>

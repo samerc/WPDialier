@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Home pivot -->
+    <string name="main_pivot_title">TÉLÉPHONE</string>
+    <string name="main_page_history">historique</string>
+    <string name="main_page_speed_dial">compos. abrégée</string>
+    <string name="main_page_people">contacts</string>
+
+    <!-- App bar actions and menu -->
+    <string name="main_action_voicemail">messagerie vocale</string>
+    <string name="main_action_keypad">clavier</string>
+    <string name="main_action_search">rechercher</string>
+    <string name="main_action_new">nouveau</string>
+    <string name="main_menu_settings">paramètres</string>
+    <string name="main_menu_delete_all_history">supprimer tout l\'historique</string>
+
+    <!-- Confirm overlays -->
+    <string name="main_confirm_delete_calls">supprimer %1$d appels ?</string>
+    <string name="main_confirm_delete_call">supprimer cet appel ?</string>
+    <string name="main_confirm_delete_all_history">supprimer tout l\'historique des appels ?</string>
+    <string name="main_confirm_cant_undo">cette action est irréversible</string>
+    <string name="main_button_delete">supprimer</string>
+    <string name="main_button_cancel">annuler</string>
+
+    <!-- SIM picker overlay -->
+    <string name="main_choose_sim_title">CHOISIR UNE SIM</string>
+    <string name="main_choose_sim_remember">toujours utiliser pour ce contact</string>
+
+    <!-- Misc -->
+    <string name="main_return_to_call">appuyez pour revenir à l\'appel</string>
+    <string name="main_toast_no_voicemail">aucun numéro de messagerie vocale configuré sur cette SIM</string>
+</resources>

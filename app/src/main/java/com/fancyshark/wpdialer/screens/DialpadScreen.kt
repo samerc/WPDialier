@@ -142,6 +142,11 @@ fun DialpadScreen(
             .background(Metro.Background)
             .padding(horizontal = 10.dp),
     ) {
+        // Numbers and the keypad never mirror in RTL locales.
+        androidx.compose.runtime.CompositionLocalProvider(
+            androidx.compose.ui.platform.LocalLayoutDirection provides
+                androidx.compose.ui.unit.LayoutDirection.Ltr,
+        ) {
         Row(
             Modifier.padding(top = 26.dp, bottom = 14.dp).height(64.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -180,6 +185,7 @@ fun DialpadScreen(
                     )
                 }
             }
+        }
         }
 
         // T9 smart dial: match typed digits against contact names and numbers.
@@ -230,6 +236,10 @@ fun DialpadScreen(
         }
         if (suggestions.isNotEmpty()) Spacer(Modifier.height(8.dp))
 
+        androidx.compose.runtime.CompositionLocalProvider(
+            androidx.compose.ui.platform.LocalLayoutDirection provides
+                androidx.compose.ui.unit.LayoutDirection.Ltr,
+        ) {
         Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
             KEYS.chunked(3).forEach { row ->
                 Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
@@ -261,6 +271,7 @@ fun DialpadScreen(
             SaveTile(accent, modifier = Modifier.weight(1f)) {
                 if (number.isNotBlank()) onSave(number)
             }
+        }
         }
         Spacer(Modifier.height(12.dp))
     }

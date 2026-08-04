@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- HomePages.kt -->
+    <string name="home_history_empty">Pour passer un appel, appuyez sur une icône ci-dessous.</string>
+    <string name="home_unknown">inconnu</string>
+    <string name="home_history_subtitle">%1$s, %2$s</string>
+    <string name="home_details">détails</string>
+    <string name="home_delete">supprimer</string>
+    <string name="home_add_to_speed_dial">ajouter à la compos. abrégée</string>
+    <string name="home_block">bloquer</string>
+    <string name="home_call">appeler</string>
+    <string name="home_text">SMS</string>
+    <string name="home_save">enregistrer</string>
+    <string name="home_profile">profil</string>
+    <string name="home_details_app_header">TÉLÉPHONE</string>
+    <string name="home_details_duration">"  ·  Durée %1$s"</string>
+    <string name="home_speed_dial_empty">Épinglez des favoris depuis le profil d\'un contact, ou maintenez une entrée de l\'historique et choisissez « ajouter à la compos. abrégée ».</string>
+    <string name="home_no_contacts">aucun contact</string>
+
+    <!-- SearchScreen.kt -->
+    <string name="search_title">RECHERCHER</string>
+    <string name="search_hint">rechercher des contacts</string>
+
+    <!-- DialpadScreen.kt -->
+    <string name="dialpad_delete">supprimer</string>
+    <string name="dialpad_call">appeler</string>
+    <string name="dialpad_save">enregistrer</string>
+</resources>
