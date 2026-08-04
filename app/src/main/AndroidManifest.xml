@@ -17,7 +17,13 @@
 
     <queries>
         <package android:name="com.google.android.dialer" />
-        <!-- Apps whose icons we show on contact app-action rows -->
+        <!-- Any app that registers contact actions (they all handle VIEW on
+             their custom contact mimetype) — needed to load their icons -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:mimeType="vnd.android.cursor.item/*" />
+        </intent>
+        <!-- Common ones pinned explicitly as well -->
         <package android:name="com.whatsapp" />
         <package android:name="com.whatsapp.w4b" />
         <package android:name="org.telegram.messenger" />
