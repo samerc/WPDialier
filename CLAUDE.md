@@ -44,16 +44,29 @@ purge it).
   (bordered style — ALL inputs use the 2dp-foreground-border look), `Pivot`
   (headers pan with pager offset), `MetroAppBar`, `Haptics`, `Fonts` (Selawik,
   default), `ContactTile` (photo or centered initials; group tiles are bold).
-- `screens/` — Dialpad (digits in fixed-width slots, DTMF tones, haptics),
-  HomePages (history: grouped "(n)" rows, right-edge call circle, long-press
-  white context menu, CallDetailsScreen w/ durations; speed dial = starred
-  contact tiles + plain numbers from AppPrefs), ContactDetail (merged call/text
-  rows, per-contact history, preferred SIM, pin/share/delete), New/EditContact,
-  Search, Settings (WP toggle switches, reject-template editor, blocked list,
-  Google-dialer notification deep link).
-- `call/` — `WpInCallService` (CallStyle incoming/ongoing/missed notifications),
-  `CallManager` (multi-call: primary + waiting/held, swap, reject-with-text,
-  CallEndpoint audio routing), `InCallActivity`, `CallActionReceiver`.
+- `screens/` — Dialpad (fixed-width digit slots, DTMF, WP8.1 call/save tiles,
+  T9 smart dial: scrollable match list above keys, `DialpadBus` for hardware
+  keys), HomePages (grouped "(n)" history rows, call circles, white context
+  menus, CallDetailsScreen w/ durations; speed dial), ContactDetail (deduped
+  phones, emails, event dates incl. note-dump parsing, website/company/
+  nickname, per-app action icons w/ chooser overlay — actions swept from
+  unaggregated sibling contacts too, ringtone picker, preferred SIM),
+  New/EditContact (full parity: typed phones/emails/dates, photo, address,
+  note; per-account diff saves), Search, Settings (toggles, reject templates,
+  blocked list, Google-dialer guidance incl. disable flow + re-enable warning,
+  about), AboutScreen ("Dialer 8", version, contact email).
+- `call/` — `WpInCallService` (custom WP RemoteViews incoming banner — Selawik
+  via layout fontFamily, round green/red buttons, day/night colors; CallStyle
+  ongoing/missed w/ name lookup + accent; proximity wake lock; full-screen
+  intent decides ringing UI — service only direct-launches for outgoing;
+  banner suppressed while InCallActivity foreground), `CallManager` (multi-call
+  swap/merge, reject-with-text, CallEndpoint routing, `userDismissedUi`),
+  `InCallActivity` (gray panel w/ SIM label, add call/merge tiles, hardware
+  CALL/ENDCALL/DTMF keys), `CallActionReceiver`. MainActivity auto-returns to
+  the call UI on reopen + "tap to return to call" banner; T9/digit hardware
+  keys; emergency numbers bypass SIM chooser.
+- D-pad/flip support: `MetroIndication` (LocalIndication) draws accent focus
+  outlines app-wide; custom controls have explicit focus states.
 - `data/` — `Repo` (contacts/call log/blocking/pretty formatting), `ContactEditor`
   (per-account raw-contact editing — writes go back to the owning account;
   read-only accounts like WhatsApp filtered from "save to"), `Sims`/`SimPrefs`,
@@ -69,7 +82,27 @@ purge it).
   fully-qualified references don't resolve. Same for Modifier extensions.
 - Android 11+ package visibility: querying other packages (e.g. Google Dialer
   detection in Settings) requires a `<queries>` manifest entry.
-- Google Phone posts its own call notifications even when not default dialer;
-  Settings has a deep-link section to disable them (can't be automated).
-- Edit-contact screen still lacks parity with create (no emails/dates/photo
-  editing) — the main known gap, on the roadmap.
+- Google Phone posts its own call notifications even when not default dialer
+  (ColorOS binds it as the type-2 system in-call service on every call).
+  ColorOS locks its notification toggles AND blocks adb pm revoke/appops —
+  the only fix is disabling the app (Settings section guides users; the
+  user's device has it disabled via `pm disable-user`). A reminder section
+  warns to re-enable before uninstalling.
+- Notification RemoteViews resolve `?android:attr` theme colors against the
+  APP theme, not the notification surface — use explicit values/values-night
+  colors. Custom fonts work via android:fontFamily in the layout XML.
+- The ColorOS notification template draws a ~32dp app-icon badge that can't
+  be moved/resized; 44dp buttons kept for tappability (32dp was too small).
+- Telegram's raw contacts carry no phone row, so Android often fails to
+  aggregate them — profile loading sweeps sibling contacts' app-action rows
+  by number match (label preferred over DATA1, which can be an app user ID).
+- Adaptive-icon foreground art is offset for the safe zone — notifications
+  need the separate centered `ic_notification` drawable.
+
+## Phase 1 closed (2026-08-04)
+
+All dialer-audit features shipped and on-device verified except live-call
+items (add call/merge, in-call SIM label, conference) and D-pad on real flip
+hardware (tester has a Cat S22 Flip). Phase 2 candidates: live-tile widget,
+settings backup/restore, localization/RTL, release build + signing +
+versioning for launch.
