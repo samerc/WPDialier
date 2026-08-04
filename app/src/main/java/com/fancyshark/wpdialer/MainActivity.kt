@@ -94,6 +94,7 @@ sealed interface Screen {
     data class CallDetails(val number: String, val name: String?) : Screen
     data object Search : Screen
     data object Settings : Screen
+    data object About : Screen
 }
 
 /** A call waiting on the user to choose a SIM. */
@@ -490,7 +491,10 @@ class MainActivity : ComponentActivity() {
                             accent = accent,
                             isDefaultDialer = default,
                             onRequestDefault = { requestDefaultDialer() },
+                            onAbout = { push(Screen.About) },
                         )
+
+                        Screen.About -> com.fancyshark.wpdialer.screens.AboutScreen(accent)
                     }
                 }
 

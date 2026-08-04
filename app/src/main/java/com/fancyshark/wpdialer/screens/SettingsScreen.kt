@@ -79,6 +79,7 @@ fun SettingsScreen(
     accent: Accent,
     isDefaultDialer: Boolean,
     onRequestDefault: () -> Unit,
+    onAbout: () -> Unit = {},
 ) {
     val context = LocalContext.current
     Column(
@@ -461,6 +462,24 @@ fun SettingsScreen(
                 )
             }
         }
+
+        Spacer(Modifier.height(30.dp))
+        Text(
+            "About",
+            color = accent.color,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Text(
+            "about this app",
+            color = Metro.Foreground,
+            fontSize = 22.sp,
+            fontWeight = FontWeight.Light,
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onAbout() }
+                .padding(vertical = 8.dp),
+        )
 
         Spacer(Modifier.height(30.dp))
     }

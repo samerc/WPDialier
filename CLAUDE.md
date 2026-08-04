@@ -1,7 +1,12 @@
 # WP Dialer — project notes for Claude
 
 Windows Phone 8 (Metro) styled Android dialer. Package `com.fancyshark.wpdialer`,
-app label "Phone". Kotlin + Jetpack Compose, single module `:app`.
+launcher label "Phone" (WP-authentic), public/store name **"Dialer 8"** (user
+decision 2026-08-04; avoids MS trademarks). Contact email on the About screen:
+fancyshark505@gmail.com. Kotlin + Jetpack Compose, single module `:app`.
+Git identity: samerc / 9696877+samerc@users.noreply.github.com (NEVER
+ai@bahriah.com — unrelated to the user's GitHub; history was rewritten to
+purge it).
 
 ## Build & install
 

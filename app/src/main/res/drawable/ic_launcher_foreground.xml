@@ -4,13 +4,24 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
+    <!-- White WP-style handset glyph, offset slightly left to make room
+         for the "8" mark at the lower right. -->
     <group
-        android:scaleX="1.6"
-        android:scaleY="1.6"
-        android:translateX="34.8"
-        android:translateY="34.8">
+        android:scaleX="1.9"
+        android:scaleY="1.9"
+        android:translateX="24"
+        android:translateY="26">
         <path
             android:fillColor="#FFFFFF"
             android:pathData="M6.62,10.79c1.44,2.83 3.76,5.14 6.59,6.59l2.2,-2.2c0.27,-0.27 0.67,-0.36 1.02,-0.24 1.12,0.37 2.33,0.57 3.57,0.57 0.55,0 1,0.45 1,1V20c0,0.55 -0.45,1 -1,1 -9.39,0 -17,-7.61 -17,-17 0,-0.55 0.45,-1 1,-1h3.5c0.55,0 1,0.45 1,1 0,1.25 0.2,2.45 0.57,3.57 0.11,0.35 0.03,0.74 -0.25,1.02l-2.2,2.2z" />
     </group>
+    <!-- "8" built from two stroked circles, Metro-thin -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2.6"
+        android:pathData="M73.4,52 a3.6,3.6 0 1,1 7.2,0 a3.6,3.6 0 1,1 -7.2,0" />
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2.6"
+        android:pathData="M72.6,59.6 a4.4,4.4 0 1,1 8.8,0 a4.4,4.4 0 1,1 -8.8,0" />
 </vector>
