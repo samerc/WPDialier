@@ -39,6 +39,20 @@ data class ContactAccount(val name: String?, val type: String?) {
 
 data class EditPhone(val dataId: Long?, val number: String, val label: String)
 
+data class EditEmail(
+    val dataId: Long?,
+    val address: String,
+    val type: Int,
+    val customLabel: String = "",
+)
+
+data class EditEvent(
+    val dataId: Long?,
+    val startDate: String,
+    val type: Int,
+    val customLabel: String = "",
+)
+
 data class EditRawContact(
     val rawContactId: Long,
     val account: ContactAccount,
@@ -47,6 +61,14 @@ data class EditRawContact(
     val phones: List<EditPhone>,
     val noteDataId: Long? = null,
     val note: String = "",
+    val emails: List<EditEmail> = emptyList(),
+    val events: List<EditEvent> = emptyList(),
+    val addressDataId: Long? = null,
+    val address: String = "",
+    /** Existing photo bytes (thumbnail from the data row), for preview only. */
+    val photo: ByteArray? = null,
+    /** Newly picked photo bytes; non-null means "replace the photo on save". */
+    val newPhoto: ByteArray? = null,
 )
 
 data class EditableContact(val contactId: Long, val raws: List<EditRawContact>)
@@ -89,7 +111,12 @@ object ContactEditor {
         var name = ""
         var noteDataId: Long? = null
         var note = ""
+        var addressDataId: Long? = null
+        var address = ""
+        var photo: ByteArray? = null
         val phones = mutableListOf<EditPhone>()
+        val emails = mutableListOf<EditEmail>()
+        val events = mutableListOf<EditEvent>()
         context.contentResolver.query(
             ContactsContract.Data.CONTENT_URI,
             arrayOf(
@@ -98,6 +125,7 @@ object ContactEditor {
                 ContactsContract.Data.DATA1,
                 ContactsContract.Data.DATA2,
                 ContactsContract.Data.DATA3,
+                ContactsContract.Data.DATA15,
             ),
             "${ContactsContract.Data.RAW_CONTACT_ID} = ?",
             arrayOf(rawContactId.toString()),
@@ -115,6 +143,33 @@ object ContactEditor {
                         ).toString().lowercase()
                         phones += EditPhone(c.getLong(0), c.getString(2) ?: "", label)
                     }
+                    Email.CONTENT_ITEM_TYPE -> {
+                        emails += EditEmail(
+                            c.getLong(0),
+                            c.getString(2) ?: "",
+                            if (c.isNull(3)) Email.TYPE_OTHER else c.getInt(3),
+                            c.getString(4) ?: "",
+                        )
+                    }
+                    Event.CONTENT_ITEM_TYPE -> {
+                        events += EditEvent(
+                            c.getLong(0),
+                            c.getString(2) ?: "",
+                            if (c.isNull(3)) Event.TYPE_OTHER else c.getInt(3),
+                            c.getString(4) ?: "",
+                        )
+                    }
+                    StructuredPostal.CONTENT_ITEM_TYPE -> {
+                        // The editor exposes a single formatted address per raw
+                        // contact; keep the first row and leave others untouched.
+                        if (addressDataId == null) {
+                            addressDataId = c.getLong(0)
+                            address = c.getString(2) ?: ""
+                        }
+                    }
+                    Photo.CONTENT_ITEM_TYPE -> {
+                        if (photo == null) photo = runCatching { c.getBlob(5) }.getOrNull()
+                    }
                     Note.CONTENT_ITEM_TYPE -> {
                         noteDataId = c.getLong(0)
                         note = c.getString(2) ?: ""
@@ -122,7 +177,10 @@ object ContactEditor {
                 }
             }
         }
-        return EditRawContact(rawContactId, account, nameDataId, name, phones, noteDataId, note)
+        return EditRawContact(
+            rawContactId, account, nameDataId, name, phones, noteDataId, note,
+            emails, events, addressDataId, address, photo,
+        )
     }
 
     /**
@@ -222,6 +280,116 @@ object ContactEditor {
                                 .build()
                     }
                 }
+
+                raw.emails.forEach { email ->
+                    val label =
+                        if (email.type == Email.TYPE_CUSTOM) email.customLabel.ifBlank { "custom" }
+                        else null
+                    if (email.dataId == null) {
+                        if (email.address.isNotBlank()) {
+                            ops += insertRow(raw.rawContactId, Email.CONTENT_ITEM_TYPE)
+                                .withValue(Email.ADDRESS, email.address)
+                                .withValue(Email.TYPE, email.type)
+                                .withValue(Email.LABEL, label)
+                                .build()
+                        }
+                    } else {
+                        val origEmail = orig.emails.firstOrNull { it.dataId == email.dataId }
+                        if (email.address.isBlank()) {
+                            ops += deleteDataRow(email.dataId)
+                        } else if (origEmail != null &&
+                            (origEmail.address != email.address ||
+                                origEmail.type != email.type ||
+                                origEmail.customLabel != email.customLabel)
+                        ) {
+                            ops += updateDataRow(email.dataId)
+                                .withValue(Email.ADDRESS, email.address)
+                                .withValue(Email.TYPE, email.type)
+                                .withValue(Email.LABEL, label)
+                                .build()
+                        }
+                    }
+                }
+
+                // Emails removed in the editor.
+                orig.emails.forEach { origEmail ->
+                    if (origEmail.dataId != null &&
+                        raw.emails.none { it.dataId == origEmail.dataId }
+                    ) {
+                        ops += deleteDataRow(origEmail.dataId)
+                    }
+                }
+
+                raw.events.forEach { event ->
+                    val label =
+                        if (event.type == Event.TYPE_CUSTOM) event.customLabel.ifBlank { "custom" }
+                        else null
+                    if (event.dataId == null) {
+                        if (event.startDate.isNotBlank()) {
+                            ops += insertRow(raw.rawContactId, Event.CONTENT_ITEM_TYPE)
+                                .withValue(Event.START_DATE, event.startDate)
+                                .withValue(Event.TYPE, event.type)
+                                .withValue(Event.LABEL, label)
+                                .build()
+                        }
+                    } else {
+                        val origEvent = orig.events.firstOrNull { it.dataId == event.dataId }
+                        if (event.startDate.isBlank()) {
+                            ops += deleteDataRow(event.dataId)
+                        } else if (origEvent != null &&
+                            (origEvent.startDate != event.startDate ||
+                                origEvent.type != event.type ||
+                                origEvent.customLabel != event.customLabel)
+                        ) {
+                            ops += updateDataRow(event.dataId)
+                                .withValue(Event.START_DATE, event.startDate)
+                                .withValue(Event.TYPE, event.type)
+                                .withValue(Event.LABEL, label)
+                                .build()
+                        }
+                    }
+                }
+
+                // Dates removed in the editor.
+                orig.events.forEach { origEvent ->
+                    if (origEvent.dataId != null &&
+                        raw.events.none { it.dataId == origEvent.dataId }
+                    ) {
+                        ops += deleteDataRow(origEvent.dataId)
+                    }
+                }
+
+                if (raw.address != orig.address) {
+                    when {
+                        raw.addressDataId != null && raw.address.isBlank() ->
+                            ops += deleteDataRow(raw.addressDataId)
+                        raw.addressDataId != null ->
+                            ops += updateDataRow(raw.addressDataId)
+                                .withValue(StructuredPostal.FORMATTED_ADDRESS, raw.address)
+                                .build()
+                        raw.address.isNotBlank() ->
+                            ops += insertRow(raw.rawContactId, StructuredPostal.CONTENT_ITEM_TYPE)
+                                .withValue(StructuredPostal.FORMATTED_ADDRESS, raw.address)
+                                .withValue(StructuredPostal.TYPE, StructuredPostal.TYPE_HOME)
+                                .build()
+                    }
+                }
+
+                // Photo replacement: drop any existing photo rows on this raw
+                // contact, then insert the newly picked bytes.
+                if (raw.newPhoto != null) {
+                    ops += ContentProviderOperation
+                        .newDelete(ContactsContract.Data.CONTENT_URI)
+                        .withSelection(
+                            "${ContactsContract.Data.RAW_CONTACT_ID} = ? AND " +
+                                "${ContactsContract.Data.MIMETYPE} = ?",
+                            arrayOf(raw.rawContactId.toString(), Photo.CONTENT_ITEM_TYPE),
+                        )
+                        .build()
+                    ops += insertRow(raw.rawContactId, Photo.CONTENT_ITEM_TYPE)
+                        .withValue(Photo.PHOTO, raw.newPhoto)
+                        .build()
+                }
             }
             if (ops.isEmpty()) return@withContext true
             runCatching {
@@ -234,6 +402,17 @@ object ContactEditor {
             .newDelete(ContactsContract.Data.CONTENT_URI)
             .withSelection("${ContactsContract.Data._ID} = ?", arrayOf(dataId.toString()))
             .build()
+
+    private fun updateDataRow(dataId: Long): ContentProviderOperation.Builder =
+        ContentProviderOperation
+            .newUpdate(ContactsContract.Data.CONTENT_URI)
+            .withSelection("${ContactsContract.Data._ID} = ?", arrayOf(dataId.toString()))
+
+    private fun insertRow(rawContactId: Long, mimeType: String): ContentProviderOperation.Builder =
+        ContentProviderOperation
+            .newInsert(ContactsContract.Data.CONTENT_URI)
+            .withValue(ContactsContract.Data.RAW_CONTACT_ID, rawContactId)
+            .withValue(ContactsContract.Data.MIMETYPE, mimeType)
 
     /**
      * Account types owned by messaging apps that expose read-only contact

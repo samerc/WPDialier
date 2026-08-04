@@ -502,6 +502,71 @@ private fun ContactDetailBody(
                 }
             }
 
+            var ringtoneUri by remember(d.id) { mutableStateOf<String?>(null) }
+            androidx.compose.runtime.LaunchedEffect(d.id) {
+                ringtoneUri = Repo.contactRingtone(context, d.id)
+            }
+            val ringtoneTitle = remember(ringtoneUri) {
+                ringtoneUri?.let { uri ->
+                    runCatching {
+                        android.media.RingtoneManager
+                            .getRingtone(context, android.net.Uri.parse(uri))
+                            ?.getTitle(context)
+                    }.getOrNull()
+                } ?: "default"
+            }
+            val ringtoneScope = androidx.compose.runtime.rememberCoroutineScope()
+            val ringtonePicker = androidx.activity.compose.rememberLauncherForActivityResult(
+                androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult(),
+            ) { result ->
+                if (result.resultCode == android.app.Activity.RESULT_OK) {
+                    val uri = result.data?.getParcelableExtra(
+                        android.media.RingtoneManager.EXTRA_RINGTONE_PICKED_URI,
+                        android.net.Uri::class.java,
+                    )?.toString()
+                    ringtoneUri = uri
+                    ringtoneScope.launch { Repo.setContactRingtone(context, d.id, uri) }
+                }
+            }
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .clickable {
+                        runCatching {
+                            ringtonePicker.launch(
+                                android.content.Intent(
+                                    android.media.RingtoneManager.ACTION_RINGTONE_PICKER,
+                                )
+                                    .putExtra(
+                                        android.media.RingtoneManager.EXTRA_RINGTONE_TYPE,
+                                        android.media.RingtoneManager.TYPE_RINGTONE,
+                                    )
+                                    .putExtra(
+                                        android.media.RingtoneManager.EXTRA_RINGTONE_TITLE,
+                                        "ringtone",
+                                    )
+                                    .putExtra(
+                                        android.media.RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT,
+                                        true,
+                                    )
+                                    .putExtra(
+                                        android.media.RingtoneManager.EXTRA_RINGTONE_EXISTING_URI,
+                                        ringtoneUri?.let { android.net.Uri.parse(it) },
+                                    ),
+                            )
+                        }
+                    }
+                    .padding(vertical = 9.dp),
+            ) {
+                Text(
+                    "ringtone",
+                    color = Metro.Foreground,
+                    fontSize = 25.sp,
+                    fontWeight = FontWeight.Light,
+                )
+                Text(ringtoneTitle, color = accent, fontSize = 15.sp)
+            }
+
             if (!d.note.isNullOrBlank()) {
                 Spacer(Modifier.height(16.dp))
                 Text(

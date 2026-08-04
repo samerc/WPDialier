@@ -26,6 +26,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Bluetooth
+import androidx.compose.material.icons.filled.CallMerge
 import androidx.compose.material.icons.filled.Dialpad
 import androidx.compose.material.icons.filled.MicOff
 import androidx.compose.material.icons.filled.Pause
@@ -353,6 +354,26 @@ private fun ActiveScreen(
         if (number.isNotBlank() && name != number) {
             Text(number, color = Metro.Subtle, fontSize = 18.sp, fontWeight = FontWeight.Light)
         }
+        // On dual-SIM devices, show which SIM carries this call.
+        val simLabel = remember(call) {
+            runCatching {
+                val sims = com.fancyshark.wpdialer.data.Sims.options(context2)
+                if (sims.size > 1) {
+                    sims.firstOrNull { it.handle == call?.details?.accountHandle }?.label
+                } else {
+                    null
+                }
+            }.getOrNull()
+        }
+        if (simLabel != null) {
+            Text(
+                simLabel,
+                color = Metro.Subtle,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Light,
+                modifier = Modifier.padding(top = 2.dp),
+            )
+        }
 
         if (secondCall != null && secondState == Call.STATE_RINGING) {
             Spacer(Modifier.height(20.dp))
@@ -412,6 +433,7 @@ private fun ActiveScreen(
             }
             Spacer(Modifier.height(6.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                val context = androidx.compose.ui.platform.LocalContext.current
                 IconTile(
                     Icons.Filled.Pause, "hold", held, accent,
                     modifier = Modifier.weight(1f),
@@ -421,14 +443,29 @@ private fun ActiveScreen(
                         Icons.Filled.SwapCalls, "swap", false, accent,
                         modifier = Modifier.weight(1f),
                     ) { CallManager.swap() }
+                    IconTile(
+                        Icons.Filled.CallMerge, "merge", false, accent,
+                        modifier = Modifier.weight(1f),
+                    ) { CallManager.merge() }
                 } else {
                     IconTile(
                         Icons.Filled.Add, "add call", false, accent,
-                        enabled = false,
                         modifier = Modifier.weight(1f),
-                    ) { }
+                    ) {
+                        // Open the dialpad to dial the second call; telecom
+                        // puts the current call on hold automatically.
+                        CallManager.userDismissedUi = true
+                        context.startActivity(
+                            android.content.Intent(
+                                context,
+                                com.fancyshark.wpdialer.MainActivity::class.java,
+                            )
+                                .setAction(android.content.Intent.ACTION_DIAL)
+                                .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+                        )
+                    }
+                    Spacer(Modifier.weight(1f))
                 }
-                Spacer(Modifier.weight(1f))
             }
         }
         Spacer(Modifier.height(6.dp))

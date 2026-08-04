@@ -62,7 +62,67 @@ data class HistoryItem(
     val duration: Long = 0,
 )
 
+/** One phone number of one contact, for smart-dial matching. */
+data class DialEntry(val contactId: Long, val name: String, val number: String)
+
 object Repo {
+
+    /** The contact's custom ringtone URI string, or null for default. */
+    suspend fun contactRingtone(context: Context, id: Long): String? =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                context.contentResolver.query(
+                    ContactsContract.Contacts.CONTENT_URI,
+                    arrayOf(ContactsContract.Contacts.CUSTOM_RINGTONE),
+                    "${ContactsContract.Contacts._ID} = ?",
+                    arrayOf(id.toString()),
+                    null,
+                )?.use { c -> if (c.moveToFirst()) c.getString(0) else null }
+            }.getOrNull()
+        }
+
+    /** Telecom's ringer honors this when the contact calls. */
+    suspend fun setContactRingtone(context: Context, id: Long, uri: String?): Unit =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val values = android.content.ContentValues().apply {
+                    put(ContactsContract.Contacts.CUSTOM_RINGTONE, uri)
+                }
+                context.contentResolver.update(
+                    android.content.ContentUris.withAppendedId(
+                        ContactsContract.Contacts.CONTENT_URI, id,
+                    ),
+                    values, null, null,
+                )
+            }
+        }
+
+    /** All contact phone numbers, deduped, for T9 smart dial. */
+    suspend fun loadDialEntries(context: Context): List<DialEntry> = withContext(Dispatchers.IO) {
+        val out = mutableListOf<DialEntry>()
+        runCatching {
+            context.contentResolver.query(
+                ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+                arrayOf(
+                    ContactsContract.CommonDataKinds.Phone.CONTACT_ID,
+                    ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME_PRIMARY,
+                    ContactsContract.CommonDataKinds.Phone.NUMBER,
+                ),
+                null,
+                null,
+                "${ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME_PRIMARY} COLLATE NOCASE ASC",
+            )?.use { c ->
+                val seen = mutableSetOf<Pair<Long, String>>()
+                while (c.moveToNext()) {
+                    val name = c.getString(1) ?: continue
+                    val num = c.getString(2) ?: continue
+                    val key = c.getLong(0) to num.filter { it.isDigit() }.takeLast(9)
+                    if (seen.add(key)) out += DialEntry(c.getLong(0), name, num)
+                }
+            }
+        }
+        out
+    }
 
     suspend fun loadContacts(context: Context): List<ContactItem> = withContext(Dispatchers.IO) {
         val out = mutableListOf<ContactItem>()

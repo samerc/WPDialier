@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -49,6 +50,36 @@ private val KEYS = listOf(
     "7" to "PQRS", "8" to "TUV", "9" to "WXYZ",
     "*" to "", "0" to "+", "#" to "",
 )
+
+// T9 mapping for smart dial: letters to keypad digits.
+private val T9: Map<Char, Char> = buildMap {
+    "abc".forEach { put(it, '2') }
+    "def".forEach { put(it, '3') }
+    "ghi".forEach { put(it, '4') }
+    "jkl".forEach { put(it, '5') }
+    "mno".forEach { put(it, '6') }
+    "pqrs".forEach { put(it, '7') }
+    "tuv".forEach { put(it, '8') }
+    "wxyz".forEach { put(it, '9') }
+}
+
+private fun t9(text: String): String = buildString {
+    for (ch in text.lowercase()) {
+        T9[ch]?.let { append(it) } ?: if (ch.isDigit()) append(ch) else Unit
+    }
+}
+
+/** Rank a smart-dial candidate for [input] digits; null = no match. */
+private fun dialRank(entry: com.fancyshark.wpdialer.data.DialEntry, input: String): Int? {
+    val words = entry.name.split(' ', '-', '.').filter { it.isNotBlank() }
+    val full = t9(entry.name)
+    return when {
+        full.startsWith(input) -> 0
+        words.any { t9(it).startsWith(input) } -> 1
+        entry.number.filter { it.isDigit() }.contains(input) -> 2
+        else -> null
+    }
+}
 
 /**
  * Routes hardware keypad presses (flip/keypad phones) into the dialpad:
@@ -151,6 +182,47 @@ fun DialpadScreen(
         }
 
         Spacer(Modifier.weight(1f))
+
+        // T9 smart dial: match typed digits against contact names and numbers.
+        val entries by androidx.compose.runtime.produceState(
+            emptyList<com.fancyshark.wpdialer.data.DialEntry>(),
+        ) {
+            value = com.fancyshark.wpdialer.data.Repo.loadDialEntries(context)
+        }
+        val input = number.filter { it.isDigit() }
+        val suggestions = remember(number, entries) {
+            if (input.length < 2 || number.any { it == '*' || it == '#' }) {
+                emptyList()
+            } else {
+                entries.mapNotNull { e -> dialRank(e, input)?.let { it to e } }
+                    .sortedBy { it.first }
+                    .map { it.second }
+                    .distinctBy { it.contactId to it.number.filter(Char::isDigit).takeLast(9) }
+                    .take(3)
+            }
+        }
+        suggestions.forEach { entry ->
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .clickable { onCall(entry.number) }
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
+            ) {
+                Text(
+                    entry.name,
+                    color = Metro.Foreground,
+                    fontSize = 21.sp,
+                    fontWeight = FontWeight.Light,
+                    maxLines = 1,
+                )
+                Text(
+                    com.fancyshark.wpdialer.data.Repo.pretty(context, entry.number),
+                    color = accent,
+                    fontSize = 14.sp,
+                )
+            }
+        }
+        if (suggestions.isNotEmpty()) Spacer(Modifier.height(8.dp))
 
         Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
             KEYS.chunked(3).forEach { row ->

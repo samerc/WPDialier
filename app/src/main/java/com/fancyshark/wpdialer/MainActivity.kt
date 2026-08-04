@@ -192,6 +192,8 @@ class MainActivity : ComponentActivity() {
         when (intent?.action) {
             Intent.ACTION_DIAL, Intent.ACTION_VIEW ->
                 dialRequest.value = intent.data?.schemeSpecificPart ?: ""
+            // Headset / hardware call button.
+            Intent.ACTION_CALL_BUTTON -> dialRequest.value = ""
         }
     }
 
@@ -240,6 +242,16 @@ class MainActivity : ComponentActivity() {
             permissionLauncher.launch(corePermissions())
             return
         }
+        // Emergency numbers bypass SIM preferences and the SIM chooser —
+        // telecom routes them itself regardless of phone account.
+        val emergency = runCatching {
+            getSystemService(android.telephony.TelephonyManager::class.java)
+                ?.isEmergencyNumber(number) == true
+        }.getOrDefault(false)
+        if (emergency) {
+            placeCallWith(number, null)
+            return
+        }
         val sims = Sims.options(this)
         if (sims.size <= 1) {
             placeCallWith(number, null)
@@ -280,7 +292,13 @@ class MainActivity : ComponentActivity() {
         val number = runCatching {
             getSystemService(android.telephony.TelephonyManager::class.java)?.voiceMailNumber
         }.getOrNull()
-        if (!number.isNullOrBlank()) placeCall(number)
+        if (!number.isNullOrBlank()) {
+            placeCall(number)
+        } else {
+            android.widget.Toast.makeText(
+                this, "no voicemail number set up on this SIM", android.widget.Toast.LENGTH_SHORT,
+            ).show()
+        }
     }
 
     private fun sendText(number: String) {

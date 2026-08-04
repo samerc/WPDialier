@@ -172,6 +172,13 @@ object CallManager {
         if (on) c.hold() else c.unhold()
     }
 
+    /** Merge the active and held calls into a conference (if supported). */
+    fun merge() {
+        val active = _call.value ?: return
+        val held = _secondCall.value ?: return
+        runCatching { active.conference(held) }
+    }
+
     fun startDtmf(digit: Char) = _call.value?.playDtmfTone(digit)
 
     fun stopDtmf() = _call.value?.stopDtmfTone()
