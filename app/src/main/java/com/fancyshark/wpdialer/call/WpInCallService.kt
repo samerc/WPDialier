@@ -10,6 +10,7 @@ import android.os.PowerManager
 import android.telecom.Call
 import android.telecom.CallEndpoint
 import android.telecom.InCallService
+import androidx.compose.ui.graphics.toArgb
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -88,13 +89,28 @@ class WpInCallService : InCallService() {
     }
 
     private fun postOngoingNotification(call: Call) {
+        val number = call.details.handle?.schemeSpecificPart ?: "unknown"
+        val s = scope ?: run {
+            postOngoingNotificationNow(number)
+            return
+        }
+        s.launch {
+            val (name, _) = com.fancyshark.wpdialer.data.Repo
+                .lookupCaller(this@WpInCallService, number)
+            val state = CallManager.stateOf(call)
+            if (state != Call.STATE_DISCONNECTED && state != Call.STATE_RINGING) {
+                postOngoingNotificationNow(name ?: number)
+            }
+        }
+    }
+
+    private fun postOngoingNotificationNow(display: String) {
         val nm = getSystemService(NotificationManager::class.java)
         nm.createNotificationChannel(
             NotificationChannel(
                 ONGOING_CHANNEL_ID, "Ongoing calls", NotificationManager.IMPORTANCE_LOW,
             ),
         )
-        val number = call.details.handle?.schemeSpecificPart ?: "unknown"
         val open = PendingIntent.getActivity(
             this, 4,
             Intent(this, InCallActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
@@ -106,9 +122,15 @@ class WpInCallService : InCallService() {
                 .setAction(CallActionReceiver.ACTION_HANGUP),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
-        val caller = Person.Builder().setName(number).setImportant(true).build()
+        val caller = Person.Builder().setName(display).setImportant(true).build()
+        com.fancyshark.wpdialer.ui.AccentStore.init(this)
         val notification = Notification.Builder(this, ONGOING_CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.sym_action_call)
+            .setSmallIcon(
+                android.graphics.drawable.Icon.createWithResource(
+                    this, com.fancyshark.wpdialer.R.drawable.ic_launcher_foreground,
+                ),
+            )
+            .setColor(com.fancyshark.wpdialer.ui.AccentStore.accent.value.color.toArgb())
             .setStyle(Notification.CallStyle.forOngoingCall(caller, hangup))
             .setCategory(Notification.CATEGORY_CALL)
             .setOngoing(true)
@@ -170,8 +192,14 @@ class WpInCallService : InCallService() {
             Intent(this, com.fancyshark.wpdialer.MainActivity::class.java),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
+        com.fancyshark.wpdialer.ui.AccentStore.init(this)
         val notification = Notification.Builder(this, MISSED_CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.sym_call_missed)
+            .setSmallIcon(
+                android.graphics.drawable.Icon.createWithResource(
+                    this, com.fancyshark.wpdialer.R.drawable.ic_launcher_foreground,
+                ),
+            )
+            .setColor(com.fancyshark.wpdialer.ui.AccentStore.accent.value.color.toArgb())
             .setContentTitle("Missed call")
             .setContentText(number)
             .setCategory(Notification.CATEGORY_MISSED_CALL)
@@ -196,12 +224,40 @@ class WpInCallService : InCallService() {
     }
 
     private fun postIncomingNotification(call: Call) {
+        val number = call.details.handle?.schemeSpecificPart ?: "unknown"
+        val s = scope ?: run {
+            postIncomingNotificationNow(number, number, null)
+            return
+        }
+        s.launch {
+            val (name, photoUri) = com.fancyshark.wpdialer.data.Repo
+                .lookupCaller(this@WpInCallService, number)
+            val photo = photoUri?.let { uri ->
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    runCatching {
+                        contentResolver.openInputStream(android.net.Uri.parse(uri))?.use {
+                            android.graphics.BitmapFactory.decodeStream(it)
+                        }
+                    }.getOrNull()
+                }
+            }
+            // The lookup may finish after the call was answered or missed.
+            if (CallManager.stateOf(call) == Call.STATE_RINGING) {
+                postIncomingNotificationNow(number, name ?: number, photo)
+            }
+        }
+    }
+
+    private fun postIncomingNotificationNow(
+        number: String,
+        display: String,
+        photo: android.graphics.Bitmap?,
+    ) {
         val nm = getSystemService(NotificationManager::class.java)
         nm.createNotificationChannel(
             NotificationChannel(CHANNEL_ID, "Incoming calls", NotificationManager.IMPORTANCE_HIGH)
                 .apply { setSound(null, null) },
         )
-        val number = call.details.handle?.schemeSpecificPart ?: "unknown"
         val fullScreen = PendingIntent.getActivity(
             this, 1,
             Intent(this, InCallActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
@@ -217,10 +273,37 @@ class WpInCallService : InCallService() {
             Intent(this, CallActionReceiver::class.java).setAction(CallActionReceiver.ACTION_DECLINE),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
-        val caller = Person.Builder().setName(number).setImportant(true).build()
+        com.fancyshark.wpdialer.ui.AccentStore.init(this)
+        val accent = com.fancyshark.wpdialer.ui.AccentStore.accent.value.color.toArgb()
+        // WP-styled custom layout: Selawik text and round Metro answer/decline
+        // buttons (CallStyle's system template allows neither).
+        val views = android.widget.RemoteViews(
+            packageName, com.fancyshark.wpdialer.R.layout.notification_incoming,
+        )
+        views.setTextViewText(com.fancyshark.wpdialer.R.id.caller_name, display)
+        views.setTextViewText(
+            com.fancyshark.wpdialer.R.id.caller_number,
+            if (display != number) number else "incoming call",
+        )
+        if (photo != null) {
+            views.setImageViewBitmap(com.fancyshark.wpdialer.R.id.caller_photo, photo)
+            views.setViewVisibility(
+                com.fancyshark.wpdialer.R.id.caller_photo, android.view.View.VISIBLE,
+            )
+        }
+        views.setOnClickPendingIntent(com.fancyshark.wpdialer.R.id.btn_answer, answer)
+        views.setOnClickPendingIntent(com.fancyshark.wpdialer.R.id.btn_decline, decline)
         val notification = Notification.Builder(this, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.sym_call_incoming)
-            .setStyle(Notification.CallStyle.forIncomingCall(caller, decline, answer))
+            .setSmallIcon(
+                android.graphics.drawable.Icon.createWithResource(
+                    this, com.fancyshark.wpdialer.R.drawable.ic_launcher_foreground,
+                ),
+            )
+            .setColor(accent)
+            .setStyle(Notification.DecoratedCustomViewStyle())
+            .setCustomContentView(views)
+            .setCustomHeadsUpContentView(views)
+            .setCustomBigContentView(views)
             .setCategory(Notification.CATEGORY_CALL)
             .setOngoing(true)
             .setFullScreenIntent(fullScreen, true)
