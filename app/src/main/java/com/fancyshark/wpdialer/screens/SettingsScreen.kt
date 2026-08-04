@@ -257,12 +257,16 @@ fun SettingsScreen(
             }
         }
 
-        val googleDialerInstalled = androidx.compose.runtime.remember {
+        // Only shown while Google's dialer is installed AND enabled — once
+        // the user disables it, the duplicate notifications are gone.
+        val googleDialerEnabled = androidx.compose.runtime.remember {
             runCatching {
-                context.packageManager.getPackageInfo("com.google.android.dialer", 0)
-            }.isSuccess
+                context.packageManager
+                    .getApplicationInfo("com.google.android.dialer", 0)
+                    .enabled
+            }.getOrDefault(false)
         }
-        if (googleDialerInstalled) {
+        if (googleDialerEnabled) {
             Spacer(Modifier.height(30.dp))
             Text(
                 "Duplicate call notifications",
@@ -289,6 +293,26 @@ fun SettingsScreen(
                         ).putExtra(
                             android.provider.Settings.EXTRA_APP_PACKAGE,
                             "com.google.android.dialer",
+                        ),
+                    )
+                }
+            }
+            Text(
+                "On some phones (OnePlus, OPPO...) those toggles are locked. If so, open the app info page below and tap \"Disable\" — this app fully replaces Google's phone app, and you can re-enable it there anytime.",
+                color = Metro.Subtle,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Light,
+                modifier = Modifier.padding(top = 12.dp, bottom = 10.dp),
+            )
+            MetroButton(
+                "open Google Phone app info",
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                runCatching {
+                    context.startActivity(
+                        android.content.Intent(
+                            android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                            android.net.Uri.parse("package:com.google.android.dialer"),
                         ),
                     )
                 }
