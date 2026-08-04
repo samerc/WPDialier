@@ -29,4 +29,6 @@
     <!-- Misc -->
     <string name="main_return_to_call">appuyez pour revenir à l\'appel</string>
     <string name="main_toast_no_voicemail">aucun numéro de messagerie vocale configuré sur cette SIM</string>
+    <string name="main_confirm_block">bloquer ce numéro ?</string>
+    <string name="main_button_block">bloquer</string>
 </resources>

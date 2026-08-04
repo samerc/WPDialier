@@ -76,12 +76,21 @@ fun HistoryPage(
         return
     }
     // WP 8.1 groups consecutive calls with the same number and type: "(2)".
+    // Bounded to the same calendar day so a group delete never removes old
+    // entries the row's single timestamp doesn't represent.
     val groups = remember(items) {
+        fun sameDay(a: Long, b: Long): Boolean {
+            val ca = java.util.Calendar.getInstance().apply { timeInMillis = a }
+            val cb = java.util.Calendar.getInstance().apply { timeInMillis = b }
+            return ca.get(java.util.Calendar.YEAR) == cb.get(java.util.Calendar.YEAR) &&
+                ca.get(java.util.Calendar.DAY_OF_YEAR) == cb.get(java.util.Calendar.DAY_OF_YEAR)
+        }
         val out = mutableListOf<MutableList<HistoryItem>>()
         items.forEach { item ->
-            val last = out.lastOrNull()?.firstOrNull()
+            val last = out.lastOrNull()?.lastOrNull()
             if (last != null && last.type == item.type &&
-                last.number.filter(Char::isDigit) == item.number.filter(Char::isDigit)
+                last.number.filter(Char::isDigit) == item.number.filter(Char::isDigit) &&
+                sameDay(last.date, item.date)
             ) {
                 out.last() += item
             } else {
@@ -548,6 +557,9 @@ fun PeoplePage(
         }
 
         if (showJump) {
+            // Back must close the jump grid, not exit the app (People sits at
+            // the bottom of the nav stack).
+            androidx.activity.compose.BackHandler { showJump = false }
             Column(
                 Modifier
                     .fillMaxSize()

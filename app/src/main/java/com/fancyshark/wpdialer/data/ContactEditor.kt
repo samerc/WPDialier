@@ -91,6 +91,11 @@ object ContactEditor {
                     null,
                 )?.use { c ->
                     while (c.moveToNext()) {
+                        // Never surface raw contacts owned by read-only sync
+                        // accounts (WhatsApp, Telegram, ...) — editing them
+                        // fights their sync adapters and gets reverted.
+                        val type = c.getString(2)?.lowercase().orEmpty()
+                        if (READ_ONLY_ACCOUNT_MARKERS.any { type.contains(it) }) continue
                         raws += loadRawContact(
                             context,
                             rawContactId = c.getLong(0),

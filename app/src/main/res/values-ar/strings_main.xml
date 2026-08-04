@@ -29,4 +29,6 @@
     <!-- Misc -->
     <string name="main_return_to_call">اضغط للعودة إلى المكالمة</string>
     <string name="main_toast_no_voicemail">لم يتم إعداد رقم بريد صوتي على هذه الشريحة</string>
+    <string name="main_confirm_block">حظر هذا الرقم؟</string>
+    <string name="main_button_block">حظر</string>
 </resources>

@@ -76,13 +76,31 @@ class WpInCallService : InCallService() {
         super.onDestroy()
     }
 
+    // Whether our in-call activity is currently in the foreground.
+    private var inCallUiVisible = false
+
     private val notifyCallback = object : Call.Callback() {
         override fun onStateChanged(call: Call, newState: Int) {
-            if (newState != Call.STATE_RINGING) cancelIncomingNotification()
+            // Another call's state change must not kill the notification of a
+            // call that is still ringing (e.g. hanging up A while B rings).
+            if (newState != Call.STATE_RINGING && CallManager.ringingCall() == null) {
+                cancelIncomingNotification()
+            }
             when (newState) {
                 Call.STATE_ACTIVE, Call.STATE_DIALING, Call.STATE_CONNECTING ->
                     postOngoingNotification(call)
-                Call.STATE_DISCONNECTED -> cancelOngoingNotification()
+                Call.STATE_DISCONNECTED -> {
+                    // If another call survives (e.g. the held one dropped),
+                    // its ongoing notification must come back.
+                    val remaining = CallManager.call.value
+                    if (remaining != null &&
+                        CallManager.stateOf(remaining) != Call.STATE_RINGING
+                    ) {
+                        postOngoingNotification(remaining)
+                    } else {
+                        cancelOngoingNotification()
+                    }
+                }
                 else -> {}
             }
         }
@@ -154,8 +172,9 @@ class WpInCallService : InCallService() {
         if (CallManager.stateOf(call) == Call.STATE_RINGING) {
             // Ringing: the notification's full-screen intent decides — full
             // screen when the device is locked/idle, a heads-up banner while
-            // the user is actively in another app (platform behavior).
-            postIncomingNotification(call)
+            // in another app (platform behavior). While our own in-call UI is
+            // in front it shows its inline waiting panel — no banner on top.
+            if (!inCallUiVisible) postIncomingNotification(call)
         } else {
             // Outgoing calls are user-initiated: open the in-call UI directly.
             startActivity(
@@ -168,7 +187,13 @@ class WpInCallService : InCallService() {
     override fun onCallRemoved(call: Call) {
         call.unregisterCallback(notifyCallback)
         CallManager.onCallRemoved(call)
-        cancelIncomingNotification()
+        // A surviving ringing call keeps (or regains) its notification.
+        val stillRinging = CallManager.ringingCall()
+        if (stillRinging == null) {
+            cancelIncomingNotification()
+        } else if (!inCallUiVisible) {
+            postIncomingNotification(stillRinging)
+        }
         if (CallManager.call.value == null) cancelOngoingNotification()
         if (call.details.disconnectCause?.code == android.telecom.DisconnectCause.MISSED) {
             postMissedNotification(call)
@@ -187,9 +212,15 @@ class WpInCallService : InCallService() {
         )
         val number = call.details.handle?.schemeSpecificPart ?: return
         val telUri = android.net.Uri.fromParts("tel", number, null)
+        // Explicit intent into our own dialpad (prefilled) — an implicit
+        // ACTION_CALL PendingIntent could be won by any dialer-filter app,
+        // and would bypass our SIM-preference flow.
         val callBack = PendingIntent.getActivity(
             this, number.hashCode(),
-            Intent(Intent.ACTION_CALL, telUri),
+            Intent(this, com.fancyshark.wpdialer.MainActivity::class.java)
+                .setAction(Intent.ACTION_DIAL)
+                .setData(telUri)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
         val text = PendingIntent.getActivity(
@@ -230,7 +261,9 @@ class WpInCallService : InCallService() {
                 ).build(),
             )
             .build()
-        runCatching { nm.notify(number.hashCode(), notification) }
+        // Tag by number with a fixed ID outside the call-notification ID
+        // space (1/2) — number.hashCode() as the ID could collide with them.
+        runCatching { nm.notify(number, MISSED_NOTIFICATION_ID, notification) }
     }
 
     override fun onCallEndpointChanged(callEndpoint: CallEndpoint) {
@@ -352,12 +385,16 @@ class WpInCallService : InCallService() {
      * repost if the user navigates away mid-ring.
      */
     fun onInCallUiVisibility(visible: Boolean) {
-        val ringing = when {
-            CallManager.state.value == Call.STATE_RINGING -> CallManager.call.value
-            CallManager.secondState.value == Call.STATE_RINGING -> CallManager.secondCall.value
-            else -> null
-        } ?: return
-        if (visible) cancelIncomingNotification() else postIncomingNotification(ringing)
+        inCallUiVisible = visible
+        val ringing = CallManager.ringingCall() ?: return
+        if (visible) {
+            cancelIncomingNotification()
+        } else {
+            // Skip the repost when the screen just went off (power button
+            // during ring) — the full-screen intent would relight it.
+            val pm = getSystemService(PowerManager::class.java)
+            if (pm?.isInteractive != false) postIncomingNotification(ringing)
+        }
     }
 
     companion object {
@@ -366,5 +403,6 @@ class WpInCallService : InCallService() {
         private const val ONGOING_CHANNEL_ID = "ongoing_calls"
         private const val NOTIFICATION_ID = 1
         private const val ONGOING_NOTIFICATION_ID = 2
+        private const val MISSED_NOTIFICATION_ID = 3
     }
 }

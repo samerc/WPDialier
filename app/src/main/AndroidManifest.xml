@@ -38,6 +38,7 @@
         android:icon="@mipmap/ic_launcher"
         android:theme="@style/Theme.WpDialer"
         android:supportsRtl="true"
+        android:allowBackup="false"
         android:localeConfig="@xml/locales_config">
 
         <activity

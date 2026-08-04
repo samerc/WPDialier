@@ -66,8 +66,11 @@ object AppPrefs {
     }
 
     private fun setSpeedDial(context: Context, numbers: List<String>) {
-        _speedDialNumbers.value = numbers
-        prefs(context).edit().putString("speed_dial", numbers.joinToString(SEPARATOR)).apply()
+        // Same separator sanitation as reject messages — a pasted entry
+        // containing the separator would round-trip as corrupt entries.
+        val cleaned = numbers.map { it.replace(SEPARATOR, " ") }.filter { it.isNotBlank() }
+        _speedDialNumbers.value = cleaned
+        prefs(context).edit().putString("speed_dial", cleaned.joinToString(SEPARATOR)).apply()
     }
 
     fun setRejectMessages(context: Context, messages: List<String>) {

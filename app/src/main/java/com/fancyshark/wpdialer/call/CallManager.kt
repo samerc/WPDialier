@@ -56,7 +56,9 @@ object CallManager {
     }
 
     private fun recompute() {
-        val live = calls.filter { stateOf(it) != Call.STATE_DISCONNECTED }
+        // After a merge, telecom keeps the child calls in the list with a
+        // conference parent — only top-level calls drive the UI.
+        val live = calls.filter { stateOf(it) != Call.STATE_DISCONNECTED && it.parent == null }
             .sortedBy { rank(it) }
         // If only a ringing call exists it is primary (the incoming screen);
         // otherwise a ringing call behind an ongoing one is the second call.
@@ -64,6 +66,12 @@ object CallManager {
         _state.value = live.firstOrNull()?.let { stateOf(it) } ?: Call.STATE_DISCONNECTED
         _secondCall.value = live.getOrNull(1)
         _secondState.value = live.getOrNull(1)?.let { stateOf(it) } ?: Call.STATE_DISCONNECTED
+        if (live.isEmpty()) {
+            // Audio-route state must not leak into the next call.
+            _endpoint.value = null
+            _availableEndpoints.value = emptyList()
+            _muted.value = false
+        }
     }
 
     /** True after the user backs out of the in-call UI to browse the app;
@@ -112,7 +120,8 @@ object CallManager {
 
     fun rejectWaiting() = ringingCall()?.reject(false, null)
 
-    private fun ringingCall(): Call? =
+    /** The ringing call, whether it's the primary or a waiting second call. */
+    fun ringingCall(): Call? =
         calls.firstOrNull { stateOf(it) == Call.STATE_RINGING }
 
     fun hangup() = _call.value?.disconnect()

@@ -145,6 +145,19 @@ private class MetroIndicationNode(
         }
     }
 
+    // Lazy layouts reuse nodes; without clearing, a row rebuilt mid-press
+    // resurrects with the pressed overlay stuck on.
+    override fun onDetach() {
+        pressed = false
+        focused = false
+    }
+
+    override fun onReset() {
+        pressed = false
+        focused = false
+        invalidateDraw()
+    }
+
     override fun ContentDrawScope.draw() {
         drawContent()
         if (pressed) drawRect(Metro.Foreground.copy(alpha = 0.08f))

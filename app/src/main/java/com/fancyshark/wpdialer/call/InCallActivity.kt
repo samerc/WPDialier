@@ -107,7 +107,11 @@ class InCallActivity : ComponentActivity() {
     override fun onKeyDown(keyCode: Int, event: android.view.KeyEvent?): Boolean {
         when (keyCode) {
             android.view.KeyEvent.KEYCODE_CALL -> {
-                if (CallManager.state.value == Call.STATE_RINGING) CallManager.answer()
+                when {
+                    CallManager.state.value == Call.STATE_RINGING -> CallManager.answer()
+                    CallManager.secondState.value == Call.STATE_RINGING ->
+                        CallManager.answerWaiting()
+                }
                 return true
             }
             android.view.KeyEvent.KEYCODE_ENDCALL -> {
@@ -124,7 +128,9 @@ class InCallActivity : ComponentActivity() {
     }
 
     override fun onKeyUp(keyCode: Int, event: android.view.KeyEvent?): Boolean {
-        if (dtmfChar(keyCode) != null && CallManager.state.value == Call.STATE_ACTIVE) {
+        // Unconditional: if the call left ACTIVE between key down and up, the
+        // tone would otherwise stay latched on the connection.
+        if (dtmfChar(keyCode) != null) {
             CallManager.stopDtmf()
             return true
         }

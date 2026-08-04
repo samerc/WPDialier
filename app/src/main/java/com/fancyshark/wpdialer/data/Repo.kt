@@ -116,7 +116,8 @@ object Repo {
                 while (c.moveToNext()) {
                     val name = c.getString(1) ?: continue
                     val num = c.getString(2) ?: continue
-                    val key = c.getLong(0) to num.filter { it.isDigit() }.takeLast(9)
+                    val key = c.getLong(0) to
+                        num.filter { it.isDigit() }.takeLast(9).ifEmpty { num }
                     if (seen.add(key)) out += DialEntry(c.getLong(0), name, num)
                 }
             }
@@ -360,7 +361,10 @@ object Repo {
             // as date rows and keep only human-written text in the note.
             note = note?.lines()?.filter { line ->
                 val m = NOTE_EVENT_LINE.matchEntire(line.trim())
-                if (m != null) {
+                // Only consume the line when the date actually parses —
+                // "PIN = 1234-56-78" must stay in the note untouched.
+                val parsedDate = m?.let { tryFormatEventDate(it.groupValues[2]) }
+                if (m != null && parsedDate != null) {
                     // Localize the well-known dump keys; keep anything else raw.
                     val label = when (val key = m.groupValues[1].trim().lowercase()) {
                         "anniversary" ->
@@ -373,12 +377,12 @@ object Repo {
                             )
                         else -> key
                     }
-                    events += ContactEvent(label, formatEventDate(m.groupValues[2]))
+                    events += ContactEvent(label, parsedDate)
                     false
                 } else {
-                    line.isNotBlank()
+                    true // keep everything else, including blank lines
                 }
-            }?.joinToString("\n")?.takeIf { it.isNotBlank() }
+            }?.joinToString("\n")?.trim()?.takeIf { it.isNotBlank() }
             val uniqueEvents = events.distinctBy { it.label to it.date }
             ContactDetail(
                 id, contactName, photo, phones, note, address, lookupKey, starred,
@@ -430,9 +434,10 @@ object Repo {
 
     /**
      * "1987-05-22" -> locale-ordered long date ("May 22, 1987" / "22 mai
-     * 1987"); "--05-22" (yearless) -> month + day in locale order.
+     * 1987"); "--05-22" (yearless) -> month + day in locale order. Null when
+     * the input isn't a plausible date.
      */
-    private fun formatEventDate(raw: String): String {
+    private fun tryFormatEventDate(raw: String): String? {
         val locale = java.util.Locale.getDefault()
         fun format(skeleton: String, year: Int, month: Int, day: Int): String {
             val pattern = android.text.format.DateFormat.getBestDateTimePattern(locale, skeleton)
@@ -441,20 +446,20 @@ object Repo {
         }
         Regex("""^--(\d{2})-(\d{2})""").find(raw.trim())?.let { m ->
             val month = m.groupValues[1].toInt()
-            if (month in 1..12) {
-                return format("MMMMd", 2000, month, m.groupValues[2].toInt())
-            }
+            val day = m.groupValues[2].toInt()
+            if (month in 1..12 && day in 1..31) return format("MMMMd", 2000, month, day)
         }
         Regex("""(\d{4})-(\d{2})-(\d{2})""").find(raw)?.let { m ->
             val month = m.groupValues[2].toInt()
-            if (month in 1..12) {
-                return format(
-                    "yMMMMd", m.groupValues[1].toInt(), month, m.groupValues[3].toInt(),
-                )
+            val day = m.groupValues[3].toInt()
+            if (month in 1..12 && day in 1..31) {
+                return format("yMMMMd", m.groupValues[1].toInt(), month, day)
             }
         }
-        return raw
+        return null
     }
+
+    private fun formatEventDate(raw: String): String = tryFormatEventDate(raw) ?: raw
 
     suspend fun loadHistory(context: Context): List<HistoryItem> = withContext(Dispatchers.IO) {
         val out = mutableListOf<HistoryItem>()
@@ -729,14 +734,16 @@ object Repo {
         if (AppPrefs.relativeTimes.value) relativeTime(date) else wpTime(date)
 
     fun formatDuration(seconds: Long): String {
-        val m = seconds / 60
-        val s = seconds % 60
+        val total = seconds.coerceAtLeast(0)
+        val m = total / 60
+        val s = total % 60
         return "%d:%02d".format(m, s)
     }
 
     /** Deletes several call log entries (a grouped history row). */
     suspend fun deleteHistoryItems(context: Context, ids: List<Long>): Boolean =
         withContext(Dispatchers.IO) {
+            if (ids.isEmpty()) return@withContext false
             runCatching {
                 context.contentResolver.delete(
                     CallLog.Calls.CONTENT_URI,

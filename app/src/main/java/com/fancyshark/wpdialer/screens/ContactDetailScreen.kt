@@ -124,13 +124,22 @@ fun ContactDetailScreen(
         }
 
         if (confirmDelete) {
+            androidx.activity.compose.BackHandler { confirmDelete = false }
             Box(
                 Modifier
                     .fillMaxSize()
                     .background(Metro.Background.copy(alpha = 0.96f))
                     .clickable { confirmDelete = false },
             ) {
-                Column(Modifier.align(Alignment.Center).padding(horizontal = 32.dp)) {
+                Column(
+                    Modifier
+                        .align(Alignment.Center)
+                        .padding(horizontal = 32.dp)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                        ) { /* consume so taps inside don't dismiss */ },
+                ) {
                     Text(
                         stringResource(
                             com.fancyshark.wpdialer.R.string.contact_delete_confirm,
@@ -150,9 +159,14 @@ fun ContactDetailScreen(
                             fill = Metro.Red,
                             modifier = Modifier.weight(1f),
                         ) {
-                            scope.launch {
-                                Repo.deleteContact(context, d.id)
-                                onDeleted()
+                            // Guard: a double-tap must not run delete +
+                            // onDeleted (an extra back-pop) twice.
+                            if (confirmDelete) {
+                                confirmDelete = false
+                                scope.launch {
+                                    Repo.deleteContact(context, d.id)
+                                    onDeleted()
+                                }
                             }
                         }
                         MetroButton(
@@ -665,6 +679,7 @@ private fun ContactDetailBody(
         }
 
         appChooser?.let { (app, actions) ->
+            androidx.activity.compose.BackHandler { appChooser = null }
             Box(
                 Modifier
                     .fillMaxSize()
@@ -700,6 +715,7 @@ private fun ContactDetailBody(
         }
 
         if (showSimChooser) {
+            androidx.activity.compose.BackHandler { showSimChooser = false }
             Box(
                 Modifier
                     .fillMaxSize()

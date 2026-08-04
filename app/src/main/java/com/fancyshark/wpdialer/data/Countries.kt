@@ -22,11 +22,20 @@ object Countries {
             .sortedBy { it.name.lowercase() }
     }
 
+    // Cached: this is read per list row during composition, and the two
+    // TelephonyManager getters are cross-process binder calls. SIM region
+    // changes are rare enough that process lifetime staleness is fine.
+    @Volatile
+    private var cachedRegion: String? = null
+
     fun defaultRegionCode(context: Context): String {
+        cachedRegion?.let { return it }
         val telephony = context.getSystemService(TelephonyManager::class.java)
-        return telephony?.simCountryIso?.takeIf { it.isNotBlank() }?.uppercase()
+        val region = telephony?.simCountryIso?.takeIf { it.isNotBlank() }?.uppercase()
             ?: telephony?.networkCountryIso?.takeIf { it.isNotBlank() }?.uppercase()
             ?: Locale.getDefault().country.ifBlank { "US" }
+        cachedRegion = region
+        return region
     }
 
     /**

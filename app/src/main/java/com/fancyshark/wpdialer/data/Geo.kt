@@ -21,13 +21,24 @@ object Geo {
                 runCatching {
                     val geocoder = Geocoder(context, Locale.getDefault())
                     suspendCancellableCoroutine { cont ->
-                        geocoder.getFromLocation(lat, lon, 1) { results ->
-                            val address = results.firstOrNull()?.let { a ->
-                                (0..a.maxAddressLineIndex)
-                                    .joinToString(", ") { a.getAddressLine(it) }
-                            }
-                            cont.resume(address)
-                        }
+                        geocoder.getFromLocation(
+                            lat, lon, 1,
+                            object : Geocoder.GeocodeListener {
+                                override fun onGeocode(results: MutableList<android.location.Address>) {
+                                    val address = results.firstOrNull()?.let { a ->
+                                        (0..a.maxAddressLineIndex)
+                                            .joinToString(", ") { a.getAddressLine(it) }
+                                    }
+                                    if (cont.isActive) cont.resume(address)
+                                }
+
+                                // The lambda SAM only covers onGeocode; without
+                                // this, failures hang until the outer timeout.
+                                override fun onError(errorMessage: String?) {
+                                    if (cont.isActive) cont.resume(null)
+                                }
+                            },
+                        )
                     }
                 }.getOrNull()
             }
@@ -42,10 +53,14 @@ object Geo {
                     cont.resume(null)
                     return@suspendCancellableCoroutine
                 }
+                // Cancel the provider request when the timeout aborts us, so
+                // the fused provider doesn't keep running (battery).
+                val signal = android.os.CancellationSignal()
+                cont.invokeOnCancellation { runCatching { signal.cancel() } }
                 runCatching {
                     manager.getCurrentLocation(
                         LocationManager.FUSED_PROVIDER,
-                        null,
+                        signal,
                         context.mainExecutor,
                     ) { location -> if (cont.isActive) cont.resume(location) }
                 }.onFailure { if (cont.isActive) cont.resume(null) }

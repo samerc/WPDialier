@@ -29,4 +29,6 @@
     <!-- Misc -->
     <string name="main_return_to_call">tap to return to call</string>
     <string name="main_toast_no_voicemail">no voicemail number set up on this SIM</string>
+    <string name="main_confirm_block">block this number?</string>
+    <string name="main_button_block">block</string>
 </resources>

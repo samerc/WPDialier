@@ -346,7 +346,9 @@ class MainActivity : ComponentActivity() {
             getSystemService(android.telephony.TelephonyManager::class.java)?.voiceMailNumber
         }.getOrNull()
         if (!number.isNullOrBlank()) {
-            placeCall(number)
+            // The voicemail number belongs to the default voice subscription —
+            // don't let a global SIM preference route it over the other SIM.
+            placeCallWith(number, null)
         } else {
             android.widget.Toast.makeText(
                 this, getString(R.string.main_toast_no_voicemail), android.widget.Toast.LENGTH_SHORT,
@@ -398,13 +400,20 @@ class MainActivity : ComponentActivity() {
         val uiScope = androidx.compose.runtime.rememberCoroutineScope()
         var confirmClearHistory by remember { mutableStateOf(false) }
         var confirmDeleteGroup by remember { mutableStateOf<List<HistoryItem>?>(null) }
-        fun push(screen: Screen) = backStack.add(screen)
+        var confirmBlock by remember { mutableStateOf<String?>(null) }
+        // Dedupe: a double-tap must not push the same screen twice (back
+        // would then appear to do nothing).
+        fun push(screen: Screen) {
+            if (backStack.last() != screen) backStack.add(screen)
+        }
         fun popAndRefresh() {
             if (backStack.size > 1) backStack.removeAt(backStack.lastIndex)
             refreshTick.value += 1
         }
         BackHandler(enabled = backStack.size > 1) {
-            backStack.removeAt(backStack.lastIndex)
+            // Refresh on plain back too — e.g. pin/unpin on a profile must
+            // show up on the speed dial page immediately.
+            popAndRefresh()
         }
 
         val contacts by produceState(emptyList<ContactItem>(), granted, tick) {
@@ -441,7 +450,12 @@ class MainActivity : ComponentActivity() {
                     .imePadding(),
             ) {
                 val top = backStack.last()
-                key(top) {
+                // Keeps each stack entry's rememberSaveable state (typed
+                // dialpad number, search query, scroll positions) alive while
+                // another screen is pushed on top of it.
+                val screenStateHolder =
+                    androidx.compose.runtime.saveable.rememberSaveableStateHolder()
+                screenStateHolder.SaveableStateProvider("${backStack.lastIndex}|$top") {
                     when (top) {
                         Screen.Home -> Column(Modifier.fillMaxSize()) {
                             ReturnToCallBanner(accent.color)
@@ -464,11 +478,7 @@ class MainActivity : ComponentActivity() {
                                                 }
                                             },
                                             onDelete = { group -> confirmDeleteGroup = group },
-                                            onBlock = { number ->
-                                                uiScope.launch {
-                                                    Repo.blockNumber(this@MainActivity, number)
-                                                }
-                                            },
+                                            onBlock = { number -> confirmBlock = number },
                                             onDetails = { item ->
                                                 push(Screen.CallDetails(item.number, item.name))
                                             },
@@ -585,7 +595,15 @@ class MainActivity : ComponentActivity() {
                                 indication = null,
                             ) { confirmDeleteGroup = null },
                     ) {
-                        Column(Modifier.align(Alignment.Center).padding(horizontal = 32.dp)) {
+                        Column(
+                            Modifier
+                                .align(Alignment.Center)
+                                .padding(horizontal = 32.dp)
+                                .clickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = null,
+                                ) { /* consume so taps inside don't dismiss */ },
+                        ) {
                             Text(
                                 if (group.size > 1) {
                                     stringResource(R.string.main_confirm_delete_calls, group.size)
@@ -638,7 +656,15 @@ class MainActivity : ComponentActivity() {
                                 indication = null,
                             ) { confirmClearHistory = false },
                     ) {
-                        Column(Modifier.align(Alignment.Center).padding(horizontal = 32.dp)) {
+                        Column(
+                            Modifier
+                                .align(Alignment.Center)
+                                .padding(horizontal = 32.dp)
+                                .clickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = null,
+                                ) { /* consume so taps inside don't dismiss */ },
+                        ) {
                             Text(
                                 stringResource(R.string.main_confirm_delete_all_history),
                                 color = Metro.Foreground,
@@ -669,6 +695,64 @@ class MainActivity : ComponentActivity() {
                                 }
                                 MetroButton(stringResource(R.string.main_button_cancel), modifier = Modifier.weight(1f)) {
                                     confirmClearHistory = false
+                                }
+                            }
+                        }
+                    }
+                }
+
+                confirmBlock?.let { number ->
+                    BackHandler { confirmBlock = null }
+                    Box(
+                        Modifier
+                            .fillMaxSize()
+                            .background(Metro.Background.copy(alpha = 0.96f))
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                            ) { confirmBlock = null },
+                    ) {
+                        Column(
+                            Modifier
+                                .align(Alignment.Center)
+                                .padding(horizontal = 32.dp)
+                                .clickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = null,
+                                ) { /* consume so taps inside don't dismiss */ },
+                        ) {
+                            Text(
+                                stringResource(R.string.main_confirm_block),
+                                color = Metro.Foreground,
+                                fontSize = 26.sp,
+                                fontWeight = FontWeight.Light,
+                            )
+                            Text(
+                                Repo.pretty(this@MainActivity, number),
+                                color = Metro.Subtle,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Light,
+                                modifier = Modifier.padding(bottom = 16.dp),
+                            )
+                            Row(
+                                horizontalArrangement = androidx.compose.foundation.layout
+                                    .Arrangement.spacedBy(10.dp),
+                            ) {
+                                MetroButton(
+                                    stringResource(R.string.main_button_block),
+                                    fill = Metro.Red,
+                                    modifier = Modifier.weight(1f),
+                                ) {
+                                    confirmBlock = null
+                                    lifecycleScope.launch {
+                                        Repo.blockNumber(this@MainActivity, number)
+                                    }
+                                }
+                                MetroButton(
+                                    stringResource(R.string.main_button_cancel),
+                                    modifier = Modifier.weight(1f),
+                                ) {
+                                    confirmBlock = null
                                 }
                             }
                         }
@@ -717,7 +801,11 @@ class MainActivity : ComponentActivity() {
             Column(
                 Modifier
                     .align(Alignment.Center)
-                    .padding(horizontal = 32.dp),
+                    .padding(horizontal = 32.dp)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                    ) { /* consume so taps inside don't dismiss */ },
             ) {
                 Text(
                     stringResource(R.string.main_choose_sim_title),
