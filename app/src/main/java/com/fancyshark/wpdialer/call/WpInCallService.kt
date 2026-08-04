@@ -149,12 +149,17 @@ class WpInCallService : InCallService() {
         call.registerCallback(notifyCallback)
 
         if (CallManager.stateOf(call) == Call.STATE_RINGING) {
+            // Ringing: the notification's full-screen intent decides — full
+            // screen when the device is locked/idle, a heads-up banner while
+            // the user is actively in another app (platform behavior).
             postIncomingNotification(call)
+        } else {
+            // Outgoing calls are user-initiated: open the in-call UI directly.
+            startActivity(
+                Intent(this, InCallActivity::class.java)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            )
         }
-        startActivity(
-            Intent(this, InCallActivity::class.java)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-        )
     }
 
     override fun onCallRemoved(call: Call) {

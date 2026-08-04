@@ -29,7 +29,7 @@
             android:layout_height="wrap_content"
             android:fontFamily="@font/selawkl"
             android:textSize="20sp"
-            android:textColor="?android:attr/textColorPrimary"
+            android:textColor="@color/wp_notif_primary"
             android:singleLine="true"
             android:ellipsize="end" />
 
@@ -39,7 +39,7 @@
             android:layout_height="wrap_content"
             android:fontFamily="@font/selawk"
             android:textSize="13sp"
-            android:textColor="?android:attr/textColorSecondary"
+            android:textColor="@color/wp_notif_secondary"
             android:singleLine="true" />
     </LinearLayout>
 

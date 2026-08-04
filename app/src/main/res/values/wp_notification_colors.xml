@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Notification text over the system notification surface (day) -->
+    <color name="wp_notif_primary">#DE000000</color>
+    <color name="wp_notif_secondary">#8A000000</color>
+</resources>
