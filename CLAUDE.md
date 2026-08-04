@@ -99,10 +99,33 @@ purge it).
 - Adaptive-icon foreground art is offset for the safe zone — notifications
   need the separate centered `ic_notification` drawable.
 
-## Phase 1 closed (2026-08-04)
+## Phase 1 closed (2026-08-04); phase 2 in progress
 
-All dialer-audit features shipped and on-device verified except live-call
-items (add call/merge, in-call SIM label, conference) and D-pad on real flip
-hardware (tester has a Cat S22 Flip). Phase 2 candidates: live-tile widget,
-settings backup/restore, localization/RTL, release build + signing +
-versioning for launch.
+Phase 2 shipped so far (all on-device verified, pushed through 7b9d9c0):
+- Privacy policy (PRIVACY.md, linked from About; store-listing URL)
+- Full localization: all ~240 strings externalized (per-area
+  strings_*.xml), complete fr + ar translations, localeConfig + in-app
+  language picker (Settings, overlay style), RTL support (offset{} is
+  already direction-aware — do NOT manually mirror; keypads forced LTR;
+  phone numbers wrapped in LRI/PDI isolates inside Repo.pretty —
+  display-only, never compare pretty() output to raw numbers)
+- Settings language + text-replies are overlay pickers (crowding rule:
+  big lists go in overlays)
+- Whole-app bug-hunt (4 parallel subsystem reviews, 22 fixes): see
+  commit 7b9d9c0 — conference-children filtering, waiting-call
+  notification races, read-only raw-contact protection in the editor,
+  explicit missed-call PendingIntent, SaveableStateHolder for
+  per-screen state, back-pop refresh, push dedupe, block confirm,
+  day-bounded history grouping, MetroIndication reset, allowBackup off
+
+Known deferred: sibling app-action sweep is a full third-party Data
+scan per profile open (IO thread, cache someday); SIM chooser lost on
+recreation mid-dial; osmdroid pause forwarding; type tables /
+kindLabel localize display-only via screens/TypeLabels.kt (keys stay
+English as data — never localize the keys).
+
+Still untested on hardware: add call/merge/conference live calls,
+in-call SIM label, D-pad on the tester's Cat S22 Flip. Remaining
+phase-2 candidates: live-tile widget, settings backup/restore
+(explicit export — auto-backup now disabled), release signing +
+versioning + Play permission declarations for launch.
