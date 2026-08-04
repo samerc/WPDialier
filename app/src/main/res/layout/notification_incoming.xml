@@ -4,14 +4,14 @@
     android:layout_height="wrap_content"
     android:orientation="horizontal"
     android:gravity="center_vertical"
-    android:paddingTop="4dp"
-    android:paddingBottom="4dp">
+    android:paddingTop="8dp"
+    android:paddingBottom="8dp">
 
     <!-- Square Metro contact tile; hidden when there is no photo -->
     <ImageView
         android:id="@+id/caller_photo"
-        android:layout_width="32dp"
-        android:layout_height="32dp"
+        android:layout_width="44dp"
+        android:layout_height="44dp"
         android:layout_marginEnd="12dp"
         android:scaleType="centerCrop"
         android:visibility="gone"
@@ -43,24 +43,22 @@
             android:singleLine="true" />
     </LinearLayout>
 
-    <!-- 32dp to match the size of the app icon badge the system template
-         draws at the left, centered on the same axis -->
     <ImageView
         android:id="@+id/btn_decline"
-        android:layout_width="32dp"
-        android:layout_height="32dp"
+        android:layout_width="44dp"
+        android:layout_height="44dp"
         android:layout_marginStart="12dp"
-        android:padding="8dp"
+        android:padding="11dp"
         android:src="@drawable/ic_wp_decline"
         android:background="@drawable/bg_wp_decline"
         android:contentDescription="decline" />
 
     <ImageView
         android:id="@+id/btn_answer"
-        android:layout_width="32dp"
-        android:layout_height="32dp"
+        android:layout_width="44dp"
+        android:layout_height="44dp"
         android:layout_marginStart="12dp"
-        android:padding="7dp"
+        android:padding="10dp"
         android:src="@drawable/ic_wp_answer"
         android:background="@drawable/bg_wp_answer"
         android:contentDescription="answer" />
