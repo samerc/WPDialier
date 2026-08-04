@@ -181,9 +181,8 @@ fun DialpadScreen(
             }
         }
 
-        Spacer(Modifier.weight(1f))
-
         // T9 smart dial: match typed digits against contact names and numbers.
+        // All matches, scrollable, anchored just above the keypad.
         val entries by androidx.compose.runtime.produceState(
             emptyList<com.fancyshark.wpdialer.data.DialEntry>(),
         ) {
@@ -198,28 +197,34 @@ fun DialpadScreen(
                     .sortedBy { it.first }
                     .map { it.second }
                     .distinctBy { it.contactId to it.number.filter(Char::isDigit).takeLast(9) }
-                    .take(3)
+                    .take(50)
             }
         }
-        suggestions.forEach { entry ->
-            Column(
-                Modifier
-                    .fillMaxWidth()
-                    .clickable { onCall(entry.number) }
-                    .padding(horizontal = 10.dp, vertical = 6.dp),
-            ) {
-                Text(
-                    entry.name,
-                    color = Metro.Foreground,
-                    fontSize = 21.sp,
-                    fontWeight = FontWeight.Light,
-                    maxLines = 1,
-                )
-                Text(
-                    com.fancyshark.wpdialer.data.Repo.pretty(context, entry.number),
-                    color = accent,
-                    fontSize = 14.sp,
-                )
+        androidx.compose.foundation.lazy.LazyColumn(
+            Modifier.weight(1f).fillMaxWidth(),
+            verticalArrangement = Arrangement.Bottom,
+        ) {
+            items(suggestions.size) { i ->
+                val entry = suggestions[i]
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable { onCall(entry.number) }
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                ) {
+                    Text(
+                        entry.name,
+                        color = Metro.Foreground,
+                        fontSize = 21.sp,
+                        fontWeight = FontWeight.Light,
+                        maxLines = 1,
+                    )
+                    Text(
+                        com.fancyshark.wpdialer.data.Repo.pretty(context, entry.number),
+                        color = accent,
+                        fontSize = 14.sp,
+                    )
+                }
             }
         }
         if (suggestions.isNotEmpty()) Spacer(Modifier.height(8.dp))
