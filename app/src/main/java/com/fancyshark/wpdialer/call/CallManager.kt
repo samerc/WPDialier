@@ -66,7 +66,13 @@ object CallManager {
         _secondState.value = live.getOrNull(1)?.let { stateOf(it) } ?: Call.STATE_DISCONNECTED
     }
 
+    /** True after the user backs out of the in-call UI to browse the app;
+     *  suppresses the auto-return until the next call. */
+    @Volatile
+    var userDismissedUi = false
+
     fun onCallAdded(call: Call) {
+        userDismissedUi = false
         if (call !in calls) {
             calls += call
             call.registerCallback(callback)

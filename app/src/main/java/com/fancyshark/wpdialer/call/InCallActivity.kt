@@ -4,6 +4,7 @@ import android.os.Bundle
 import android.telecom.Call
 import android.telecom.CallEndpoint
 import androidx.activity.ComponentActivity
+import androidx.activity.addCallback
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -64,6 +65,10 @@ class InCallActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setShowWhenLocked(true)
         setTurnScreenOn(true)
+        onBackPressedDispatcher.addCallback(this) {
+            CallManager.userDismissedUi = true
+            finish()
+        }
         AccentStore.init(this)
         FontStore.init(this)
         com.fancyshark.wpdialer.data.AppPrefs.init(this)

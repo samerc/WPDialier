@@ -6,9 +6,17 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Person
 import android.content.Intent
+import android.os.PowerManager
 import android.telecom.Call
 import android.telecom.CallEndpoint
 import android.telecom.InCallService
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.launch
 
 /**
  * Bound by the system Telecom framework while this app is the default dialer.
@@ -16,6 +24,56 @@ import android.telecom.InCallService
  * UI (directly and via a full-screen-intent notification for the lock screen).
  */
 class WpInCallService : InCallService() {
+
+    // Turns the screen off when the phone is held to the ear during a call;
+    // inactive while audio is routed to speaker/Bluetooth/headset.
+    private var proximityLock: PowerManager.WakeLock? = null
+    private var scope: CoroutineScope? = null
+
+    override fun onCreate() {
+        super.onCreate()
+        val pm = getSystemService(PowerManager::class.java)
+        if (pm.isWakeLockLevelSupported(PowerManager.PROXIMITY_SCREEN_OFF_WAKE_LOCK)) {
+            proximityLock =
+                pm.newWakeLock(PowerManager.PROXIMITY_SCREEN_OFF_WAKE_LOCK, "wpdialer:proximity")
+        }
+        val s = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+        scope = s
+        s.launch {
+            combine(
+                CallManager.state, CallManager.secondState, CallManager.endpoint,
+            ) { first, second, endpoint ->
+                val inCall = listOf(first, second).any {
+                    it == Call.STATE_ACTIVE || it == Call.STATE_DIALING ||
+                        it == Call.STATE_CONNECTING || it == Call.STATE_HOLDING
+                }
+                val onEarpiece = endpoint == null ||
+                    endpoint.endpointType == CallEndpoint.TYPE_EARPIECE ||
+                    endpoint.endpointType == CallEndpoint.TYPE_UNKNOWN
+                inCall && onEarpiece
+            }.distinctUntilChanged().collect { hold -> setProximityHeld(hold) }
+        }
+    }
+
+    private fun setProximityHeld(hold: Boolean) {
+        val lock = proximityLock ?: return
+        runCatching {
+            if (hold && !lock.isHeld) {
+                lock.acquire()
+            } else if (!hold && lock.isHeld) {
+                // Wait until the phone leaves the ear so the screen doesn't
+                // flash on mid-call when the route flips.
+                lock.release(PowerManager.RELEASE_FLAG_WAIT_FOR_NO_PROXIMITY)
+            }
+        }
+    }
+
+    override fun onDestroy() {
+        scope?.cancel()
+        scope = null
+        proximityLock?.let { runCatching { if (it.isHeld) it.release() } }
+        super.onDestroy()
+    }
 
     private val notifyCallback = object : Call.Callback() {
         override fun onStateChanged(call: Call, newState: Int) {

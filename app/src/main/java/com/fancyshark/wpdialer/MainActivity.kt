@@ -56,6 +56,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.lifecycleScope
+import com.fancyshark.wpdialer.call.CallManager
 import com.fancyshark.wpdialer.data.ContactItem
 import com.fancyshark.wpdialer.data.HistoryItem
 import com.fancyshark.wpdialer.data.Repo
@@ -149,6 +150,14 @@ class MainActivity : ComponentActivity() {
         updatePermissionState()
         refreshDefaultState()
         refreshTick.value += 1
+        // Reopening the app during a call goes back to the call screen,
+        // unless the user backed out of it on purpose.
+        if (CallManager.call.value != null &&
+            CallManager.state.value != android.telecom.Call.STATE_DISCONNECTED &&
+            !CallManager.userDismissedUi
+        ) {
+            startActivity(Intent(this, com.fancyshark.wpdialer.call.InCallActivity::class.java))
+        }
     }
 
     private fun handleIntent(intent: Intent?) {
@@ -252,6 +261,29 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /** WP-style accent strip shown while a call is in progress. */
+    @Composable
+    private fun ReturnToCallBanner(accent: Color) {
+        val call by CallManager.call.collectAsState()
+        val callState by CallManager.state.collectAsState()
+        if (call == null || callState == android.telecom.Call.STATE_DISCONNECTED) return
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .background(accent)
+                .clickable {
+                    CallManager.userDismissedUi = false
+                    startActivity(
+                        Intent(this@MainActivity, com.fancyshark.wpdialer.call.InCallActivity::class.java),
+                    )
+                }
+                .padding(vertical = 8.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text("tap to return to call", color = Color.White, fontSize = 14.sp)
+        }
+    }
+
     @Composable
     private fun WpApp() {
         val accent by AccentStore.accent.collectAsState()
@@ -307,6 +339,7 @@ class MainActivity : ComponentActivity() {
                 key(top) {
                     when (top) {
                         Screen.Home -> Column(Modifier.fillMaxSize()) {
+                            ReturnToCallBanner(accent.color)
                             Pivot(
                                 title = "PHONE",
                                 modifier = Modifier.weight(1f),
