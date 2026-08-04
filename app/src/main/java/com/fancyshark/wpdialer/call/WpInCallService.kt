@@ -127,7 +127,7 @@ class WpInCallService : InCallService() {
         val notification = Notification.Builder(this, ONGOING_CHANNEL_ID)
             .setSmallIcon(
                 android.graphics.drawable.Icon.createWithResource(
-                    this, com.fancyshark.wpdialer.R.drawable.ic_launcher_foreground,
+                    this, com.fancyshark.wpdialer.R.drawable.ic_notification,
                 ),
             )
             .setColor(com.fancyshark.wpdialer.ui.AccentStore.accent.value.color.toArgb())
@@ -201,7 +201,7 @@ class WpInCallService : InCallService() {
         val notification = Notification.Builder(this, MISSED_CHANNEL_ID)
             .setSmallIcon(
                 android.graphics.drawable.Icon.createWithResource(
-                    this, com.fancyshark.wpdialer.R.drawable.ic_launcher_foreground,
+                    this, com.fancyshark.wpdialer.R.drawable.ic_notification,
                 ),
             )
             .setColor(com.fancyshark.wpdialer.ui.AccentStore.accent.value.color.toArgb())
@@ -301,7 +301,7 @@ class WpInCallService : InCallService() {
         val notification = Notification.Builder(this, CHANNEL_ID)
             .setSmallIcon(
                 android.graphics.drawable.Icon.createWithResource(
-                    this, com.fancyshark.wpdialer.R.drawable.ic_launcher_foreground,
+                    this, com.fancyshark.wpdialer.R.drawable.ic_notification,
                 ),
             )
             .setColor(accent)
