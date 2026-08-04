@@ -182,11 +182,21 @@ private fun AppActionIcon(accountType: String?, app: String, onClick: () -> Unit
     }
 }
 
+/** The registering app's launcher label ("Telegram"), falling back to DATA2. */
+private fun appDisplayName(
+    context: android.content.Context,
+    a: com.fancyshark.wpdialer.data.ContactAppAction,
+): String = a.accountType?.let { pkg ->
+    runCatching {
+        context.packageManager
+            .getApplicationLabel(context.packageManager.getApplicationInfo(pkg, 0))
+            .toString()
+    }.getOrNull()
+} ?: a.app
+
 /** Digits key of an app action's target number, or null if it isn't one. */
-private fun actionDigits(a: com.fancyshark.wpdialer.data.ContactAppAction): String? {
-    val digits = (a.data1 ?: a.label).substringBefore('@').filter { it.isDigit() }
-    return if (digits.length >= 5) digits.takeLast(9) else null
-}
+private fun actionDigits(a: com.fancyshark.wpdialer.data.ContactAppAction): String? =
+    com.fancyshark.wpdialer.data.Repo.actionNumberKey(a.label, a.data1)
 
 /** "Voice call +961 70 996 669" -> "voice call". */
 private fun shortActionLabel(a: com.fancyshark.wpdialer.data.ContactAppAction): String {
@@ -256,9 +266,12 @@ private fun ContactDetailBody(
 
     @Composable
     fun AppIcons(actions: List<ContactAppAction>) {
-        actions.groupBy { it.app }.forEach { (app, list) ->
-            AppActionIcon(list.first().accountType, app) {
-                if (list.size == 1) launchAction(list[0]) else appChooser = app to list
+        // Group by package: apps like Telegram use a different summary name
+        // per row ("Telegram Voice Call", ...), which is one app, not three.
+        actions.groupBy { it.accountType ?: it.app }.forEach { (_, list) ->
+            val name = appDisplayName(context, list.first())
+            AppActionIcon(list.first().accountType, name) {
+                if (list.size == 1) launchAction(list[0]) else appChooser = name to list
             }
         }
     }

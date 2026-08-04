@@ -300,6 +300,54 @@ object Repo {
                     }
                 }
             }
+            // Apps like Telegram register their rows on their own raw contact,
+            // which Android may fail to aggregate with this one (no phone row
+            // to match on). Sweep third-party rows from other contacts and
+            // attach any whose action label carries one of our numbers.
+            runCatching {
+                val phoneKeys = phones
+                    .map { it.number.filter(Char::isDigit) }
+                    .filter { it.length >= 5 }
+                    .map { it.takeLast(9) }
+                    .toSet()
+                if (phoneKeys.isNotEmpty()) {
+                    context.contentResolver.query(
+                        ContactsContract.Data.CONTENT_URI,
+                        arrayOf(
+                            ContactsContract.Data._ID,
+                            ContactsContract.Data.MIMETYPE,
+                            ContactsContract.Data.DATA1,
+                            ContactsContract.Data.DATA2,
+                            ContactsContract.Data.DATA3,
+                            ContactsContract.RawContacts.ACCOUNT_TYPE,
+                        ),
+                        "(${ContactsContract.Data.MIMETYPE} LIKE 'vnd.android.cursor.item/vnd.%' " +
+                            "OR ${ContactsContract.Data.MIMETYPE} LIKE 'vnd.android.cursor.item/com.%') " +
+                            "AND ${ContactsContract.Data.CONTACT_ID} != ?",
+                        arrayOf(id.toString()),
+                        null,
+                    )?.use { c ->
+                        val seenKinds = appActions
+                            .map { it.mimetype to actionNumberKey(it.label, it.data1) }
+                            .toMutableSet()
+                        while (c.moveToNext()) {
+                            val mimetype = c.getString(1) ?: continue
+                            val label = c.getString(4)?.takeIf { it.isNotBlank() } ?: continue
+                            val key = actionNumberKey(label, c.getString(2)) ?: continue
+                            if (key !in phoneKeys) continue
+                            if (!seenKinds.add(mimetype to key)) continue
+                            appActions += ContactAppAction(
+                                c.getLong(0),
+                                mimetype,
+                                c.getString(3)?.takeIf { it.isNotBlank() } ?: "app",
+                                label,
+                                c.getString(2),
+                                c.getString(5),
+                            )
+                        }
+                    }
+                }
+            }
             appActions.sortBy { it.app.lowercase() }
             // Some sync sources (e.g. Outlook) dump events into the note as
             // "anniversary = 2016-06-09 09:00:00 +0000" lines — surface those
@@ -322,6 +370,18 @@ object Repo {
                 emails, uniqueEvents, websites, organization, nickname, appActions,
             )
         }
+
+    /**
+     * The phone number an app action targets, as a trailing-digits key. The
+     * label ("Voice call +961 3 039 056") is preferred because DATA1 may be
+     * an app-internal ID (Telegram) rather than a number.
+     */
+    fun actionNumberKey(label: String, data1: String?): String? {
+        val fromLabel = label.filter { it.isDigit() }
+        if (fromLabel.length >= 5) return fromLabel.takeLast(9)
+        val fromData = (data1 ?: "").substringBefore('@').filter { it.isDigit() }
+        return if (fromData.length >= 5) fromData.takeLast(9) else null
+    }
 
     /** Built-in mimetypes that are either handled above or not displayable. */
     private val STANDARD_MIMETYPES = setOf(
