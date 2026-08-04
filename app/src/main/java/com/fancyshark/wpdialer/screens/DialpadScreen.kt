@@ -4,9 +4,11 @@ import android.media.AudioManager
 import android.media.ToneGenerator
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -48,6 +50,16 @@ private val KEYS = listOf(
     "*" to "", "0" to "+", "#" to "",
 )
 
+/**
+ * Routes hardware keypad presses (flip/keypad phones) into the dialpad:
+ * digits/star/pound append, "del" backspaces, "call" dials.
+ */
+object DialpadBus {
+    @Volatile
+    var open = false
+    val events = kotlinx.coroutines.flow.MutableSharedFlow<String>(extraBufferCapacity = 16)
+}
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun DialpadScreen(
@@ -62,7 +74,11 @@ fun DialpadScreen(
         runCatching { ToneGenerator(AudioManager.STREAM_DTMF, 70) }.getOrNull()
     }
     DisposableEffect(Unit) {
-        onDispose { tones?.release() }
+        DialpadBus.open = true
+        onDispose {
+            DialpadBus.open = false
+            tones?.release()
+        }
     }
 
     fun beep(key: String) {
@@ -72,6 +88,20 @@ fun DialpadScreen(
             else -> key.toIntOrNull() ?: return
         }
         runCatching { tones?.startTone(tone, 120) }
+    }
+
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        DialpadBus.events.collect { event ->
+            when (event) {
+                "del" -> number = number.dropLast(1)
+                "call" -> if (number.isNotBlank()) onCall(number)
+                else -> {
+                    beep(event)
+                    Haptics.tick(context)
+                    number += event
+                }
+            }
+        }
     }
 
     Column(
@@ -163,12 +193,14 @@ fun DialpadScreen(
 private fun CallTile(accent: Color, modifier: Modifier = Modifier, onClick: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
+    val focused by interaction.collectIsFocusedAsState()
     val tiltOn by com.fancyshark.wpdialer.data.AppPrefs.tilt.collectAsState()
     Box(
         modifier
             .metroTilt(tiltOn)
             .height(64.dp)
             .background(if (pressed) Metro.Foreground else accent)
+            .then(if (focused) Modifier.border(3.dp, Metro.Foreground) else Modifier)
             .clickable(
                 interactionSource = interaction,
                 indication = null,
@@ -188,12 +220,14 @@ private fun CallTile(accent: Color, modifier: Modifier = Modifier, onClick: () -
 private fun SaveTile(accent: Color, modifier: Modifier = Modifier, onClick: () -> Unit) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
+    val focused by interaction.collectIsFocusedAsState()
     val tiltOn by com.fancyshark.wpdialer.data.AppPrefs.tilt.collectAsState()
     Box(
         modifier
             .metroTilt(tiltOn)
             .height(64.dp)
             .background(if (pressed) accent else Metro.Key)
+            .then(if (focused) Modifier.border(3.dp, accent) else Modifier)
             .clickable(
                 interactionSource = interaction,
                 indication = null,
@@ -229,12 +263,14 @@ private fun DialKey(
 ) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
+    val focused by interaction.collectIsFocusedAsState()
     val tiltOn by com.fancyshark.wpdialer.data.AppPrefs.tilt.collectAsState()
     Box(
         modifier
             .metroTilt(tiltOn)
             .height(64.dp)
             .background(if (pressed) accent else Metro.Key)
+            .then(if (focused) Modifier.border(3.dp, accent) else Modifier)
             .combinedClickable(
                 interactionSource = interaction,
                 indication = null,

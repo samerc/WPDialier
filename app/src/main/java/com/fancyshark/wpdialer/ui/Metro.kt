@@ -11,9 +11,14 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
+import androidx.compose.foundation.IndicationNodeFactory
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.FocusInteraction
+import androidx.compose.foundation.interaction.InteractionSource
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.PressInteraction
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -42,7 +47,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.drawscope.ContentDrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.node.DelegatableNode
+import androidx.compose.ui.node.DrawModifierNode
+import androidx.compose.ui.node.invalidateDraw
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
@@ -98,6 +110,54 @@ fun Modifier.metroTilt(enabled: Boolean): Modifier = this.composed {
                 tiltY = 0f
             }
         }
+}
+
+/**
+ * WP-style indication for default clickables app-wide: no Material ripple; a
+ * dim tint while pressed and an accent outline when focused — the outline is
+ * what makes D-pad navigation usable on flip/keypad phones.
+ */
+object MetroIndication : IndicationNodeFactory {
+    override fun create(interactionSource: InteractionSource): DelegatableNode =
+        MetroIndicationNode(interactionSource)
+
+    override fun equals(other: Any?): Boolean = other === this
+    override fun hashCode(): Int = 0x4D657472
+}
+
+private class MetroIndicationNode(
+    private val interactionSource: InteractionSource,
+) : Modifier.Node(), DrawModifierNode {
+    private var pressed = false
+    private var focused = false
+
+    override fun onAttach() {
+        coroutineScope.launch {
+            interactionSource.interactions.collect { interaction ->
+                when (interaction) {
+                    is PressInteraction.Press -> pressed = true
+                    is PressInteraction.Release, is PressInteraction.Cancel -> pressed = false
+                    is FocusInteraction.Focus -> focused = true
+                    is FocusInteraction.Unfocus -> focused = false
+                }
+                invalidateDraw()
+            }
+        }
+    }
+
+    override fun ContentDrawScope.draw() {
+        drawContent()
+        if (pressed) drawRect(Metro.Foreground.copy(alpha = 0.08f))
+        if (focused) {
+            val stroke = 2.dp.toPx()
+            drawRect(
+                AccentStore.accent.value.color,
+                topLeft = Offset(stroke / 2, stroke / 2),
+                size = Size(size.width - stroke, size.height - stroke),
+                style = Stroke(stroke),
+            )
+        }
+    }
 }
 
 data class Accent(val name: String, val color: Color)
@@ -157,6 +217,8 @@ fun MetroButton(
 ) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
+    val focused by interaction.collectIsFocusedAsState()
+    val focusAccent by AccentStore.accent.collectAsState()
     val bg = when {
         pressed -> Metro.Foreground
         fill != null -> fill
@@ -169,6 +231,7 @@ fun MetroButton(
     }
     val borderColor = when {
         pressed -> Metro.Foreground
+        focused -> focusAccent.color
         fill != null -> fill
         !enabled -> Metro.Dim
         else -> Metro.Foreground
@@ -227,12 +290,19 @@ fun Pivot(
                     IntOffset(-(base + frac.toInt()), 0)
                 },
         ) {
+            val accent by AccentStore.accent.collectAsState()
             pages.forEachIndexed { i, (name, _) ->
+                val interaction = remember { MutableInteractionSource() }
+                val focused by interaction.collectIsFocusedAsState()
                 Text(
                     name,
                     maxLines = 1,
                     softWrap = false,
-                    color = if (pagerState.currentPage == i) Metro.Foreground else Metro.Dim,
+                    color = when {
+                        focused -> accent.color
+                        pagerState.currentPage == i -> Metro.Foreground
+                        else -> Metro.Dim
+                    },
                     fontSize = 48.sp,
                     fontWeight = FontWeight.Light,
                     modifier = Modifier
@@ -244,7 +314,7 @@ fun Pivot(
                         }
                         .padding(end = 16.dp)
                         .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
+                            interactionSource = interaction,
                             indication = null,
                         ) { scope.launch { pagerState.animateScrollToPage(i) } },
                 )
@@ -314,6 +384,7 @@ fun MetroAppBar(
     modifier: Modifier = Modifier,
 ) {
     var expanded by remember { mutableStateOf(false) }
+    val accent by AccentStore.accent.collectAsState()
     Column(
         modifier
             .fillMaxWidth()
@@ -321,15 +392,17 @@ fun MetroAppBar(
             .animateContentSize(),
     ) {
         Box(Modifier.fillMaxWidth()) {
+            val dotsInteraction = remember { MutableInteractionSource() }
+            val dotsFocused by dotsInteraction.collectIsFocusedAsState()
             Text(
                 "•••",
-                color = Metro.Foreground,
+                color = if (dotsFocused) accent.color else Metro.Foreground,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
+                        interactionSource = dotsInteraction,
                         indication = null,
                     ) { expanded = !expanded }
                     .padding(horizontal = 14.dp, vertical = 6.dp),
@@ -342,12 +415,21 @@ fun MetroAppBar(
             ) {
                 actions.forEach { action ->
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        val interaction = remember { MutableInteractionSource() }
+                        val focused by interaction.collectIsFocusedAsState()
                         Box(
                             Modifier
                                 .size(46.dp)
                                 .clip(CircleShape)
-                                .border(2.dp, Metro.Foreground, CircleShape)
-                                .clickable {
+                                .border(
+                                    if (focused) 3.dp else 2.dp,
+                                    if (focused) accent.color else Metro.Foreground,
+                                    CircleShape,
+                                )
+                                .clickable(
+                                    interactionSource = interaction,
+                                    indication = null,
+                                ) {
                                     expanded = false
                                     action.onClick()
                                 },
@@ -376,15 +458,17 @@ fun MetroAppBar(
         if (expanded) {
             Column(Modifier.padding(start = 20.dp, bottom = 16.dp, top = 4.dp)) {
                 menu.forEach { (label, onClick) ->
+                    val interaction = remember { MutableInteractionSource() }
+                    val focused by interaction.collectIsFocusedAsState()
                     Text(
                         label,
-                        color = Metro.Foreground,
+                        color = if (focused) accent.color else Metro.Foreground,
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Light,
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
+                                interactionSource = interaction,
                                 indication = null,
                             ) {
                                 expanded = false

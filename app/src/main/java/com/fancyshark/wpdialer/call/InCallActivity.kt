@@ -81,10 +81,50 @@ class InCallActivity : ComponentActivity() {
                         fontFamily = if (selawik) Selawik
                         else androidx.compose.ui.text.font.FontFamily.Default,
                     ),
+                androidx.compose.foundation.LocalIndication provides
+                    com.fancyshark.wpdialer.ui.MetroIndication,
             ) {
                 InCallRoot(onFinished = { finish() })
             }
         }
+    }
+
+    // Flip/keypad phones: the call key answers a ringing call, the end key
+    // hangs up (fallback — most devices route ENDCALL through telecom), and
+    // hardware digits send DTMF during the call.
+    override fun onKeyDown(keyCode: Int, event: android.view.KeyEvent?): Boolean {
+        when (keyCode) {
+            android.view.KeyEvent.KEYCODE_CALL -> {
+                if (CallManager.state.value == Call.STATE_RINGING) CallManager.answer()
+                return true
+            }
+            android.view.KeyEvent.KEYCODE_ENDCALL -> {
+                CallManager.hangup()
+                return true
+            }
+        }
+        val dtmf = dtmfChar(keyCode)
+        if (dtmf != null && CallManager.state.value == Call.STATE_ACTIVE) {
+            CallManager.startDtmf(dtmf)
+            return true
+        }
+        return super.onKeyDown(keyCode, event)
+    }
+
+    override fun onKeyUp(keyCode: Int, event: android.view.KeyEvent?): Boolean {
+        if (dtmfChar(keyCode) != null && CallManager.state.value == Call.STATE_ACTIVE) {
+            CallManager.stopDtmf()
+            return true
+        }
+        return super.onKeyUp(keyCode, event)
+    }
+
+    private fun dtmfChar(keyCode: Int): Char? = when (keyCode) {
+        in android.view.KeyEvent.KEYCODE_0..android.view.KeyEvent.KEYCODE_9 ->
+            '0' + (keyCode - android.view.KeyEvent.KEYCODE_0)
+        android.view.KeyEvent.KEYCODE_STAR -> '*'
+        android.view.KeyEvent.KEYCODE_POUND -> '#'
+        else -> null
     }
 }
 

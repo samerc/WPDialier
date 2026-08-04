@@ -64,6 +64,7 @@ import com.fancyshark.wpdialer.data.SimOption
 import com.fancyshark.wpdialer.data.SimPrefs
 import com.fancyshark.wpdialer.data.Sims
 import com.fancyshark.wpdialer.screens.ContactDetailScreen
+import com.fancyshark.wpdialer.screens.DialpadBus
 import com.fancyshark.wpdialer.screens.DialpadScreen
 import com.fancyshark.wpdialer.screens.EditContactScreen
 import com.fancyshark.wpdialer.screens.HistoryPage
@@ -158,6 +159,32 @@ class MainActivity : ComponentActivity() {
         ) {
             startActivity(Intent(this, com.fancyshark.wpdialer.call.InCallActivity::class.java))
         }
+    }
+
+    // Hardware keypad support (flip/keypad phones): digits open or type into
+    // the dialpad, the call key opens it or dials the entered number. Only
+    // reached when no focused field consumed the key.
+    override fun onKeyDown(keyCode: Int, event: android.view.KeyEvent?): Boolean {
+        val digit = when (keyCode) {
+            in android.view.KeyEvent.KEYCODE_0..android.view.KeyEvent.KEYCODE_9 ->
+                ('0' + (keyCode - android.view.KeyEvent.KEYCODE_0)).toString()
+            android.view.KeyEvent.KEYCODE_STAR -> "*"
+            android.view.KeyEvent.KEYCODE_POUND -> "#"
+            else -> null
+        }
+        if (digit != null) {
+            if (DialpadBus.open) DialpadBus.events.tryEmit(digit) else dialRequest.value = digit
+            return true
+        }
+        if (DialpadBus.open && keyCode == android.view.KeyEvent.KEYCODE_DEL) {
+            DialpadBus.events.tryEmit("del")
+            return true
+        }
+        if (keyCode == android.view.KeyEvent.KEYCODE_CALL) {
+            if (DialpadBus.open) DialpadBus.events.tryEmit("call") else dialRequest.value = ""
+            return true
+        }
+        return super.onKeyDown(keyCode, event)
     }
 
     private fun handleIntent(intent: Intent?) {
@@ -326,6 +353,8 @@ class MainActivity : ComponentActivity() {
                 LocalTextStyle provides TextStyle(
                     fontFamily = if (selawik) Selawik else FontFamily.Default,
                 ),
+                androidx.compose.foundation.LocalIndication provides
+                    com.fancyshark.wpdialer.ui.MetroIndication,
             ) {
             Box(
                 Modifier
