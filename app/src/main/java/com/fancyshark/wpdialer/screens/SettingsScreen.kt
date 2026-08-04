@@ -633,7 +633,13 @@ fun SettingsScreen(
                 Modifier
                     .align(Alignment.Center)
                     .fillMaxWidth()
-                    .padding(horizontal = 32.dp),
+                    .padding(horizontal = 32.dp)
+                    .clickable(
+                        interactionSource = androidx.compose.runtime.remember {
+                            androidx.compose.foundation.interaction.MutableInteractionSource()
+                        },
+                        indication = null,
+                    ) { /* consume so taps inside don't dismiss */ },
             ) {
                 Text(
                     stringResource(R.string.settings_language_title),

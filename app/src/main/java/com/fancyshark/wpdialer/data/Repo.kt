@@ -361,10 +361,19 @@ object Repo {
             note = note?.lines()?.filter { line ->
                 val m = NOTE_EVENT_LINE.matchEntire(line.trim())
                 if (m != null) {
-                    events += ContactEvent(
-                        m.groupValues[1].trim().lowercase(),
-                        formatEventDate(m.groupValues[2]),
-                    )
+                    // Localize the well-known dump keys; keep anything else raw.
+                    val label = when (val key = m.groupValues[1].trim().lowercase()) {
+                        "anniversary" ->
+                            context.getString(
+                                com.fancyshark.wpdialer.R.string.data_event_anniversary,
+                            )
+                        "birthday" ->
+                            context.getString(
+                                com.fancyshark.wpdialer.R.string.data_event_birthday,
+                            )
+                        else -> key
+                    }
+                    events += ContactEvent(label, formatEventDate(m.groupValues[2]))
                     false
                 } else {
                     line.isNotBlank()
@@ -419,19 +428,29 @@ object Repo {
             else -> context.getString(com.fancyshark.wpdialer.R.string.data_event_date)
         }
 
-    private fun monthName(month: Int): String =
-        java.text.DateFormatSymbols().months.getOrNull(month - 1) ?: month.toString()
-
-    /** "1987-05-22" -> "May 22, 1987"; "--05-22" (yearless) -> "May 22". */
+    /**
+     * "1987-05-22" -> locale-ordered long date ("May 22, 1987" / "22 mai
+     * 1987"); "--05-22" (yearless) -> month + day in locale order.
+     */
     private fun formatEventDate(raw: String): String {
+        val locale = java.util.Locale.getDefault()
+        fun format(skeleton: String, year: Int, month: Int, day: Int): String {
+            val pattern = android.text.format.DateFormat.getBestDateTimePattern(locale, skeleton)
+            return java.text.SimpleDateFormat(pattern, locale)
+                .format(java.util.GregorianCalendar(year, month - 1, day).time)
+        }
         Regex("""^--(\d{2})-(\d{2})""").find(raw.trim())?.let { m ->
             val month = m.groupValues[1].toInt()
-            if (month in 1..12) return "${monthName(month)} ${m.groupValues[2].toInt()}"
+            if (month in 1..12) {
+                return format("MMMMd", 2000, month, m.groupValues[2].toInt())
+            }
         }
         Regex("""(\d{4})-(\d{2})-(\d{2})""").find(raw)?.let { m ->
             val month = m.groupValues[2].toInt()
             if (month in 1..12) {
-                return "${monthName(month)} ${m.groupValues[3].toInt()}, ${m.groupValues[1]}"
+                return format(
+                    "yMMMMd", m.groupValues[1].toInt(), month, m.groupValues[3].toInt(),
+                )
             }
         }
         return raw

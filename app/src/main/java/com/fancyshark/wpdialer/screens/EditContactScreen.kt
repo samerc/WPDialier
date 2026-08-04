@@ -106,7 +106,7 @@ fun EditContactScreen(
         val title = if (edited.raws.size == 1) {
             stringResource(
                 com.fancyshark.wpdialer.R.string.editcontact_title_kind,
-                edited.raws.first().account.kindLabel.uppercase(),
+                accountKindLabel(edited.raws.first().account.kindLabel).uppercase(),
             )
         } else {
             stringResource(com.fancyshark.wpdialer.R.string.editcontact_title)
@@ -267,10 +267,11 @@ fun EditContactScreen(
                         WpDropdown(
                             current = ContactEditor.EMAIL_TYPES
                                 .firstOrNull { it.second == email.type }?.first
+                                ?.let { typeKeyLabel(it) }
                                 ?: stringResource(
                                     com.fancyshark.wpdialer.R.string.editcontact_other,
                                 ),
-                            options = ContactEditor.EMAIL_TYPES.map { it.first },
+                            options = ContactEditor.EMAIL_TYPES.map { typeKeyLabel(it.first) },
                             onSelect = { t ->
                                 updateRaw(rawIndex) { r ->
                                     r.copy(
@@ -370,10 +371,11 @@ fun EditContactScreen(
                         WpDropdown(
                             current = ContactEditor.EVENT_TYPES
                                 .firstOrNull { it.second == event.type }?.first
+                                ?.let { typeKeyLabel(it) }
                                 ?: stringResource(
                                     com.fancyshark.wpdialer.R.string.editcontact_other,
                                 ),
-                            options = ContactEditor.EVENT_TYPES.map { it.first },
+                            options = ContactEditor.EVENT_TYPES.map { typeKeyLabel(it.first) },
                             onSelect = { t ->
                                 updateRaw(rawIndex) { r ->
                                     r.copy(

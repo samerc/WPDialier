@@ -137,7 +137,7 @@ fun NewContactScreen(
             Text(
                 stringResource(
                     com.fancyshark.wpdialer.R.string.newcontact_title,
-                    chosen.kindLabel.uppercase(),
+                    accountKindLabel(chosen.kindLabel).uppercase(),
                 ),
                 color = Metro.Foreground,
                 fontSize = 16.sp,
@@ -197,7 +197,7 @@ fun NewContactScreen(
 
                 FieldLabel(stringResource(com.fancyshark.wpdialer.R.string.newcontact_save_to))
                 MetroSelector(
-                    primary = chosen.kindLabel,
+                    primary = accountKindLabel(chosen.kindLabel),
                     secondary = chosen.name,
                     accent = accent,
                 ) { showAccountPicker = true }
@@ -265,8 +265,8 @@ fun NewContactScreen(
                         }
                         Spacer(Modifier.width(8.dp))
                         WpDropdown(
-                            current = ContactEditor.EVENT_TYPES[entry.typeIdx].first,
-                            options = ContactEditor.EVENT_TYPES.map { it.first },
+                            current = typeKeyLabel(ContactEditor.EVENT_TYPES[entry.typeIdx].first),
+                            options = ContactEditor.EVENT_TYPES.map { typeKeyLabel(it.first) },
                             onSelect = { t -> events[i] = entry.copy(typeIdx = t) },
                             modifier = Modifier.width(130.dp),
                         )
@@ -451,7 +451,7 @@ fun NewContactScreen(
                             .padding(vertical = 10.dp),
                     ) {
                         Text(
-                            account.kindLabel,
+                            accountKindLabel(account.kindLabel),
                             color = if (selected) accent else Metro.Foreground,
                             fontSize = 26.sp,
                             fontWeight = FontWeight.Light,
@@ -777,8 +777,8 @@ private fun TypedSection(
             )
             Spacer(Modifier.width(8.dp))
             WpDropdown(
-                current = typeLabels[entry.typeIdx],
-                options = typeLabels,
+                current = typeKeyLabel(typeLabels[entry.typeIdx]),
+                options = typeLabels.map { typeKeyLabel(it) },
                 onSelect = { t -> entries[i] = entry.copy(typeIdx = t) },
                 modifier = Modifier.width(110.dp),
             )

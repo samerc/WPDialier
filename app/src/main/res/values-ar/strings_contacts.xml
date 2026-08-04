@@ -1,5 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Contact type keys (display only) -->
+    <string name="type_mobile">الجوال</string>
+    <string name="type_home">المنزل</string>
+    <string name="type_work">العمل</string>
+    <string name="type_main">رئيسي</string>
+    <string name="type_other">آخر</string>
+    <string name="type_custom">مخصص</string>
+    <string name="type_personal">شخصي</string>
+    <string name="type_birthday">عيد ميلاد</string>
+    <string name="type_anniversary">ذكرى سنوية</string>
+    <string name="account_kind_phone">الهاتف</string>
     <!-- ContactDetailScreen.kt -->
     <string name="contact_edit">تحرير</string>
     <string name="contact_pin">تثبيت</string>

@@ -1,5 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Contact type keys (display only; keys stay English as data) -->
+    <string name="type_mobile">mobile</string>
+    <string name="type_home">home</string>
+    <string name="type_work">work</string>
+    <string name="type_main">main</string>
+    <string name="type_other">other</string>
+    <string name="type_custom">custom</string>
+    <string name="type_personal">personal</string>
+    <string name="type_birthday">birthday</string>
+    <string name="type_anniversary">anniversary</string>
+    <string name="account_kind_phone">phone</string>
     <!-- ContactDetailScreen.kt -->
     <string name="contact_edit">edit</string>
     <string name="contact_pin">pin</string>

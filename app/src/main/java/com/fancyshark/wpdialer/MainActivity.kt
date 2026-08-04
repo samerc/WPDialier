@@ -101,6 +101,56 @@ sealed interface Screen {
 /** A call waiting on the user to choose a SIM. */
 data class SimRequest(val number: String, val contactId: Long?)
 
+// Serializes the navigation stack across activity recreation (locale change,
+// process death). Field delimiter is a control char that can't appear in
+// phone numbers; names get their own trailing slot.
+private const val SCREEN_SEP = '\u0001'
+
+private val ScreenStackSaver = androidx.compose.runtime.saveable.listSaver<
+    androidx.compose.runtime.snapshots.SnapshotStateList<Screen>, String,
+>(
+    save = { stack ->
+        stack.map { screen ->
+            when (screen) {
+                Screen.Home -> "home"
+                is Screen.Dialpad -> "dialpad$SCREEN_SEP${screen.initial}"
+                is Screen.Contact -> "contact$SCREEN_SEP${screen.id}"
+                is Screen.EditContact -> "edit$SCREEN_SEP${screen.id}"
+                is Screen.NewContact -> "new$SCREEN_SEP${screen.initialNumber}"
+                is Screen.CallDetails ->
+                    "details$SCREEN_SEP${screen.number}$SCREEN_SEP${screen.name.orEmpty()}"
+                Screen.Search -> "search"
+                Screen.Settings -> "settings"
+                Screen.About -> "about"
+            }
+        }
+    },
+    restore = { saved ->
+        androidx.compose.runtime.mutableStateListOf<Screen>().apply {
+            saved.forEach { entry ->
+                val parts = entry.split(SCREEN_SEP)
+                add(
+                    when (parts[0]) {
+                        "dialpad" -> Screen.Dialpad(parts.getOrElse(1) { "" })
+                        "contact" -> Screen.Contact(parts.getOrNull(1)?.toLongOrNull() ?: 0L)
+                        "edit" -> Screen.EditContact(parts.getOrNull(1)?.toLongOrNull() ?: 0L)
+                        "new" -> Screen.NewContact(parts.getOrElse(1) { "" })
+                        "details" -> Screen.CallDetails(
+                            parts.getOrElse(1) { "" },
+                            parts.getOrNull(2)?.takeIf { it.isNotEmpty() },
+                        )
+                        "search" -> Screen.Search
+                        "settings" -> Screen.Settings
+                        "about" -> Screen.About
+                        else -> Screen.Home
+                    },
+                )
+            }
+            if (isEmpty()) add(Screen.Home)
+        }
+    },
+)
+
 class MainActivity : ComponentActivity() {
 
     private val dialRequest = MutableStateFlow<String?>(null)
@@ -133,7 +183,9 @@ class MainActivity : ComponentActivity() {
 
         updatePermissionState()
         refreshDefaultState()
-        handleIntent(intent)
+        // Only on a fresh launch — recreation (locale change) redelivers the
+        // original intent, which must not re-fire a stale dial request.
+        if (savedInstanceState == null) handleIntent(intent)
         setContent { WpApp() }
 
         if (!permissionsGranted.value) {
@@ -338,7 +390,11 @@ class MainActivity : ComponentActivity() {
         val default by isDefaultDialer.collectAsState()
         val tick by refreshTick.collectAsState()
 
-        val backStack = remember { mutableStateListOf<Screen>(Screen.Home) }
+        // Saveable so activity recreation (e.g. an in-app language switch)
+        // restores the navigation stack instead of resetting to Home.
+        val backStack = androidx.compose.runtime.saveable.rememberSaveable(
+            saver = ScreenStackSaver,
+        ) { mutableStateListOf<Screen>(Screen.Home) }
         val uiScope = androidx.compose.runtime.rememberCoroutineScope()
         var confirmClearHistory by remember { mutableStateOf(false) }
         var confirmDeleteGroup by remember { mutableStateOf<List<HistoryItem>?>(null) }
