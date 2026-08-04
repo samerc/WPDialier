@@ -21,6 +21,7 @@ import com.fancyshark.wpdialer.ui.Accent
 import com.fancyshark.wpdialer.ui.Metro
 
 private const val CONTACT_EMAIL = "fancyshark505@gmail.com"
+private const val PRIVACY_URL = "https://github.com/samerc/WPDialier/blob/main/PRIVACY.md"
 
 @Composable
 fun AboutScreen(accent: Accent) {
@@ -103,6 +104,35 @@ fun AboutScreen(accent: Accent) {
                 fontWeight = FontWeight.Light,
             )
             Text(CONTACT_EMAIL, color = accent.color, fontSize = 15.sp)
+        }
+
+        Spacer(Modifier.height(22.dp))
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .clickable {
+                    runCatching {
+                        context.startActivity(
+                            android.content.Intent(
+                                android.content.Intent.ACTION_VIEW,
+                                android.net.Uri.parse(PRIVACY_URL),
+                            ),
+                        )
+                    }
+                }
+                .padding(vertical = 4.dp),
+        ) {
+            Text(
+                "privacy policy",
+                color = Metro.Foreground,
+                fontSize = 25.sp,
+                fontWeight = FontWeight.Light,
+            )
+            Text(
+                "everything stays on your phone — read the policy",
+                color = accent.color,
+                fontSize = 15.sp,
+            )
         }
 
         Spacer(Modifier.height(30.dp))
