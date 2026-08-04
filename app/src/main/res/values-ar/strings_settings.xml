@@ -33,6 +33,7 @@
     <string name="settings_accent_sienna">بني سيينا</string>
     <string name="settings_language_title">اللغة</string>
     <string name="settings_language_system">لغة النظام</string>
+    <string name="settings_replies_manage">إدارة الردود (%1$d)</string>
     <string name="settings_font_title">الخط</string>
     <string name="settings_font_selawik">Selawik ‏(Windows Phone)</string>
     <string name="settings_font_system">خط النظام</string>

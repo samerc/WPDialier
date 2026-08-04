@@ -33,6 +33,7 @@
     <string name="settings_accent_sienna">terre de Sienne</string>
     <string name="settings_language_title">Langue</string>
     <string name="settings_language_system">langue du système</string>
+    <string name="settings_replies_manage">gérer les réponses (%1$d)</string>
     <string name="settings_font_title">Police</string>
     <string name="settings_font_selawik">Selawik (Windows Phone)</string>
     <string name="settings_font_system">police système</string>

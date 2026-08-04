@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Text
@@ -121,6 +122,32 @@ fun SettingsScreen(
     onAbout: () -> Unit = {},
 ) {
     val context = LocalContext.current
+    var showLanguagePicker by androidx.compose.runtime.remember {
+        androidx.compose.runtime.mutableStateOf(false)
+    }
+    var showRepliesEditor by androidx.compose.runtime.remember {
+        androidx.compose.runtime.mutableStateOf(false)
+    }
+    val localeManager = androidx.compose.runtime.remember {
+        context.getSystemService(android.app.LocaleManager::class.java)
+    }
+    var currentLangTag by androidx.compose.runtime.remember {
+        androidx.compose.runtime.mutableStateOf(
+            localeManager?.applicationLocales?.toLanguageTags().orEmpty(),
+        )
+    }
+    // Language names are shown as endonyms on purpose — never translated.
+    val languageOptions = listOf(
+        "" to stringResource(R.string.settings_language_system),
+        "en" to "English",
+        "fr" to "français",
+        "ar" to "العربية",
+    )
+    fun langSelected(tag: String): Boolean =
+        if (tag.isEmpty()) currentLangTag.isEmpty() else currentLangTag.startsWith(tag)
+    val replies by AppPrefs.rejectMessages.collectAsState()
+
+    Box(Modifier.fillMaxSize()) {
     Column(
         Modifier
             .fillMaxSize()
@@ -288,44 +315,17 @@ fun SettingsScreen(
             fontWeight = FontWeight.SemiBold,
             letterSpacing = 1.sp,
         )
-        val localeManager = androidx.compose.runtime.remember {
-            context.getSystemService(android.app.LocaleManager::class.java)
-        }
-        var currentLangTag by androidx.compose.runtime.remember {
-            androidx.compose.runtime.mutableStateOf(
-                localeManager?.applicationLocales?.toLanguageTags().orEmpty(),
-            )
-        }
-        // Language names are shown as endonyms on purpose — never translated.
-        listOf(
-            "" to stringResource(R.string.settings_language_system),
-            "en" to "English",
-            "fr" to "français",
-            "ar" to "العربية",
-        ).forEach { (tag, label) ->
-            val selected = if (tag.isEmpty()) {
-                currentLangTag.isEmpty()
-            } else {
-                currentLangTag.startsWith(tag)
-            }
-            Text(
-                label,
-                color = if (selected) accent.color else Metro.Foreground,
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Light,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable {
-                        currentLangTag = tag
-                        localeManager?.applicationLocales = if (tag.isEmpty()) {
-                            android.os.LocaleList.getEmptyLocaleList()
-                        } else {
-                            android.os.LocaleList.forLanguageTags(tag)
-                        }
-                    }
-                    .padding(vertical = 6.dp),
-            )
-        }
+        Text(
+            languageOptions.firstOrNull { langSelected(it.first) }?.second
+                ?: stringResource(R.string.settings_language_system),
+            color = Metro.Foreground,
+            fontSize = 22.sp,
+            fontWeight = FontWeight.Light,
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { showLanguagePicker = true }
+                .padding(vertical = 8.dp),
+        )
 
         Spacer(Modifier.height(30.dp))
         Text(
@@ -495,57 +495,23 @@ fun SettingsScreen(
         )
 
         Spacer(Modifier.height(30.dp))
-        val replies by AppPrefs.rejectMessages.collectAsState()
-        var newReply by androidx.compose.runtime.remember {
-            androidx.compose.runtime.mutableStateOf("")
-        }
         Text(
             stringResource(R.string.settings_text_replies_title),
             color = accent.color,
             fontSize = 14.sp,
             fontWeight = FontWeight.SemiBold,
             letterSpacing = 1.sp,
-            modifier = Modifier.padding(bottom = 6.dp),
         )
-        replies.forEach { message ->
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp),
-            ) {
-                Text(
-                    message,
-                    color = Metro.Foreground,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Light,
-                    modifier = Modifier.weight(1f),
-                )
-                Text(
-                    "✕",
-                    color = Metro.Subtle,
-                    fontSize = 18.sp,
-                    modifier = Modifier
-                        .clickable {
-                            AppPrefs.setRejectMessages(context, replies - message)
-                        }
-                        .padding(start = 10.dp),
-                )
-            }
-        }
-        Spacer(Modifier.height(6.dp))
-        MetroTextBox(
-            newReply,
-            { newReply = it },
-            accent.color,
-            placeholder = stringResource(R.string.settings_new_reply_placeholder),
+        Text(
+            stringResource(R.string.settings_replies_manage, replies.size),
+            color = Metro.Foreground,
+            fontSize = 22.sp,
+            fontWeight = FontWeight.Light,
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { showRepliesEditor = true }
+                .padding(vertical = 8.dp),
         )
-        Spacer(Modifier.height(8.dp))
-        MetroButton(
-            stringResource(R.string.settings_add_reply_button),
-            enabled = newReply.isNotBlank(),
-        ) {
-            AppPrefs.setRejectMessages(context, replies + newReply.trim())
-            newReply = ""
-        }
 
         val sims = androidx.compose.runtime.remember { Sims.options(context) }
         if (sims.size > 1) {
@@ -648,5 +614,142 @@ fun SettingsScreen(
         )
 
         Spacer(Modifier.height(30.dp))
+    }
+
+    if (showLanguagePicker) {
+        androidx.activity.compose.BackHandler { showLanguagePicker = false }
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(Metro.Background.copy(alpha = 0.97f))
+                .clickable(
+                    interactionSource = androidx.compose.runtime.remember {
+                        androidx.compose.foundation.interaction.MutableInteractionSource()
+                    },
+                    indication = null,
+                ) { showLanguagePicker = false },
+        ) {
+            Column(
+                Modifier
+                    .align(Alignment.Center)
+                    .fillMaxWidth()
+                    .padding(horizontal = 32.dp),
+            ) {
+                Text(
+                    stringResource(R.string.settings_language_title),
+                    color = Metro.Foreground,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    letterSpacing = 1.sp,
+                    modifier = Modifier.padding(bottom = 14.dp),
+                )
+                languageOptions.forEach { (tag, label) ->
+                    Text(
+                        label,
+                        color = if (langSelected(tag)) accent.color else Metro.Foreground,
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Light,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                currentLangTag = tag
+                                localeManager?.applicationLocales = if (tag.isEmpty()) {
+                                    android.os.LocaleList.getEmptyLocaleList()
+                                } else {
+                                    android.os.LocaleList.forLanguageTags(tag)
+                                }
+                                showLanguagePicker = false
+                            }
+                            .padding(vertical = 10.dp),
+                    )
+                }
+            }
+        }
+    }
+
+    if (showRepliesEditor) {
+        androidx.activity.compose.BackHandler { showRepliesEditor = false }
+        var newReply by androidx.compose.runtime.remember {
+            androidx.compose.runtime.mutableStateOf("")
+        }
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(Metro.Background.copy(alpha = 0.97f))
+                .clickable(
+                    interactionSource = androidx.compose.runtime.remember {
+                        androidx.compose.foundation.interaction.MutableInteractionSource()
+                    },
+                    indication = null,
+                ) { showRepliesEditor = false },
+        ) {
+            Column(
+                Modifier
+                    .align(Alignment.Center)
+                    .fillMaxWidth()
+                    .padding(horizontal = 32.dp)
+                    .clickable(
+                        interactionSource = androidx.compose.runtime.remember {
+                            androidx.compose.foundation.interaction.MutableInteractionSource()
+                        },
+                        indication = null,
+                    ) { /* consume so taps inside don't dismiss */ },
+            ) {
+                Text(
+                    stringResource(R.string.settings_text_replies_title),
+                    color = Metro.Foreground,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    letterSpacing = 1.sp,
+                    modifier = Modifier.padding(bottom = 12.dp),
+                )
+                Column(
+                    Modifier
+                        .heightIn(max = 340.dp)
+                        .verticalScroll(rememberScrollState()),
+                ) {
+                    replies.forEach { message ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp),
+                        ) {
+                            Text(
+                                message,
+                                color = Metro.Foreground,
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Light,
+                                modifier = Modifier.weight(1f),
+                            )
+                            Text(
+                                "✕",
+                                color = Metro.Subtle,
+                                fontSize = 18.sp,
+                                modifier = Modifier
+                                    .clickable {
+                                        AppPrefs.setRejectMessages(context, replies - message)
+                                    }
+                                    .padding(start = 10.dp),
+                            )
+                        }
+                    }
+                }
+                Spacer(Modifier.height(10.dp))
+                MetroTextBox(
+                    newReply,
+                    { newReply = it },
+                    accent.color,
+                    placeholder = stringResource(R.string.settings_new_reply_placeholder),
+                )
+                Spacer(Modifier.height(8.dp))
+                MetroButton(
+                    stringResource(R.string.settings_add_reply_button),
+                    enabled = newReply.isNotBlank(),
+                ) {
+                    AppPrefs.setRejectMessages(context, replies + newReply.trim())
+                    newReply = ""
+                }
+            }
+        }
+    }
     }
 }
