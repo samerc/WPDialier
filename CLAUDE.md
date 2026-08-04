@@ -22,6 +22,12 @@ app label "Phone". Kotlin + Jetpack Compose, single module `:app`.
 - Anything user-customizable belongs in the Settings screen.
 - UI changes are checked against real WP8 reference screenshots (kept in
   `%TEMP%\wp_refs\` during sessions; re-fetch from GSMArena WP8 review if gone).
+- User-supplied WP 8.1 reference screenshots live in `C:\Users\Administrator\Pictures\wp`
+  (phone app video stills: history w/ call circles + white context menus,
+  details page w/ durations, speed dial number list, in-call gray panel,
+  settings toggles). All 8 observations from them are implemented.
+- User cannot be asked to do manual device steps for end users — prefer deep
+  links (e.g. the Google Phone notification settings shortcut in Settings).
 
 ## Architecture
 
@@ -34,9 +40,12 @@ app label "Phone". Kotlin + Jetpack Compose, single module `:app`.
   (headers pan with pager offset), `MetroAppBar`, `Haptics`, `Fonts` (Selawik,
   default), `ContactTile` (photo or centered initials; group tiles are bold).
 - `screens/` — Dialpad (digits in fixed-width slots, DTMF tones, haptics),
-  HomePages (history w/ icon action panels, speed dial = starred contacts,
-  people w/ jump grid), ContactDetail (merged call/text rows, per-contact
-  history, preferred SIM, pin/share/delete), New/EditContact, Search, Settings.
+  HomePages (history: grouped "(n)" rows, right-edge call circle, long-press
+  white context menu, CallDetailsScreen w/ durations; speed dial = starred
+  contact tiles + plain numbers from AppPrefs), ContactDetail (merged call/text
+  rows, per-contact history, preferred SIM, pin/share/delete), New/EditContact,
+  Search, Settings (WP toggle switches, reject-template editor, blocked list,
+  Google-dialer notification deep link).
 - `call/` — `WpInCallService` (CallStyle incoming/ongoing/missed notifications),
   `CallManager` (multi-call: primary + waiting/held, swap, reject-with-text,
   CallEndpoint audio routing), `InCallActivity`, `CallActionReceiver`.
