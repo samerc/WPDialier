@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -43,6 +44,35 @@ import com.fancyshark.wpdialer.ui.MetroTextBox
 import com.fancyshark.wpdialer.ui.WpAccents
 import kotlinx.coroutines.launch
 
+/** Localized display name for a WP accent color; the key stays English. */
+@Composable
+private fun accentDisplayName(name: String): String {
+    val id = when (name) {
+        "lime" -> R.string.settings_accent_lime
+        "green" -> R.string.settings_accent_green
+        "emerald" -> R.string.settings_accent_emerald
+        "teal" -> R.string.settings_accent_teal
+        "cyan" -> R.string.settings_accent_cyan
+        "cobalt" -> R.string.settings_accent_cobalt
+        "indigo" -> R.string.settings_accent_indigo
+        "violet" -> R.string.settings_accent_violet
+        "pink" -> R.string.settings_accent_pink
+        "magenta" -> R.string.settings_accent_magenta
+        "crimson" -> R.string.settings_accent_crimson
+        "red" -> R.string.settings_accent_red
+        "orange" -> R.string.settings_accent_orange
+        "amber" -> R.string.settings_accent_amber
+        "yellow" -> R.string.settings_accent_yellow
+        "brown" -> R.string.settings_accent_brown
+        "olive" -> R.string.settings_accent_olive
+        "steel" -> R.string.settings_accent_steel
+        "mauve" -> R.string.settings_accent_mauve
+        "sienna" -> R.string.settings_accent_sienna
+        else -> return name
+    }
+    return stringResource(id)
+}
+
 /** The WP settings toggle: On/Off label + bordered track with square thumb. */
 @Composable
 private fun WpToggleRow(checked: Boolean, accent: Color, onChange: (Boolean) -> Unit) {
@@ -61,7 +91,10 @@ private fun WpToggleRow(checked: Boolean, accent: Color, onChange: (Boolean) -> 
             color = Metro.Foreground,
             fontSize = 22.sp,
             fontWeight = FontWeight.Light,
-            modifier = Modifier.width(52.dp),
+            maxLines = 1,
+            modifier = Modifier
+                .widthIn(min = 52.dp)
+                .padding(end = 10.dp),
         )
         Box(
             Modifier
@@ -117,7 +150,7 @@ fun SettingsScreen(
             letterSpacing = 1.sp,
         )
         Text(
-            accent.name,
+            accentDisplayName(accent.name),
             color = accent.color,
             fontSize = 22.sp,
             fontWeight = FontWeight.Light,
@@ -167,7 +200,10 @@ fun SettingsScreen(
                 color = Metro.Foreground,
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Light,
-                modifier = Modifier.width(52.dp),
+                maxLines = 1,
+                modifier = Modifier
+                    .widthIn(min = 52.dp)
+                    .padding(end = 10.dp),
             )
             // WP-style toggle: bordered track, square thumb, accent when on.
             Box(
@@ -198,9 +234,15 @@ fun SettingsScreen(
                 horizontalArrangement = Arrangement.spacedBy(20.dp),
                 modifier = Modifier.padding(top = 10.dp),
             ) {
-                Haptics.LEVELS.forEachIndexed { i, label ->
+                Haptics.LEVELS.forEachIndexed { i, _ ->
                     Text(
-                        label,
+                        stringResource(
+                            when (i) {
+                                0 -> R.string.settings_haptic_low
+                                1 -> R.string.settings_haptic_medium
+                                else -> R.string.settings_haptic_high
+                            },
+                        ),
                         color = if (level == i) accent.color else Metro.Subtle,
                         fontSize = 20.sp,
                         fontWeight = if (level == i) FontWeight.Normal else FontWeight.Light,
@@ -235,6 +277,53 @@ fun SettingsScreen(
                     .fillMaxWidth()
                     .clickable { FontStore.set(context, value) }
                     .padding(vertical = 7.dp),
+            )
+        }
+
+        Spacer(Modifier.height(30.dp))
+        Text(
+            stringResource(R.string.settings_language_title),
+            color = accent.color,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.SemiBold,
+            letterSpacing = 1.sp,
+        )
+        val localeManager = androidx.compose.runtime.remember {
+            context.getSystemService(android.app.LocaleManager::class.java)
+        }
+        var currentLangTag by androidx.compose.runtime.remember {
+            androidx.compose.runtime.mutableStateOf(
+                localeManager?.applicationLocales?.toLanguageTags().orEmpty(),
+            )
+        }
+        // Language names are shown as endonyms on purpose — never translated.
+        listOf(
+            "" to stringResource(R.string.settings_language_system),
+            "en" to "English",
+            "fr" to "français",
+            "ar" to "العربية",
+        ).forEach { (tag, label) ->
+            val selected = if (tag.isEmpty()) {
+                currentLangTag.isEmpty()
+            } else {
+                currentLangTag.startsWith(tag)
+            }
+            Text(
+                label,
+                color = if (selected) accent.color else Metro.Foreground,
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Light,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable {
+                        currentLangTag = tag
+                        localeManager?.applicationLocales = if (tag.isEmpty()) {
+                            android.os.LocaleList.getEmptyLocaleList()
+                        } else {
+                            android.os.LocaleList.forLanguageTags(tag)
+                        }
+                    }
+                    .padding(vertical = 6.dp),
             )
         }
 
