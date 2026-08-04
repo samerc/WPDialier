@@ -257,16 +257,46 @@ fun SettingsScreen(
             }
         }
 
-        // Only shown while Google's dialer is installed AND enabled — once
-        // the user disables it, the duplicate notifications are gone.
+        // enabled=true -> duplicate-notification guidance; enabled=false ->
+        // reminder to re-enable before uninstalling; null -> not installed.
         val googleDialerEnabled = androidx.compose.runtime.remember {
             runCatching {
                 context.packageManager
                     .getApplicationInfo("com.google.android.dialer", 0)
                     .enabled
-            }.getOrDefault(false)
+            }.getOrNull()
         }
-        if (googleDialerEnabled) {
+        if (googleDialerEnabled == false) {
+            Spacer(Modifier.height(30.dp))
+            Text(
+                "Google phone app",
+                color = accent.color,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
+                letterSpacing = 1.sp,
+            )
+            Text(
+                "Google's phone app is disabled, so only this app handles calls. If you ever uninstall this app, re-enable it first so your phone keeps a dialer.",
+                color = Metro.Foreground,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Light,
+                modifier = Modifier.padding(top = 6.dp, bottom = 10.dp),
+            )
+            MetroButton(
+                "open Google Phone app info",
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                runCatching {
+                    context.startActivity(
+                        android.content.Intent(
+                            android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                            android.net.Uri.parse("package:com.google.android.dialer"),
+                        ),
+                    )
+                }
+            }
+        }
+        if (googleDialerEnabled == true) {
             Spacer(Modifier.height(30.dp))
             Text(
                 "Duplicate call notifications",
