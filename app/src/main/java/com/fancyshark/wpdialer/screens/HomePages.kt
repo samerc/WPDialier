@@ -101,7 +101,14 @@ fun HistoryPage(
     }
     var expandedId by remember { mutableStateOf<Long?>(null) }
     var menuForId by remember { mutableStateOf<Long?>(null) }
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 20.dp, end = 20.dp, top = 6.dp, bottom = 20.dp)) {
+    // One-handed mode anchors the list to the bottom: index 0 (the newest
+    // call) renders just above the thumb, like the dialpad's T9 list.
+    val oneHanded by com.fancyshark.wpdialer.data.AppPrefs.oneHandedLists.collectAsState()
+    LazyColumn(
+        Modifier.fillMaxSize(),
+        reverseLayout = oneHanded,
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 20.dp, end = 20.dp, top = 6.dp, bottom = 20.dp),
+    ) {
         items(groups.size, key = { groups[it].first().id }) { i ->
             val group = groups[i]
             val item = group.first()

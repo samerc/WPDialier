@@ -495,6 +495,42 @@ fun SettingsScreen(
         )
 
         Spacer(Modifier.height(30.dp))
+        val oneHandedLists by AppPrefs.oneHandedLists.collectAsState()
+        Text(
+            stringResource(R.string.settings_one_handed_lists_title),
+            color = accent.color,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.SemiBold,
+            letterSpacing = 1.sp,
+        )
+        WpToggleRow(oneHandedLists, accent.color) { AppPrefs.setOneHandedLists(context, it) }
+        Text(
+            stringResource(R.string.settings_one_handed_lists_hint),
+            color = Metro.Subtle,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Light,
+            modifier = Modifier.padding(top = 6.dp),
+        )
+
+        Spacer(Modifier.height(30.dp))
+        val reachGesture by AppPrefs.reachGesture.collectAsState()
+        Text(
+            stringResource(R.string.settings_reach_title),
+            color = accent.color,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.SemiBold,
+            letterSpacing = 1.sp,
+        )
+        WpToggleRow(reachGesture, accent.color) { AppPrefs.setReachGesture(context, it) }
+        Text(
+            stringResource(R.string.settings_reach_hint),
+            color = Metro.Subtle,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Light,
+            modifier = Modifier.padding(top = 6.dp),
+        )
+
+        Spacer(Modifier.height(30.dp))
         Text(
             stringResource(R.string.settings_text_replies_title),
             color = accent.color,

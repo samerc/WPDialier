@@ -10,6 +10,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.IndicationNodeFactory
 import androidx.compose.foundation.border
@@ -42,6 +43,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -396,14 +398,36 @@ fun MetroAppBar(
     actions: List<AppBarAction>,
     menu: List<Pair<String, () -> Unit>> = emptyList(),
     modifier: Modifier = Modifier,
+    onSwipeDown: (() -> Unit)? = null,
 ) {
     var expanded by remember { mutableStateOf(false) }
     val accent by AccentStore.accent.collectAsState()
+    val swipeDown by rememberUpdatedState(onSwipeDown)
     Column(
         modifier
             .fillMaxWidth()
             .background(Metro.Chrome)
-            .animateContentSize(),
+            .animateContentSize()
+            .then(
+                if (onSwipeDown != null) {
+                    Modifier.pointerInput(Unit) {
+                        // Reachability trigger: a downward flick on the bar.
+                        var total = 0f
+                        detectVerticalDragGestures(
+                            onDragStart = { total = 0f },
+                            onVerticalDrag = { _, dragAmount -> total += dragAmount },
+                            onDragEnd = {
+                                // Low bar on purpose: the strip is only ~60dp
+                                // tall and system edge gestures can steal long
+                                // swipes, so a short flick must be enough.
+                                if (total > 28.dp.toPx()) swipeDown?.invoke()
+                            },
+                        )
+                    }
+                } else {
+                    Modifier
+                },
+            ),
     ) {
         Box(Modifier.fillMaxWidth()) {
             val dotsInteraction = remember { MutableInteractionSource() }

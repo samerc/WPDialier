@@ -63,6 +63,7 @@ fun ContactDetailScreen(
     onText: (String) -> Unit,
     onEdit: () -> Unit,
     onDeleted: () -> Unit,
+    onReachDown: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val scope = androidx.compose.runtime.rememberCoroutineScope()
@@ -78,6 +79,7 @@ fun ContactDetailScreen(
         Column(Modifier.fillMaxSize()) {
             ContactDetailBody(d, accent, history, onCall, onText, Modifier.weight(1f))
             MetroAppBar(
+                onSwipeDown = onReachDown,
                 actions = listOf(
                     AppBarAction(
                         Icons.Filled.Edit,

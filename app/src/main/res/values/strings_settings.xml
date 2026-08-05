@@ -52,6 +52,10 @@
     <string name="settings_tilt_title">Tile tilt effect</string>
     <string name="settings_relative_times_title">Relative times in history</string>
     <string name="settings_relative_times_hint">on: \"2 hours ago\" — off: Windows Phone style \"Sat 01:06\"</string>
+    <string name="settings_one_handed_lists_title">One-handed lists</string>
+    <string name="settings_one_handed_lists_hint">history and search results anchor to the bottom of the screen, within thumb reach</string>
+    <string name="settings_reach_title">Slide down to reach</string>
+    <string name="settings_reach_hint">swipe down on the bottom bar to pull the screen within reach; it springs back after a few seconds. Your phone may also offer a system-wide one-handed mode in its own settings.</string>
     <string name="settings_text_replies_title">Text replies (decline with message)</string>
     <string name="settings_new_reply_placeholder">New reply</string>
     <string name="settings_add_reply_button">add reply</string>

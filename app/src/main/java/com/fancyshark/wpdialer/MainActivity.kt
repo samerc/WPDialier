@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -50,6 +51,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -441,6 +445,31 @@ class MainActivity : ComponentActivity() {
                 androidx.compose.foundation.LocalIndication provides
                     com.fancyshark.wpdialer.ui.MetroIndication,
             ) {
+            // WP10M-style reachability: a swipe down on the app bar slides the
+            // whole screen down so top content lands under the thumb, then
+            // springs back after a timeout or a tap on the vacated gap.
+            val reachEnabled by com.fancyshark.wpdialer.data.AppPrefs.reachGesture.collectAsState()
+            val reach = remember { androidx.compose.animation.core.Animatable(0f) }
+            var reachTimer by remember {
+                mutableStateOf<kotlinx.coroutines.Job?>(null)
+            }
+            fun dismissReach() {
+                reachTimer?.cancel()
+                reachTimer = uiScope.launch {
+                    reach.animateTo(0f, androidx.compose.animation.core.tween(180))
+                }
+            }
+            fun triggerReach(targetPx: Float) {
+                reachTimer?.cancel()
+                reachTimer = uiScope.launch {
+                    reach.animateTo(targetPx, androidx.compose.animation.core.tween(220))
+                    kotlinx.coroutines.delay(5000)
+                    reach.animateTo(0f, androidx.compose.animation.core.tween(220))
+                }
+            }
+            LaunchedEffect(backStack.lastIndex) {
+                if (reach.value > 0f) dismissReach()
+            }
             Box(
                 Modifier
                     .fillMaxSize()
@@ -450,6 +479,13 @@ class MainActivity : ComponentActivity() {
                     .imePadding(),
             ) {
                 val top = backStack.last()
+                var contentHeightPx by remember { mutableStateOf(0) }
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .onSizeChanged { contentHeightPx = it.height }
+                        .graphicsLayer { translationY = reach.value },
+                ) {
                 // Keeps each stack entry's rememberSaveable state (typed
                 // dialpad number, search query, scroll positions) alive while
                 // another screen is pushed on top of it.
@@ -526,6 +562,11 @@ class MainActivity : ComponentActivity() {
                                     stringResource(R.string.main_menu_settings) to { push(Screen.Settings) },
                                     stringResource(R.string.main_menu_delete_all_history) to { confirmClearHistory = true },
                                 ),
+                                onSwipeDown = if (reachEnabled) {
+                                    { triggerReach(contentHeightPx * 0.42f) }
+                                } else {
+                                    null
+                                },
                             )
                         }
 
@@ -545,6 +586,11 @@ class MainActivity : ComponentActivity() {
                             onText = { sendText(it) },
                             onEdit = { push(Screen.EditContact(top.id)) },
                             onDeleted = { popAndRefresh() },
+                            onReachDown = if (reachEnabled) {
+                                { triggerReach(contentHeightPx * 0.42f) }
+                            } else {
+                                null
+                            },
                         )
 
                         is Screen.EditContact -> EditContactScreen(
@@ -581,6 +627,21 @@ class MainActivity : ComponentActivity() {
 
                         Screen.About -> com.fancyshark.wpdialer.screens.AboutScreen(accent)
                     }
+                }
+                }
+
+                // Tapping the gap the content vacated snaps it back up.
+                if (reach.value > 0.5f) {
+                    val density = LocalDensity.current
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .height(with(density) { reach.value.toDp() })
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                            ) { dismissReach() },
+                    )
                 }
 
                 confirmDeleteGroup?.let { group ->

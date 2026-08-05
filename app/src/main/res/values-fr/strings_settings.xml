@@ -52,6 +52,10 @@
     <string name="settings_tilt_title">Effet d\'inclinaison des tuiles</string>
     <string name="settings_relative_times_title">Heures relatives dans l\'historique</string>
     <string name="settings_relative_times_hint">activé : « il y a 2 heures » — désactivé : style Windows Phone « sam. 01:06 »</string>
+    <string name="settings_one_handed_lists_title">Listes à une main</string>
+    <string name="settings_one_handed_lists_hint">l\'historique et les résultats de recherche s\'ancrent en bas de l\'écran, à portée du pouce</string>
+    <string name="settings_reach_title">Glisser pour rapprocher</string>
+    <string name="settings_reach_hint">balayez vers le bas sur la barre inférieure pour rapprocher l\'écran ; il revient après quelques secondes. Votre téléphone peut aussi proposer un mode une main dans ses propres paramètres.</string>
     <string name="settings_text_replies_title">Réponses par SMS (refuser avec un message)</string>
     <string name="settings_new_reply_placeholder">Nouvelle réponse</string>
     <string name="settings_add_reply_button">ajouter une réponse</string>

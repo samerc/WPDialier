@@ -16,6 +16,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -58,14 +59,12 @@ fun SearchScreen(
         }
     }
 
-    Column(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
-        Text(
-            stringResource(com.fancyshark.wpdialer.R.string.search_title),
-            color = Metro.Foreground,
-            fontSize = 15.sp,
-            letterSpacing = 2.sp,
-            modifier = Modifier.padding(top = 18.dp, bottom = 14.dp),
-        )
+    // One-handed mode flips the layout: results grow upward from a
+    // bottom-anchored search box, keeping everything within thumb reach.
+    val oneHanded by com.fancyshark.wpdialer.data.AppPrefs.oneHandedLists
+        .collectAsState()
+
+    val searchBox: @Composable () -> Unit = {
         Box(
             Modifier
                 .fillMaxWidth()
@@ -88,8 +87,9 @@ fun SearchScreen(
                 modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
             )
         }
-        Spacer(Modifier.padding(top = 8.dp))
-        LazyColumn(Modifier.fillMaxSize()) {
+    }
+    val resultsList: @Composable (Modifier) -> Unit = { modifier ->
+        LazyColumn(modifier, reverseLayout = oneHanded) {
             items(results.size, key = { results[it].id }) { i ->
                 val contact = results[i]
                 Row(
@@ -111,6 +111,26 @@ fun SearchScreen(
                     )
                 }
             }
+        }
+    }
+
+    Column(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
+        Text(
+            stringResource(com.fancyshark.wpdialer.R.string.search_title),
+            color = Metro.Foreground,
+            fontSize = 15.sp,
+            letterSpacing = 2.sp,
+            modifier = Modifier.padding(top = 18.dp, bottom = 14.dp),
+        )
+        if (oneHanded) {
+            resultsList(Modifier.weight(1f).fillMaxWidth())
+            Spacer(Modifier.padding(top = 8.dp))
+            searchBox()
+            Spacer(Modifier.padding(top = 12.dp))
+        } else {
+            searchBox()
+            Spacer(Modifier.padding(top = 8.dp))
+            resultsList(Modifier.fillMaxSize())
         }
     }
 }

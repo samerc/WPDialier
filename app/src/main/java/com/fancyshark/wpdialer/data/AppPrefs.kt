@@ -31,6 +31,14 @@ object AppPrefs {
     private val _relativeTimes = MutableStateFlow(false)
     val relativeTimes: StateFlow<Boolean> = _relativeTimes
 
+    /** One-handed: history and search results anchor to the bottom, within thumb reach. */
+    private val _oneHandedLists = MutableStateFlow(false)
+    val oneHandedLists: StateFlow<Boolean> = _oneHandedLists
+
+    /** One-handed: swipe down on the app bar slides the screen down (WP10M-style). */
+    private val _reachGesture = MutableStateFlow(false)
+    val reachGesture: StateFlow<Boolean> = _reachGesture
+
     private val _speedDialNumbers = MutableStateFlow<List<String>>(emptyList())
     val speedDialNumbers: StateFlow<List<String>> = _speedDialNumbers
 
@@ -47,6 +55,8 @@ object AppPrefs {
         _light.value = p.getBoolean("theme_light", false)
         _tilt.value = p.getBoolean("tilt", true)
         _relativeTimes.value = p.getBoolean("relative_times", false)
+        _oneHandedLists.value = p.getBoolean("one_handed_lists", false)
+        _reachGesture.value = p.getBoolean("reach_gesture", false)
         _speedDialNumbers.value = p.getString("speed_dial", null)
             ?.split(SEPARATOR)?.filter { it.isNotBlank() } ?: emptyList()
     }
@@ -54,6 +64,16 @@ object AppPrefs {
     fun setRelativeTimes(context: Context, on: Boolean) {
         _relativeTimes.value = on
         prefs(context).edit().putBoolean("relative_times", on).apply()
+    }
+
+    fun setOneHandedLists(context: Context, on: Boolean) {
+        _oneHandedLists.value = on
+        prefs(context).edit().putBoolean("one_handed_lists", on).apply()
+    }
+
+    fun setReachGesture(context: Context, on: Boolean) {
+        _reachGesture.value = on
+        prefs(context).edit().putBoolean("reach_gesture", on).apply()
     }
 
     fun addSpeedDial(context: Context, number: String) {

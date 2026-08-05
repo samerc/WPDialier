@@ -52,6 +52,10 @@
     <string name="settings_tilt_title">تأثير إمالة المربعات</string>
     <string name="settings_relative_times_title">الأوقات النسبية في السجل</string>
     <string name="settings_relative_times_hint">تشغيل: \"قبل ساعتين\" — إيقاف: بنمط Windows Phone ‏\"السبت 01:06\"</string>
+    <string name="settings_one_handed_lists_title">قوائم بيد واحدة</string>
+    <string name="settings_one_handed_lists_hint">يلتصق سجل المكالمات ونتائج البحث بأسفل الشاشة في متناول الإبهام</string>
+    <string name="settings_reach_title">الانزلاق للوصول</string>
+    <string name="settings_reach_hint">اسحب لأسفل على الشريط السفلي لتقريب الشاشة؛ تعود بعد ثوانٍ قليلة. قد يوفر هاتفك أيضًا وضع الاستخدام بيد واحدة في إعداداته الخاصة.</string>
     <string name="settings_text_replies_title">الردود النصية (الرفض برسالة)</string>
     <string name="settings_new_reply_placeholder">رد جديد</string>
     <string name="settings_add_reply_button">إضافة رد</string>
