@@ -42,6 +42,11 @@ android {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
+            // Embed native symbol tables in the AAB so Play can symbolicate
+            // crashes in the androidx native libs (removes a Console warning).
+            ndk {
+                debugSymbolLevel = "SYMBOL_TABLE"
+            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
