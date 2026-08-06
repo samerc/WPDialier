@@ -1,8 +1,10 @@
 # WP Dialer — project notes for Claude
 
 Windows Phone 8 (Metro) styled Android dialer. Package `com.fancyshark.wpdialer`,
-launcher label "Phone" (WP-authentic), public/store name **"Dialer 8"** (user
-decision 2026-08-04; avoids MS trademarks). Contact email on the About screen:
+app name **"Dialer 8"** everywhere the system shows it — launcher, settings,
+permission/role dialogs (user decision 2026-08-06; avoids MS trademarks and
+disambiguates the role picker). The in-app pivot header stays "PHONE"
+(WP-authentic UI, not the app name). Contact email on the About screen:
 fancyshark505@gmail.com. Kotlin + Jetpack Compose, single module `:app`.
 Git identity: samerc / 9696877+samerc@users.noreply.github.com (NEVER
 ai@bahriah.com — unrelated to the user's GitHub; history was rewritten to
@@ -14,6 +16,13 @@ purge it).
 - Android SDK at `C:\android-sdk` (see `local.properties`, untracked); adb: `C:\android-sdk\platform-tools\adb.exe`
 - Build: `$env:JAVA_HOME='C:\jdk-21'; & C:\gradle\gradle-8.13\bin\gradle.bat -p "<repo>" assembleDebug`
 - Install: `adb install -r app\build\outputs\apk\debug\app-debug.apk`
+- Release: `assembleRelease` — R8 + resource shrinking, signed via untracked
+  `keystore.properties` + `release.keystore` in the repo root (gitignored,
+  NEVER commit; losing the keystore = losing the app's signing identity —
+  keep an off-machine backup). ~2.7 MB vs 65 MB debug. `assembleReleaseTest`
+  builds an R8 smoke-test variant (`.r8test` appId suffix, debug-signed)
+  installable NEXT TO the daily app, so minification testing never requires
+  uninstalling (= wiping) the real install.
 - Test device: user's OnePlus 10 Pro (NE2213, Android 16) over USB. Screenshots via
   `adb shell screencap` + `adb pull` (PowerShell `>` redirection corrupts binary).
   Downscale screenshots before Reading them (System.Drawing) to save context.
@@ -88,6 +97,9 @@ purge it).
   the only fix is disabling the app (Settings section guides users; the
   user's device has it disabled via `pm disable-user`). A reminder section
   warns to re-enable before uninstalling.
+- ColorOS also blocks `adb shell pm grant` (SecurityException) — to grant
+  permissions to a test install, drive the app's own permission dialogs
+  with input taps instead.
 - Notification RemoteViews resolve `?android:attr` theme colors against the
   APP theme, not the notification surface — use explicit values/values-night
   colors. Custom fonts work via android:fontFamily in the layout XML.
@@ -118,11 +130,33 @@ Phase 2 shipped so far (all on-device verified, pushed through 7b9d9c0):
   per-screen state, back-pop refresh, push dedupe, block confirm,
   day-bounded history grouping, MetroIndication reset, allowBackup off
 
-Known deferred: sibling app-action sweep is a full third-party Data
-scan per profile open (IO thread, cache someday); SIM chooser lost on
-recreation mid-dial; osmdroid pause forwarding; type tables /
-kindLabel localize display-only via screens/TypeLabels.kt (keys stay
-English as data — never localize the keys).
+Shipped 2026-08-06 (launch-prep batch):
+- One-handed use (44d80bc): Settings toggles for bottom-anchored
+  history/search (T9-style reverseLayout) + WP10M slide-down reach
+  (flick down on the app bar; 28dp threshold because ColorOS steals
+  long swipes near the bottom edge for system one-handed mode).
+- Release build: R8 + resource shrinking + profileinstaller, 2.74 MB
+  vs 65 MB debug; `releaseTest` variant for side-by-side R8 testing.
+- Sibling app-action sweep now cached (Repo.sweepRows, 60s TTL).
+- T9 digit forms precomputed once per contact (PreparedDialEntry) —
+  was recomputing every name per keystroke (150ms janks at ~2k
+  contacts, now 61ms worst frame).
+- First-run setup wizard (SetupWizardScreen): role first (its grant
+  carries the phone permissions), then leftover permissions, then
+  full-screen-intent health check; every step skippable; skipping the
+  role shows a calm home banner — NEVER an auto role dialog on launch
+  (nag-loops are a Play-review red flag). Existing installs are
+  grandfathered (role held => setup_done). Settings has "run
+  first-time setup again".
+- Stress-tested with +684 fake contacts / +300 call rows (tagged
+  account_type stress.test, purged after): release cold start
+  303-363ms, history fling 0.08% janky frames, profile w/ app actions
+  <900ms. Debug-build numbers are 3-5x worse — never profile on debug.
+
+Known deferred: SIM chooser lost on recreation mid-dial; osmdroid
+pause forwarding; type tables / kindLabel localize display-only via
+screens/TypeLabels.kt (keys stay English as data — never localize
+the keys).
 
 Still untested on hardware: add call/merge/conference live calls,
 in-call SIM label, D-pad on the tester's Cat S22 Flip. Remaining

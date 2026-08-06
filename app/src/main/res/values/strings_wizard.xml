@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="wizard_app_title">DIALER 8</string>
+    <string name="wizard_welcome_title">welcome</string>
+    <string name="wizard_welcome_body">A phone app in the Metro style — fast, flat, and glanceable. A couple of quick steps and you\'re ready to call.</string>
+    <string name="wizard_role_title">your phone app</string>
+    <string name="wizard_role_body">Dialer 8 works as your default phone app: it dials your calls, shows who\'s calling, and keeps your call history. You can switch back anytime in your phone\'s settings.</string>
+    <string name="wizard_role_button">make it my phone app</string>
+    <string name="wizard_perms_title">permissions</string>
+    <string name="wizard_perms_body">To show names and history, Dialer 8 needs access to your contacts, call log, and notifications.</string>
+    <string name="wizard_perms_privacy">Everything stays on your phone. Nothing is collected, uploaded, or shared — see the privacy policy in the about page.</string>
+    <string name="wizard_perms_button">grant permissions</string>
+    <string name="wizard_banner_title">incoming calls</string>
+    <string name="wizard_banner_body">Full-screen call alerts are turned off for this app, so incoming calls would only show a small notification. Turn the setting on so calls ring properly.</string>
+    <string name="wizard_banner_button">open the setting</string>
+    <string name="wizard_done_title">all set</string>
+    <string name="wizard_done_body">You\'re ready to go. Everything can be adjusted later in settings.</string>
+    <string name="wizard_next">next</string>
+    <string name="wizard_skip">skip for now</string>
+    <string name="wizard_start">start</string>
+    <string name="main_make_default_banner">tap to make Dialer 8 your phone app</string>
+</resources>

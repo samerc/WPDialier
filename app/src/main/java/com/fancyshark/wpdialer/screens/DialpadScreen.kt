@@ -70,16 +70,23 @@ private fun t9(text: String): String = buildString {
     }
 }
 
-/** Rank a smart-dial candidate for [input] digits; null = no match. */
-private fun dialRank(entry: com.fancyshark.wpdialer.data.DialEntry, input: String): Int? {
-    val words = entry.name.split(' ', '-', '.').filter { it.isNotBlank() }
+/**
+ * A dial entry with its T9 digit forms computed once — recomputing them for
+ * every contact on every keystroke caused visible jank at ~2k contacts.
+ */
+private class PreparedDialEntry(val entry: com.fancyshark.wpdialer.data.DialEntry) {
     val full = t9(entry.name)
-    return when {
-        full.startsWith(input) -> 0
-        words.any { t9(it).startsWith(input) } -> 1
-        entry.number.filter { it.isDigit() }.contains(input) -> 2
-        else -> null
-    }
+    val words = entry.name.split(' ', '-', '.')
+        .filter { it.isNotBlank() }.map { t9(it) }
+    val digits = entry.number.filter { it.isDigit() }
+}
+
+/** Rank a smart-dial candidate for [input] digits; null = no match. */
+private fun dialRank(p: PreparedDialEntry, input: String): Int? = when {
+    p.full.startsWith(input) -> 0
+    p.words.any { it.startsWith(input) } -> 1
+    p.digits.contains(input) -> 2
+    else -> null
 }
 
 /**
@@ -191,16 +198,19 @@ fun DialpadScreen(
         // T9 smart dial: match typed digits against contact names and numbers.
         // All matches, scrollable, anchored just above the keypad.
         val entries by androidx.compose.runtime.produceState(
-            emptyList<com.fancyshark.wpdialer.data.DialEntry>(),
+            emptyList<PreparedDialEntry>(),
         ) {
-            value = com.fancyshark.wpdialer.data.Repo.loadDialEntries(context)
+            value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                com.fancyshark.wpdialer.data.Repo.loadDialEntries(context)
+                    .map { PreparedDialEntry(it) }
+            }
         }
         val input = number.filter { it.isDigit() }
         val suggestions = remember(number, entries) {
             if (input.length < 2 || number.any { it == '*' || it == '#' }) {
                 emptyList()
             } else {
-                entries.mapNotNull { e -> dialRank(e, input)?.let { it to e } }
+                entries.mapNotNull { p -> dialRank(p, input)?.let { it to p.entry } }
                     .sortedBy { it.first }
                     .map { it.second }
                     .distinctBy { it.contactId to it.number.filter(Char::isDigit).takeLast(9) }

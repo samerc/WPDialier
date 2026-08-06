@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="wizard_app_title">DIALER 8</string>
+    <string name="wizard_welcome_title">bienvenue</string>
+    <string name="wizard_welcome_body">Une application téléphone au style Metro — rapide, épurée, lisible d\'un coup d\'œil. Deux petites étapes et vous pourrez appeler.</string>
+    <string name="wizard_role_title">votre app téléphone</string>
+    <string name="wizard_role_body">Dialer 8 fonctionne comme application téléphone par défaut : elle compose vos appels, affiche qui appelle et conserve votre historique. Vous pouvez revenir en arrière à tout moment dans les paramètres du téléphone.</string>
+    <string name="wizard_role_button">en faire mon app téléphone</string>
+    <string name="wizard_perms_title">autorisations</string>
+    <string name="wizard_perms_body">Pour afficher les noms et l\'historique, Dialer 8 a besoin d\'accéder à vos contacts, au journal d\'appels et aux notifications.</string>
+    <string name="wizard_perms_privacy">Tout reste sur votre téléphone. Rien n\'est collecté, envoyé ni partagé — voir la politique de confidentialité dans la page à propos.</string>
+    <string name="wizard_perms_button">accorder les autorisations</string>
+    <string name="wizard_banner_title">appels entrants</string>
+    <string name="wizard_banner_body">Les alertes d\'appel en plein écran sont désactivées pour cette application : les appels entrants ne montreraient qu\'une petite notification. Activez le réglage pour que les appels sonnent correctement.</string>
+    <string name="wizard_banner_button">ouvrir le réglage</string>
+    <string name="wizard_done_title">tout est prêt</string>
+    <string name="wizard_done_body">Vous êtes prêt. Tout peut être ajusté plus tard dans les paramètres.</string>
+    <string name="wizard_next">suivant</string>
+    <string name="wizard_skip">passer pour l\'instant</string>
+    <string name="wizard_start">commencer</string>
+    <string name="main_make_default_banner">touchez pour faire de Dialer 8 votre app téléphone</string>
+</resources>

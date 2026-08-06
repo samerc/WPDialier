@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="wizard_app_title">DIALER 8</string>
+    <string name="wizard_welcome_title">مرحبًا</string>
+    <string name="wizard_welcome_body">تطبيق هاتف بأسلوب مترو — سريع ومسطّح وواضح بلمحة. خطوتان سريعتان وتصبح جاهزًا للاتصال.</string>
+    <string name="wizard_role_title">تطبيق الهاتف</string>
+    <string name="wizard_role_body">يعمل Dialer 8 كتطبيق الهاتف الافتراضي: يجري مكالماتك، ويعرض هوية المتصل، ويحفظ سجل مكالماتك. يمكنك العودة في أي وقت من إعدادات هاتفك.</string>
+    <string name="wizard_role_button">اجعله تطبيق هاتفي</string>
+    <string name="wizard_perms_title">الأذونات</string>
+    <string name="wizard_perms_body">لعرض الأسماء والسجل، يحتاج Dialer 8 إلى الوصول إلى جهات الاتصال وسجل المكالمات والإشعارات.</string>
+    <string name="wizard_perms_privacy">كل شيء يبقى على هاتفك. لا يُجمع أي شيء ولا يُرفع ولا يُشارك — راجع سياسة الخصوصية في صفحة حول التطبيق.</string>
+    <string name="wizard_perms_button">منح الأذونات</string>
+    <string name="wizard_banner_title">المكالمات الواردة</string>
+    <string name="wizard_banner_body">تنبيهات الاتصال بملء الشاشة معطّلة لهذا التطبيق، لذا ستظهر المكالمات الواردة كإشعار صغير فقط. فعّل الإعداد لكي ترن المكالمات كما يجب.</string>
+    <string name="wizard_banner_button">فتح الإعداد</string>
+    <string name="wizard_done_title">اكتمل الإعداد</string>
+    <string name="wizard_done_body">أنت جاهز الآن. يمكن تعديل كل شيء لاحقًا من الإعدادات.</string>
+    <string name="wizard_next">التالي</string>
+    <string name="wizard_skip">التخطي الآن</string>
+    <string name="wizard_start">ابدأ</string>
+    <string name="main_make_default_banner">انقر لجعل Dialer 8 تطبيق هاتفك</string>
+</resources>

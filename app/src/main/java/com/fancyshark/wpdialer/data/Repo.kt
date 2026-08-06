@@ -315,43 +315,23 @@ object Repo {
                     .map { it.takeLast(9) }
                     .toSet()
                 if (phoneKeys.isNotEmpty()) {
-                    context.contentResolver.query(
-                        ContactsContract.Data.CONTENT_URI,
-                        arrayOf(
-                            ContactsContract.Data._ID,
-                            ContactsContract.Data.MIMETYPE,
-                            ContactsContract.Data.DATA1,
-                            ContactsContract.Data.DATA2,
-                            ContactsContract.Data.DATA3,
-                            ContactsContract.RawContacts.ACCOUNT_TYPE,
-                        ),
-                        "(${ContactsContract.Data.MIMETYPE} LIKE 'vnd.android.cursor.item/vnd.%' " +
-                            "OR ${ContactsContract.Data.MIMETYPE} LIKE 'vnd.android.cursor.item/com.%') " +
-                            "AND ${ContactsContract.Data.CONTACT_ID} != ?",
-                        arrayOf(id.toString()),
-                        null,
-                    )?.use { c ->
-                        val seenKinds = appActions
-                            .map { it.mimetype to actionNumberKey(it.label, it.data1) }
-                            .toMutableSet()
-                        while (c.moveToNext()) {
-                            val mimetype = c.getString(1) ?: continue
-                            val label = c.getString(4)?.takeIf { it.isNotBlank() } ?: continue
-                            val key = actionNumberKey(label, c.getString(2)) ?: continue
-                            if (key !in phoneKeys) continue
-                            if (!seenKinds.add(mimetype to key)) continue
-                            appActions += ContactAppAction(
-                                c.getLong(0),
-                                mimetype,
-                                c.getString(3)?.takeIf { it.isNotBlank() }
-                                            ?: context.getString(
-                                                com.fancyshark.wpdialer.R.string.data_app_fallback,
-                                            ),
-                                label,
-                                c.getString(2),
-                                c.getString(5),
-                            )
-                        }
+                    val seenKinds = appActions
+                        .map { it.mimetype to actionNumberKey(it.label, it.data1) }
+                        .toMutableSet()
+                    for (row in sweepRows(context)) {
+                        if (row.contactId == id) continue
+                        if (row.key !in phoneKeys) continue
+                        if (!seenKinds.add(row.mimetype to row.key)) continue
+                        appActions += ContactAppAction(
+                            row.dataId,
+                            row.mimetype,
+                            row.app ?: context.getString(
+                                com.fancyshark.wpdialer.R.string.data_app_fallback,
+                            ),
+                            row.label,
+                            row.data1,
+                            row.accountType,
+                        )
                     }
                 }
             }
@@ -389,6 +369,65 @@ object Repo {
                 emails, uniqueEvents, websites, organization, nickname, appActions,
             )
         }
+
+    private data class SweepRow(
+        val dataId: Long,
+        val contactId: Long,
+        val mimetype: String,
+        val app: String?,
+        val label: String,
+        val data1: String?,
+        val accountType: String?,
+        val key: String,
+    )
+
+    // The sibling-action sweep reads every third-party Data row in the
+    // contacts provider — too heavy to repeat on each profile open, so the
+    // parsed rows are cached briefly and filtered per contact in memory.
+    @Volatile
+    private var sweepCache: Pair<Long, List<SweepRow>>? = null
+    private const val SWEEP_TTL_MS = 60_000L
+
+    private fun sweepRows(context: Context): List<SweepRow> {
+        sweepCache?.let { (loadedAt, rows) ->
+            if (android.os.SystemClock.elapsedRealtime() - loadedAt < SWEEP_TTL_MS) return rows
+        }
+        val rows = mutableListOf<SweepRow>()
+        context.contentResolver.query(
+            ContactsContract.Data.CONTENT_URI,
+            arrayOf(
+                ContactsContract.Data._ID,
+                ContactsContract.Data.MIMETYPE,
+                ContactsContract.Data.DATA1,
+                ContactsContract.Data.DATA2,
+                ContactsContract.Data.DATA3,
+                ContactsContract.RawContacts.ACCOUNT_TYPE,
+                ContactsContract.Data.CONTACT_ID,
+            ),
+            "${ContactsContract.Data.MIMETYPE} LIKE 'vnd.android.cursor.item/vnd.%' " +
+                "OR ${ContactsContract.Data.MIMETYPE} LIKE 'vnd.android.cursor.item/com.%'",
+            null,
+            null,
+        )?.use { c ->
+            while (c.moveToNext()) {
+                val mimetype = c.getString(1) ?: continue
+                val label = c.getString(4)?.takeIf { it.isNotBlank() } ?: continue
+                val key = actionNumberKey(label, c.getString(2)) ?: continue
+                rows += SweepRow(
+                    c.getLong(0),
+                    c.getLong(6),
+                    mimetype,
+                    c.getString(3)?.takeIf { it.isNotBlank() },
+                    label,
+                    c.getString(2),
+                    c.getString(5),
+                    key,
+                )
+            }
+        }
+        sweepCache = android.os.SystemClock.elapsedRealtime() to rows
+        return rows
+    }
 
     /**
      * The phone number an app action targets, as a trailing-digits key. The

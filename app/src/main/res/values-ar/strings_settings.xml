@@ -64,6 +64,8 @@
     <string name="settings_blocked_title">الأرقام المحظورة</string>
     <string name="settings_blocked_none">لا يوجد — احظر الأرقام من قائمة السجل</string>
     <string name="settings_unblock">إلغاء الحظر</string>
+    <string name="settings_setup_title">الإعداد</string>
+    <string name="settings_setup_rerun">إعادة تشغيل الإعداد الأولي</string>
     <string name="settings_about_title">حول</string>
     <string name="settings_about_link">حول هذا التطبيق</string>
 

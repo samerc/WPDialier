@@ -39,6 +39,10 @@ object AppPrefs {
     private val _reachGesture = MutableStateFlow(false)
     val reachGesture: StateFlow<Boolean> = _reachGesture
 
+    /** First-run wizard completed (or grandfathered by an existing install). */
+    private val _setupDone = MutableStateFlow(false)
+    val setupDone: StateFlow<Boolean> = _setupDone
+
     private val _speedDialNumbers = MutableStateFlow<List<String>>(emptyList())
     val speedDialNumbers: StateFlow<List<String>> = _speedDialNumbers
 
@@ -57,6 +61,7 @@ object AppPrefs {
         _relativeTimes.value = p.getBoolean("relative_times", false)
         _oneHandedLists.value = p.getBoolean("one_handed_lists", false)
         _reachGesture.value = p.getBoolean("reach_gesture", false)
+        _setupDone.value = p.getBoolean("setup_done", false)
         _speedDialNumbers.value = p.getString("speed_dial", null)
             ?.split(SEPARATOR)?.filter { it.isNotBlank() } ?: emptyList()
     }
@@ -74,6 +79,11 @@ object AppPrefs {
     fun setReachGesture(context: Context, on: Boolean) {
         _reachGesture.value = on
         prefs(context).edit().putBoolean("reach_gesture", on).apply()
+    }
+
+    fun setSetupDone(context: Context, done: Boolean) {
+        _setupDone.value = done
+        prefs(context).edit().putBoolean("setup_done", done).apply()
     }
 
     fun addSpeedDial(context: Context, number: String) {

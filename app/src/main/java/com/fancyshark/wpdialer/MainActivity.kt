@@ -160,9 +160,9 @@ class MainActivity : ComponentActivity() {
     private val dialRequest = MutableStateFlow<String?>(null)
     private val permissionsGranted = MutableStateFlow(false)
     private val isDefaultDialer = MutableStateFlow(false)
+    private val canUseFullScreen = MutableStateFlow(true)
     private val refreshTick = MutableStateFlow(0)
     private val simRequest = MutableStateFlow<SimRequest?>(null)
-    private var promptedForDefault = false
 
     private lateinit var permissionLauncher: ActivityResultLauncher<Array<String>>
     private lateinit var roleLauncher: ActivityResultLauncher<Intent>
@@ -179,7 +179,6 @@ class MainActivity : ComponentActivity() {
             ActivityResultContracts.RequestMultiplePermissions(),
         ) {
             updatePermissionState()
-            maybePromptForDefault()
         }
         roleLauncher = registerForActivityResult(
             ActivityResultContracts.StartActivityForResult(),
@@ -187,15 +186,23 @@ class MainActivity : ComponentActivity() {
 
         updatePermissionState()
         refreshDefaultState()
+        // Existing installs predate the wizard — if the role is already held
+        // this phone has clearly been set up; don't replay first-run.
+        if (!com.fancyshark.wpdialer.data.AppPrefs.setupDone.value && isDefaultDialer.value) {
+            com.fancyshark.wpdialer.data.AppPrefs.setSetupDone(this, true)
+        }
         // Only on a fresh launch — recreation (locale change) redelivers the
         // original intent, which must not re-fire a stale dial request.
         if (savedInstanceState == null) handleIntent(intent)
         setContent { WpApp() }
 
-        if (!permissionsGranted.value) {
+        // First run goes through the setup wizard instead of ad-hoc dialogs.
+        // Users who skipped the role there get a calm home banner, never a
+        // repeated system dialog (nag-loops are a Play review red flag).
+        if (com.fancyshark.wpdialer.data.AppPrefs.setupDone.value &&
+            !permissionsGranted.value
+        ) {
             permissionLauncher.launch(corePermissions())
-        } else {
-            maybePromptForDefault()
         }
     }
 
@@ -271,18 +278,14 @@ class MainActivity : ComponentActivity() {
             Manifest.permission.READ_CONTACTS,
             Manifest.permission.READ_CALL_LOG,
         ).all { checkSelfPermission(it) == PackageManager.PERMISSION_GRANTED }
+        canUseFullScreen.value =
+            getSystemService(android.app.NotificationManager::class.java)
+                ?.canUseFullScreenIntent() != false
     }
 
     private fun refreshDefaultState() {
         val telecom = getSystemService(TelecomManager::class.java)
         isDefaultDialer.value = telecom?.defaultDialerPackage == packageName
-    }
-
-    private fun maybePromptForDefault() {
-        if (!promptedForDefault && !isDefaultDialer.value) {
-            promptedForDefault = true
-            requestDefaultDialer()
-        }
     }
 
     private fun requestDefaultDialer() {
@@ -495,6 +498,23 @@ class MainActivity : ComponentActivity() {
                     when (top) {
                         Screen.Home -> Column(Modifier.fillMaxSize()) {
                             ReturnToCallBanner(accent.color)
+                            // Passive nudge when another app holds the dialer
+                            // role — a tap re-asks; it never auto-pops.
+                            if (!default) {
+                                Box(
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .background(accent.color)
+                                        .clickable { requestDefaultDialer() }
+                                        .padding(horizontal = 20.dp, vertical = 10.dp),
+                                ) {
+                                    Text(
+                                        stringResource(R.string.main_make_default_banner),
+                                        color = Color.White,
+                                        fontSize = 14.sp,
+                                    )
+                                }
+                            }
                             Pivot(
                                 title = stringResource(R.string.main_pivot_title),
                                 modifier = Modifier.weight(1f),
@@ -833,6 +853,36 @@ class MainActivity : ComponentActivity() {
                             placeCallWith(req.number, option.handle)
                         },
                         onCancel = { simRequest.value = null },
+                    )
+                }
+
+                // First-run setup covers the whole app until finished.
+                val setupDone by com.fancyshark.wpdialer.data.AppPrefs.setupDone.collectAsState()
+                if (!setupDone) {
+                    val fsi by canUseFullScreen.collectAsState()
+                    com.fancyshark.wpdialer.screens.SetupWizardScreen(
+                        accent = accent.color,
+                        isDefaultDialer = default,
+                        permissionsGranted = granted,
+                        canUseFullScreen = fsi,
+                        onRequestRole = { requestDefaultDialer() },
+                        onRequestPermissions = { permissionLauncher.launch(corePermissions()) },
+                        onOpenBannerSetting = {
+                            runCatching {
+                                startActivity(
+                                    Intent(
+                                        android.provider.Settings
+                                            .ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT,
+                                        Uri.parse("package:$packageName"),
+                                    ),
+                                )
+                            }
+                        },
+                        onFinish = {
+                            com.fancyshark.wpdialer.data.AppPrefs
+                                .setSetupDone(this@MainActivity, true)
+                            refreshTick.value += 1
+                        },
                     )
                 }
             }

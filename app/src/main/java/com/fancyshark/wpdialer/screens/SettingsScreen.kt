@@ -633,6 +633,24 @@ fun SettingsScreen(
 
         Spacer(Modifier.height(30.dp))
         Text(
+            stringResource(R.string.settings_setup_title),
+            color = accent.color,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
+        Text(
+            stringResource(R.string.settings_setup_rerun),
+            color = Metro.Foreground,
+            fontSize = 22.sp,
+            fontWeight = FontWeight.Light,
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { AppPrefs.setSetupDone(context, false) }
+                .padding(vertical = 8.dp),
+        )
+
+        Spacer(Modifier.height(30.dp))
+        Text(
             stringResource(R.string.settings_about_title),
             color = accent.color,
             fontSize = 14.sp,

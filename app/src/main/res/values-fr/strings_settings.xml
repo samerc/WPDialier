@@ -64,6 +64,8 @@
     <string name="settings_blocked_title">Numéros bloqués</string>
     <string name="settings_blocked_none">aucun — bloquez des numéros depuis l\'historique</string>
     <string name="settings_unblock">débloquer</string>
+    <string name="settings_setup_title">Configuration</string>
+    <string name="settings_setup_rerun">relancer la configuration initiale</string>
     <string name="settings_about_title">À propos</string>
     <string name="settings_about_link">à propos de cette application</string>
 
