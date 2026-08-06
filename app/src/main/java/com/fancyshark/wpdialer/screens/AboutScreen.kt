@@ -85,15 +85,15 @@ fun AboutScreen(accent: Accent) {
                 .fillMaxWidth()
                 .clickable {
                     runCatching {
+                        // Subject rides in the mailto URI — some Gmail builds
+                        // ignore EXTRA_SUBJECT/EXTRA_TEXT on ACTION_SENDTO.
                         context.startActivity(
                             android.content.Intent(
                                 android.content.Intent.ACTION_SENDTO,
                                 android.net.Uri.parse(
-                                    "mailto:${android.net.Uri.encode(CONTACT_EMAIL)}",
+                                    "mailto:${android.net.Uri.encode(CONTACT_EMAIL)}" +
+                                        "?subject=${android.net.Uri.encode(feedbackSubject)}",
                                 ),
-                            ).putExtra(
-                                android.content.Intent.EXTRA_SUBJECT,
-                                feedbackSubject,
                             ),
                         )
                     }
@@ -107,6 +107,54 @@ fun AboutScreen(accent: Accent) {
                 fontWeight = FontWeight.Light,
             )
             Text(CONTACT_EMAIL, color = accent.color, fontSize = 15.sp)
+        }
+
+        Spacer(Modifier.height(22.dp))
+        val reportSubject = stringResource(R.string.about_report_subject)
+        val reportNoCrash = stringResource(R.string.about_report_no_crash)
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .clickable {
+                    val log = com.fancyshark.wpdialer.data.CrashLog.tail(context)
+                    val body = buildString {
+                        append("Dialer 8 $version — Android ")
+                        append(android.os.Build.VERSION.RELEASE)
+                        append(" — ")
+                        append(android.os.Build.MANUFACTURER)
+                        append(' ')
+                        append(android.os.Build.MODEL)
+                        append("\n\n\n\n")
+                        append(log ?: reportNoCrash)
+                    }
+                    runCatching {
+                        // Subject/body ride in the mailto URI — some Gmail
+                        // builds ignore the intent extras on ACTION_SENDTO.
+                        context.startActivity(
+                            android.content.Intent(
+                                android.content.Intent.ACTION_SENDTO,
+                                android.net.Uri.parse(
+                                    "mailto:${android.net.Uri.encode(CONTACT_EMAIL)}" +
+                                        "?subject=${android.net.Uri.encode(reportSubject)}" +
+                                        "&body=${android.net.Uri.encode(body)}",
+                                ),
+                            ),
+                        )
+                    }
+                }
+                .padding(vertical = 4.dp),
+        ) {
+            Text(
+                stringResource(R.string.about_report),
+                color = Metro.Foreground,
+                fontSize = 25.sp,
+                fontWeight = FontWeight.Light,
+            )
+            Text(
+                stringResource(R.string.about_report_hint),
+                color = accent.color,
+                fontSize = 15.sp,
+            )
         }
 
         Spacer(Modifier.height(22.dp))

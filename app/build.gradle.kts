@@ -16,12 +16,13 @@ val keystoreProps = Properties().apply {
 
 android {
     namespace = "com.fancyshark.wpdialer"
-    compileSdk = 35
+    // 36: Play requires new apps to target the latest API (deadline Aug 2026).
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.fancyshark.wpdialer"
         minSdk = 34
-        targetSdk = 35
+        targetSdk = 36
         versionCode = 1
         versionName = "1.0"
     }
@@ -68,6 +69,14 @@ android {
     }
     buildFeatures {
         compose = true
+    }
+    bundle {
+        // The in-app language picker needs all locales installed — Play's
+        // per-language splits would strip fr/ar from most installs. The
+        // whole app is ~3 MB; splitting saves nothing worth the breakage.
+        language {
+            enableSplit = false
+        }
     }
 }
 

@@ -152,6 +152,13 @@ Shipped 2026-08-06 (launch-prep batch):
   account_type stress.test, purged after): release cold start
   303-363ms, history fling 0.08% janky frames, profile w/ app actions
   <900ms. Debug-build numbers are 3-5x worse — never profile on debug.
+- Play-submission prep: targetSdk/compileSdk 36 (all back handling is
+  dispatcher-based so predictive back is safe), `bundleRelease` AAB
+  (3.5 MB; language splits disabled — in-app picker needs all locales
+  installed), crash journal (WpApplication + data/CrashLog, local
+  file only per privacy policy) + About "report a problem" mailto —
+  subject/body must ride IN the mailto URI, Gmail drops SENDTO
+  extras. Store assets + en/fr/ar listing text in `store/`.
 
 Known deferred: SIM chooser lost on recreation mid-dial; osmdroid
 pause forwarding; type tables / kindLabel localize display-only via

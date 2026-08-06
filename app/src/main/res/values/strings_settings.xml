@@ -79,4 +79,8 @@
     <string name="about_contact">contact</string>
     <string name="about_privacy">privacy policy</string>
     <string name="about_privacy_hint">everything stays on your phone — read the policy</string>
+    <string name="about_report">Report a problem</string>
+    <string name="about_report_hint">email us the app\'s local error log</string>
+    <string name="about_report_subject">Dialer 8 problem report</string>
+    <string name="about_report_no_crash">(no crashes recorded)</string>
 </resources>

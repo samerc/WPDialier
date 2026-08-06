@@ -79,4 +79,8 @@
     <string name="about_contact">التواصل</string>
     <string name="about_privacy">سياسة الخصوصية</string>
     <string name="about_privacy_hint">كل شيء يبقى على هاتفك — اقرأ السياسة</string>
+    <string name="about_report">الإبلاغ عن مشكلة</string>
+    <string name="about_report_hint">أرسل لنا سجل الأخطاء المحلي للتطبيق</string>
+    <string name="about_report_subject">تقرير مشكلة Dialer 8</string>
+    <string name="about_report_no_crash">(لا أعطال مسجلة)</string>
 </resources>
