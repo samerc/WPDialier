@@ -26,7 +26,13 @@ purge it).
 - Test device: user's OnePlus 10 Pro (NE2213, Android 16) over USB. Screenshots via
   `adb shell screencap` + `adb pull` (PowerShell `>` redirection corrupts binary).
   Downscale screenshots before Reading them (System.Drawing) to save context.
-- minSdk 34 (user decision — enables CallEndpoint + CallStyle APIs), target 35.
+- minSdk 34, target/compile 36. NEXT TASK (user-approved 2026-08-12):
+  lower minSdk to 33 — needs a CallAudioState/setAudioRoute compat path
+  for audio routing (CallEndpoint is 34+) and Build.VERSION guards on
+  canUseFullScreenIntent + its settings deep link (34+; on 33 FSI is
+  always granted, wizard skips the step). Android 13 is the floor —
+  going lower loses per-app languages etc. Cat S22 Flip tester
+  (Android 11) stays out of reach.
 
 ## Workflow rules (user-established)
 
@@ -173,8 +179,40 @@ pause forwarding; type tables / kindLabel localize display-only via
 screens/TypeLabels.kt (keys stay English as data — never localize
 the keys).
 
+Shipped 2026-08-12 (beta round): DTMF digit echo in-call (dtmfTyped
+resets per call), dialpad consumes number on dial, missed-call
+notifications resolve names via shared call/MissedCalls (goAsync
+receiver, count>1 summary, cancelMissedCallsNotification on app open,
+generation counter, no name downgrade; Telecom broadcast suppresses
+the system dup). Then a whole-app review sweep (5 finder + 4 verifier
+agents, 33 verified fixes, commit 15771f2): sticky primary on rank
+ties, DTMF start/stop pairing, audio-route reset per session,
+banner-race guards, photo subsampling for RemoteViews, conference
+labels, CallManager.reset on service destroy, Repo.numbersMatch/
+numberKey everywhere, number-keyed SimPrefs, U+0001 prefs separator,
+block dedupe, synchronized CrashLog, hardware-key guard (Home/Dialpad
+only), wizard back fix + wizard_seen resume, cold-start-only
+permission ask, dial nonce, saveable search query, configChanges +
+portrait lock (landscape hid the dialpad call tile), ringtone Silent
+fix, blocked-list needs-default hint, blank-number menu guard,
+profile overlay hides app bar, resume-keyed Google-dialer check,
+reach flick ignored while app-bar menu open.
+
+PLAY STATE: app created in Console ("Dialer 8", Communication,
+free — decision: v1.0 free, v1.1 adds Play Billing tip jar; account
+registered in CANADA). All content declarations done (data safety =
+nothing collected, call-log declaration = default phone handler, FSI
+pre-grant = yes). v1 (1.0) uploaded to closed track "Beta", in
+review; v1.0.1 (versionCode 2) AAB built but NOT uploaded — the
+minSdk-33 work ships inside it (rebuild + re-hand-over, en/fr/ar
+release notes already drafted, add a line about Android 13 support).
+12-tester/14-day rule applies (new personal account). Declaration video optional — postponed (script ready:
+banner->role dialog->history->T9->delete; re-stage demo data +
+`cmd role add-role-holder` to Google first). Testers invited via
+opt-in link https://play.google.com/apps/testing/com.fancyshark.wpdialer
+
 Still untested on hardware: add call/merge/conference live calls,
 in-call SIM label, D-pad on the tester's Cat S22 Flip. Remaining
 phase-2 candidates: live-tile widget, settings backup/restore
-(explicit export — auto-backup now disabled), release signing +
-versioning + Play permission declarations for launch.
+(explicit export — auto-backup now disabled), Play Billing tip jar
+(v1.1).
