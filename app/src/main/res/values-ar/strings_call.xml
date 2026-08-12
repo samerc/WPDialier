@@ -27,6 +27,8 @@
     <string name="notif_channel_ongoing">المكالمات الجارية</string>
     <string name="notif_channel_missed">المكالمات الفائتة</string>
     <string name="notif_missed_call">مكالمة فائتة</string>
+    <string name="call_conference">مكالمة جماعية</string>
+    <string name="notif_missed_many">%1$d مكالمات فائتة</string>
     <string name="notif_call_back">معاودة الاتصال</string>
     <string name="notif_text">رسالة نصية</string>
     <string name="notif_incoming_call">مكالمة واردة</string>

@@ -42,7 +42,9 @@ fun SearchScreen(
     accent: Color,
     onOpen: (ContactItem) -> Unit,
 ) {
-    var query by remember { mutableStateOf("") }
+    // Saveable: the state holder keeps the query alive while a result's
+    // profile is open on top, so back returns to the same search.
+    var query by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf("") }
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(Unit) { focusRequester.requestFocus() }
 

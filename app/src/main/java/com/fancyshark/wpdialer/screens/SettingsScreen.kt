@@ -361,7 +361,18 @@ fun SettingsScreen(
 
         // enabled=true -> duplicate-notification guidance; enabled=false ->
         // reminder to re-enable before uninstalling; null -> not installed.
-        val googleDialerEnabled = androidx.compose.runtime.remember {
+        // Re-queried on resume: the section's own deep link lets the user
+        // flip the state and come straight back.
+        var resumeTick by androidx.compose.runtime.remember { androidx.compose.runtime.mutableIntStateOf(0) }
+        val settingsLifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current
+        androidx.compose.runtime.DisposableEffect(settingsLifecycle) {
+            val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+                if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) resumeTick++
+            }
+            settingsLifecycle.lifecycle.addObserver(observer)
+            onDispose { settingsLifecycle.lifecycle.removeObserver(observer) }
+        }
+        val googleDialerEnabled = androidx.compose.runtime.remember(resumeTick) {
             runCatching {
                 context.packageManager
                     .getApplicationInfo("com.google.android.dialer", 0)
@@ -597,7 +608,16 @@ fun SettingsScreen(
             letterSpacing = 1.sp,
             modifier = Modifier.padding(bottom = 4.dp),
         )
-        if (blocked.isEmpty()) {
+        if (!isDefaultDialer) {
+            // Non-default dialers can't read the blocked list (the provider
+            // throws) — an empty list here would be a lie.
+            Text(
+                stringResource(R.string.settings_blocked_needs_default),
+                color = Metro.Subtle,
+                fontSize = 17.sp,
+                fontWeight = FontWeight.Light,
+            )
+        } else if (blocked.isEmpty()) {
             Text(
                 stringResource(R.string.settings_blocked_none),
                 color = Metro.Foreground,

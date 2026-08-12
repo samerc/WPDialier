@@ -62,6 +62,7 @@
     <string name="settings_default_sim_title">SIM par défaut pour les appels</string>
     <string name="settings_sim_always_ask">toujours demander</string>
     <string name="settings_blocked_title">Numéros bloqués</string>
+    <string name="settings_blocked_needs_default">faites de Dialer 8 votre app téléphone pour gérer les numéros bloqués</string>
     <string name="settings_blocked_none">aucun — bloquez des numéros depuis l\'historique</string>
     <string name="settings_unblock">débloquer</string>
     <string name="settings_setup_title">Configuration</string>

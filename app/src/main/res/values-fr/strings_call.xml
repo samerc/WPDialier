@@ -27,6 +27,8 @@
     <string name="notif_channel_ongoing">Appels en cours</string>
     <string name="notif_channel_missed">Appels manqués</string>
     <string name="notif_missed_call">Appel manqué</string>
+    <string name="call_conference">conférence</string>
+    <string name="notif_missed_many">%1$d appels manqués</string>
     <string name="notif_call_back">rappeler</string>
     <string name="notif_text">SMS</string>
     <string name="notif_incoming_call">appel entrant</string>

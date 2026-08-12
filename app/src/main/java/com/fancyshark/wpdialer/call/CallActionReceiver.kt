@@ -21,15 +21,21 @@ class CallActionReceiver : BroadcastReceiver() {
                 val count = intent.getIntExtra(
                     android.telecom.TelecomManager.EXTRA_NOTIFICATION_COUNT, 0,
                 )
+                // Telecom only includes the number when count == 1.
                 val number = intent.getStringExtra(
                     android.telecom.TelecomManager.EXTRA_NOTIFICATION_PHONE_NUMBER,
                 )
-                if (count == 0) {
-                    MissedCalls.cancelAll(context)
-                } else if (number != null) {
-                    // Same tag+id as the in-call service path, so at worst
-                    // the two paths replace rather than duplicate.
-                    MissedCalls.post(context, number)
+                when {
+                    count == 0 -> MissedCalls.cancelAll(context)
+                    number != null -> {
+                        // goAsync keeps the process alive through the async
+                        // name lookup — this broadcast is often the only
+                        // thing that woke the process, and without it the
+                        // notification would silently never post.
+                        val pending = goAsync()
+                        MissedCalls.post(context, number) { pending.finish() }
+                    }
+                    else -> MissedCalls.postSummary(context, count)
                 }
             }
         }

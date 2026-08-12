@@ -75,10 +75,16 @@ fun ContactDetailScreen(
     var confirmDelete by remember { mutableStateOf(false) }
     val shareChooserTitle = stringResource(com.fancyshark.wpdialer.R.string.contact_share_chooser)
 
+    // The body's chooser overlays only span the body area — hide the app
+    // bar while one is open so edit/delete aren't tappable "through" it.
+    var bodyOverlayOpen by remember { mutableStateOf(false) }
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
-            ContactDetailBody(d, accent, history, onCall, onText, Modifier.weight(1f))
-            MetroAppBar(
+            ContactDetailBody(
+                d, accent, history, onCall, onText, Modifier.weight(1f),
+                onOverlayVisible = { bodyOverlayOpen = it },
+            )
+            if (!bodyOverlayOpen) MetroAppBar(
                 onSwipeDown = onReachDown,
                 actions = listOf(
                     AppBarAction(
@@ -184,8 +190,10 @@ fun ContactDetailScreen(
     }
 }
 
+// 7-significant-digit key via Repo — unifies national ("03 039 056") and
+// E.164 ("+961 3 039 056") spellings of the same line.
 private fun normalized(number: String): String =
-    number.filter { it.isDigit() }.takeLast(9)
+    com.fancyshark.wpdialer.data.Repo.numberKey(number)
 
 /** The registering app's launcher icon, falling back to its initial. */
 @Composable
@@ -238,6 +246,7 @@ private fun appDisplayName(
 /** Digits key of an app action's target number, or null if it isn't one. */
 private fun actionDigits(a: com.fancyshark.wpdialer.data.ContactAppAction): String? =
     com.fancyshark.wpdialer.data.Repo.actionNumberKey(a.label, a.data1)
+        ?.let { com.fancyshark.wpdialer.data.Repo.numberKey(it) }
 
 /** "Voice call +961 70 996 669" -> "voice call". */
 private fun shortActionLabel(a: com.fancyshark.wpdialer.data.ContactAppAction): String {
@@ -257,10 +266,13 @@ private fun ContactDetailBody(
     onCall: (String) -> Unit,
     onText: (String) -> Unit,
     modifier: Modifier = Modifier,
+    onOverlayVisible: (Boolean) -> Unit = {},
 ) {
     val context = LocalContext.current
     val simOptions = remember { Sims.options(context) }
-    var simPref by remember(d.id) { mutableStateOf(SimPrefs.get(context, d.id)) }
+    var simPref by remember(d.id) {
+        mutableStateOf(d.phones.firstOrNull()?.let { SimPrefs.get(context, it.number) })
+    }
     var showSimChooser by remember { mutableStateOf(false) }
 
     val contactNumbers = remember(d) { d.phones.map { normalized(it.number) }.filter { it.isNotEmpty() } }
@@ -271,6 +283,9 @@ private fun ContactDetailBody(
     // Fold app actions into the phone/email rows they target; the rest stay
     // as standalone rows.
     var appChooser by remember { mutableStateOf<Pair<String, List<ContactAppAction>>?>(null) }
+    androidx.compose.runtime.LaunchedEffect(appChooser, showSimChooser) {
+        onOverlayVisible(appChooser != null || showSimChooser)
+    }
     val (phoneActions, emailActions, standaloneActions) = remember(d) {
         val byPhone = mutableMapOf<String, MutableList<ContactAppAction>>()
         val byEmail = mutableMapOf<String, MutableList<ContactAppAction>>()
@@ -617,9 +632,21 @@ private fun ContactDetailBody(
                                         android.media.RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT,
                                         true,
                                     )
+                                    // "Silent" returns a null picked URI —
+                                    // indistinguishable from picking Default
+                                    // (CUSTOM_RINGTONE null = default), so
+                                    // hide it; a null existing URI would also
+                                    // wrongly preselect Silent, so fall back
+                                    // to the default tone.
+                                    .putExtra(
+                                        android.media.RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT,
+                                        false,
+                                    )
                                     .putExtra(
                                         android.media.RingtoneManager.EXTRA_RINGTONE_EXISTING_URI,
-                                        ringtoneUri?.let { android.net.Uri.parse(it) },
+                                        ringtoneUri?.let { android.net.Uri.parse(it) }
+                                            ?: android.provider.Settings.System
+                                                .DEFAULT_RINGTONE_URI,
                                     ),
                             )
                         }
@@ -750,7 +777,11 @@ private fun ContactDetailBody(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable {
-                                    SimPrefs.set(context, d.id, flat)
+                                    // The preference applies to the person:
+                                    // store it for every number they have.
+                                    d.phones.forEach {
+                                        SimPrefs.set(context, it.number, flat)
+                                    }
                                     simPref = flat
                                     showSimChooser = false
                                 }

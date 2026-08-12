@@ -62,6 +62,7 @@
     <string name="settings_default_sim_title">الشريحة الافتراضية للمكالمات</string>
     <string name="settings_sim_always_ask">السؤال دائمًا</string>
     <string name="settings_blocked_title">الأرقام المحظورة</string>
+    <string name="settings_blocked_needs_default">اجعل Dialer 8 تطبيق هاتفك لإدارة الأرقام المحظورة</string>
     <string name="settings_blocked_none">لا يوجد — احظر الأرقام من قائمة السجل</string>
     <string name="settings_unblock">إلغاء الحظر</string>
     <string name="settings_setup_title">الإعداد</string>

@@ -165,7 +165,12 @@ private fun InCallRoot(onFinished: () -> Unit) {
         value = Repo.lookupCaller(context, number)
     }
     val unknownLabel = stringResource(com.fancyshark.wpdialer.R.string.call_unknown)
-    val displayName = caller.first ?: number.ifBlank { unknownLabel }
+    val isConference =
+        call?.details?.hasProperty(Call.Details.PROPERTY_CONFERENCE) == true
+    val displayName = when {
+        isConference -> stringResource(com.fancyshark.wpdialer.R.string.call_conference)
+        else -> caller.first ?: number.ifBlank { unknownLabel }
+    }
     // The call object vanishes on disconnect before the ended screen shows —
     // keep the last caller name so it doesn't fall back to "unknown".
     var lastKnownName by remember { mutableStateOf(unknownLabel) }
@@ -352,6 +357,11 @@ private fun ActiveScreen(
     val muted by CallManager.muted.collectAsState()
     val call by CallManager.call.collectAsState()
     var showKeypad by remember { mutableStateOf(false) }
+
+    // The digit echo belongs to one call: reset when the primary call
+    // changes (swap/new call), never on a keypad toggle — hardware-typed
+    // digits from this call must survive opening the on-screen pad.
+    LaunchedEffect(call) { dtmfTyped.value = "" }
 
     val speakerOn = endpoint?.endpointType == CallEndpoint.TYPE_SPEAKER
     val bluetoothOn = endpoint?.endpointType == CallEndpoint.TYPE_BLUETOOTH
@@ -577,11 +587,7 @@ private fun ActiveScreen(
                 stringResource(com.fancyshark.wpdialer.R.string.call_keypad),
                 showKeypad, accent,
                 modifier = Modifier.weight(1f),
-            ) {
-                showKeypad = !showKeypad
-                // Each keypad session starts with a clean digit echo.
-                if (showKeypad) dtmfTyped.value = ""
-            }
+            ) { showKeypad = !showKeypad }
         }
         Spacer(Modifier.height(16.dp))
         }

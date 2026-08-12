@@ -159,8 +159,15 @@ class MainActivity : ComponentActivity() {
 
     private val dialRequest = MutableStateFlow<String?>(null)
     private val permissionsGranted = MutableStateFlow(false)
+    private val allCorePermissionsGranted = MutableStateFlow(false)
     private val isDefaultDialer = MutableStateFlow(false)
     private val canUseFullScreen = MutableStateFlow(true)
+    // Hardware digit/CALL keys act as dial shortcuts only on Home/Dialpad —
+    // from an editor they would destroy the back stack (and unsaved edits).
+    private val hardwareDialSafe = MutableStateFlow(true)
+    // Bumped per dial request so the dialpad's saved state can't shadow the
+    // requested number when the navigation key happens to be identical.
+    private val dialNonce = MutableStateFlow(0)
     private val refreshTick = MutableStateFlow(0)
     private val simRequest = MutableStateFlow<SimRequest?>(null)
 
@@ -187,8 +194,13 @@ class MainActivity : ComponentActivity() {
         updatePermissionState()
         refreshDefaultState()
         // Existing installs predate the wizard — if the role is already held
-        // this phone has clearly been set up; don't replay first-run.
-        if (!com.fancyshark.wpdialer.data.AppPrefs.setupDone.value && isDefaultDialer.value) {
+        // AND the wizard has never been shown, this phone was set up before
+        // the wizard existed. (A user killed mid-wizard after granting the
+        // role must resume it instead — the remaining steps still matter.)
+        if (!com.fancyshark.wpdialer.data.AppPrefs.setupDone.value &&
+            !com.fancyshark.wpdialer.data.AppPrefs.wizardSeen &&
+            isDefaultDialer.value
+        ) {
             com.fancyshark.wpdialer.data.AppPrefs.setSetupDone(this, true)
         }
         // Only on a fresh launch — recreation (locale change) redelivers the
@@ -199,7 +211,10 @@ class MainActivity : ComponentActivity() {
         // First run goes through the setup wizard instead of ad-hoc dialogs.
         // Users who skipped the role there get a calm home banner, never a
         // repeated system dialog (nag-loops are a Play review red flag).
-        if (com.fancyshark.wpdialer.data.AppPrefs.setupDone.value &&
+        // Cold starts only — recreation (language/theme switch) must not
+        // re-fire the request over whatever the user was doing.
+        if (savedInstanceState == null &&
+            com.fancyshark.wpdialer.data.AppPrefs.setupDone.value &&
             !permissionsGranted.value
         ) {
             permissionLauncher.launch(corePermissions())
@@ -216,6 +231,15 @@ class MainActivity : ComponentActivity() {
         updatePermissionState()
         refreshDefaultState()
         refreshTick.value += 1
+        // Opening the app counts as seeing the call log (home IS history):
+        // clear our missed-call notifications and reset Telecom's unread
+        // counter so its restore broadcast doesn't re-post them later.
+        if (isDefaultDialer.value) {
+            runCatching {
+                getSystemService(TelecomManager::class.java)?.cancelMissedCallsNotification()
+            }
+            com.fancyshark.wpdialer.call.MissedCalls.cancelAll(this)
+        }
         // Reopening the app during a call goes back to the call screen,
         // unless the user backed out of it on purpose.
         if (CallManager.call.value != null &&
@@ -230,6 +254,10 @@ class MainActivity : ComponentActivity() {
     // the dialpad, the call key opens it or dials the entered number. Only
     // reached when no focused field consumed the key.
     override fun onKeyDown(keyCode: Int, event: android.view.KeyEvent?): Boolean {
+        // Dial shortcuts only apply on Home/Dialpad — from other screens
+        // (e.g. mid-edit in the contact editor) a stray CALL key would
+        // destroy the back stack and any unsaved input.
+        if (!hardwareDialSafe.value) return super.onKeyDown(keyCode, event)
         val digit = when (keyCode) {
             in android.view.KeyEvent.KEYCODE_0..android.view.KeyEvent.KEYCODE_9 ->
                 ('0' + (keyCode - android.view.KeyEvent.KEYCODE_0)).toString()
@@ -278,6 +306,11 @@ class MainActivity : ComponentActivity() {
             Manifest.permission.READ_CONTACTS,
             Manifest.permission.READ_CALL_LOG,
         ).all { checkSelfPermission(it) == PackageManager.PERMISSION_GRANTED }
+        // The wizard's permission step must not report success while e.g.
+        // CALL_PHONE or notifications are still denied.
+        allCorePermissionsGranted.value = corePermissions().all {
+            checkSelfPermission(it) == PackageManager.PERMISSION_GRANTED
+        }
         canUseFullScreen.value =
             getSystemService(android.app.NotificationManager::class.java)
                 ?.canUseFullScreenIntent() != false
@@ -319,8 +352,7 @@ class MainActivity : ComponentActivity() {
         }
         lifecycleScope.launch {
             val contactId = Repo.contactIdFor(this@MainActivity, number)
-            val contactPref = contactId
-                ?.let { SimPrefs.get(this@MainActivity, it) }
+            val contactPref = SimPrefs.get(this@MainActivity, number)
                 ?.let { flat -> sims.firstOrNull { it.flat == flat } }
             val globalPref = com.fancyshark.wpdialer.data.AppPrefs.globalSim.value
                 ?.let { flat -> sims.firstOrNull { it.flat == flat } }
@@ -434,6 +466,10 @@ class MainActivity : ComponentActivity() {
         LaunchedEffect(pendingDial) {
             pendingDial?.let { number ->
                 while (backStack.size > 1) backStack.removeAt(backStack.lastIndex)
+                // Fresh state-holder key: otherwise a Dialpad entry equal to
+                // the previous one restores the old typed number instead of
+                // this request's.
+                dialNonce.value += 1
                 push(Screen.Dialpad(number))
                 dialRequest.value = null
             }
@@ -482,6 +518,9 @@ class MainActivity : ComponentActivity() {
                     .imePadding(),
             ) {
                 val top = backStack.last()
+                LaunchedEffect(top) {
+                    hardwareDialSafe.value = top is Screen.Home || top is Screen.Dialpad
+                }
                 var contentHeightPx by remember { mutableStateOf(0) }
                 Box(
                     Modifier
@@ -494,7 +533,11 @@ class MainActivity : ComponentActivity() {
                 // another screen is pushed on top of it.
                 val screenStateHolder =
                     androidx.compose.runtime.saveable.rememberSaveableStateHolder()
-                screenStateHolder.SaveableStateProvider("${backStack.lastIndex}|$top") {
+                val nonce by dialNonce.collectAsState()
+                val stateKey =
+                    if (top is Screen.Dialpad) "${backStack.lastIndex}|$top|$nonce"
+                    else "${backStack.lastIndex}|$top"
+                screenStateHolder.SaveableStateProvider(stateKey) {
                     when (top) {
                         Screen.Home -> Column(Modifier.fillMaxSize()) {
                             ReturnToCallBanner(accent.color)
@@ -847,7 +890,7 @@ class MainActivity : ComponentActivity() {
                         accent = accent.color,
                         onPick = { option, remember ->
                             if (remember && req.contactId != null) {
-                                SimPrefs.set(this@MainActivity, req.contactId, option.flat)
+                                SimPrefs.set(this@MainActivity, req.number, option.flat)
                             }
                             simRequest.value = null
                             placeCallWith(req.number, option.handle)
@@ -860,10 +903,11 @@ class MainActivity : ComponentActivity() {
                 val setupDone by com.fancyshark.wpdialer.data.AppPrefs.setupDone.collectAsState()
                 if (!setupDone) {
                     val fsi by canUseFullScreen.collectAsState()
+                    val allGranted by allCorePermissionsGranted.collectAsState()
                     com.fancyshark.wpdialer.screens.SetupWizardScreen(
                         accent = accent.color,
                         isDefaultDialer = default,
-                        permissionsGranted = granted,
+                        permissionsGranted = allGranted,
                         canUseFullScreen = fsi,
                         onRequestRole = { requestDefaultDialer() },
                         onRequestPermissions = { permissionLauncher.launch(corePermissions()) },

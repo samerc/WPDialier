@@ -28,6 +28,9 @@ object CrashLog {
         }
     }
 
+    // Synchronized: multiple threads can crash near-simultaneously, and an
+    // interleaved read-truncate-write would destroy the journal.
+    @Synchronized
     private fun append(context: Context, thread: Thread, e: Throwable) {
         val trace = StringWriter().also { e.printStackTrace(PrintWriter(it)) }
         val version = runCatching {

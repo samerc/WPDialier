@@ -20,22 +20,63 @@ object MissedCalls {
 
     private const val CHANNEL_ID = "missed_calls"
     const val NOTIFICATION_ID = 3
+    private const val SUMMARY_TAG = "summary"
 
-    fun post(context: Context, number: String) {
+    // Bumped by cancelAll so a lookup that was in flight when the user
+    // acknowledged the calls doesn't resurrect a notification afterwards.
+    @Volatile
+    private var generation = 0
+
+    fun post(context: Context, number: String, onDone: (() -> Unit)? = null) {
         val app = context.applicationContext
+        val gen = generation
         // Detached scope on purpose: the in-call service is torn down right
         // after the last call ends, which would cancel a service-scoped
         // lookup before the name resolves.
         CoroutineScope(Dispatchers.IO).launch {
-            val name = runCatching {
-                com.fancyshark.wpdialer.data.Repo.lookupCaller(app, number).first
-            }.getOrNull()
-            postNow(app, number, name)
+            try {
+                val name = runCatching {
+                    com.fancyshark.wpdialer.data.Repo.lookupCaller(app, number).first
+                }.getOrNull()
+                if (gen == generation) postNow(app, number, name)
+            } finally {
+                onDone?.invoke()
+            }
         }
     }
 
-    private fun postNow(context: Context, number: String, name: String?) {
+    /**
+     * Telecom's restore broadcast (e.g. after reboot) carries only a count
+     * when more than one call was missed — post an aggregate.
+     */
+    fun postSummary(context: Context, count: Int) {
         val nm = context.getSystemService(NotificationManager::class.java) ?: return
+        ensureChannel(context, nm)
+        val open = PendingIntent.getActivity(
+            context, SUMMARY_TAG.hashCode(),
+            Intent(context, com.fancyshark.wpdialer.MainActivity::class.java),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        com.fancyshark.wpdialer.ui.AccentStore.init(context)
+        val notification = Notification.Builder(context, CHANNEL_ID)
+            .setSmallIcon(
+                android.graphics.drawable.Icon.createWithResource(
+                    context, com.fancyshark.wpdialer.R.drawable.ic_notification,
+                ),
+            )
+            .setColor(com.fancyshark.wpdialer.ui.AccentStore.accent.value.color.toArgb())
+            .setContentTitle(context.getString(com.fancyshark.wpdialer.R.string.notif_missed_call))
+            .setContentText(
+                context.getString(com.fancyshark.wpdialer.R.string.notif_missed_many, count),
+            )
+            .setCategory(Notification.CATEGORY_MISSED_CALL)
+            .setContentIntent(open)
+            .setAutoCancel(true)
+            .build()
+        runCatching { nm.notify(SUMMARY_TAG, NOTIFICATION_ID, notification) }
+    }
+
+    private fun ensureChannel(context: Context, nm: NotificationManager) {
         nm.createNotificationChannel(
             NotificationChannel(
                 CHANNEL_ID,
@@ -43,6 +84,22 @@ object MissedCalls {
                 NotificationManager.IMPORTANCE_DEFAULT,
             ),
         )
+    }
+
+    private fun postNow(context: Context, number: String, name: String?) {
+        val nm = context.getSystemService(NotificationManager::class.java) ?: return
+        // The service path and the Telecom broadcast both post for the same
+        // miss. If our lookup failed but a notification for this number is
+        // already showing (possibly with the name resolved), keep it —
+        // replacing would downgrade name -> number.
+        if (name == null &&
+            runCatching {
+                nm.activeNotifications.any { it.id == NOTIFICATION_ID && it.tag == number }
+            }.getOrDefault(false)
+        ) {
+            return
+        }
+        ensureChannel(context, nm)
         val telUri = android.net.Uri.fromParts("tel", number, null)
         // Explicit intent into our own dialpad (prefilled) — an implicit
         // ACTION_CALL PendingIntent could be won by any dialer-filter app,
@@ -100,6 +157,7 @@ object MissedCalls {
 
     /** Telecom sends count=0 when the user has seen the call log. */
     fun cancelAll(context: Context) {
+        generation += 1
         val nm = context.getSystemService(NotificationManager::class.java) ?: return
         runCatching {
             nm.activeNotifications

@@ -116,8 +116,7 @@ object Repo {
                 while (c.moveToNext()) {
                     val name = c.getString(1) ?: continue
                     val num = c.getString(2) ?: continue
-                    val key = c.getLong(0) to
-                        num.filter { it.isDigit() }.takeLast(9).ifEmpty { num }
+                    val key = c.getLong(0) to numberKey(num).ifEmpty { num }
                     if (seen.add(key)) out += DialEntry(c.getLong(0), name, num)
                 }
             }
@@ -190,13 +189,14 @@ object Repo {
                     arrayOf(id.toString()),
                     null,
                 )?.use { c ->
-                    val seen = mutableSetOf<String>()
                     while (c.moveToNext()) {
                         val number = c.getString(0) ?: continue
                         // Raw contacts from chat apps repeat the same number
-                        // unformatted — dedupe on trailing digits.
-                        val key = number.filter { it.isDigit() }.takeLast(9).ifEmpty { number }
-                        if (!seen.add(key)) continue
+                        // unformatted (national vs E.164) — pairwise suffix
+                        // matching dedupes those without collapsing numbers
+                        // that merely share trailing digits across country
+                        // codes.
+                        if (phones.any { numbersMatch(it.number, number) }) continue
                         val label = ContactsContract.CommonDataKinds.Phone.getTypeLabel(
                             context.resources, c.getInt(1), c.getString(2),
                         ).toString().lowercase()
@@ -309,19 +309,26 @@ object Repo {
             // to match on). Sweep third-party rows from other contacts and
             // attach any whose action label carries one of our numbers.
             runCatching {
-                val phoneKeys = phones
-                    .map { it.number.filter(Char::isDigit) }
+                val phoneDigits = phones
+                    .map { numberDigits(it.number) }
                     .filter { it.length >= 5 }
-                    .map { it.takeLast(9) }
-                    .toSet()
-                if (phoneKeys.isNotEmpty()) {
+                if (phoneDigits.isNotEmpty()) {
                     val seenKinds = appActions
-                        .map { it.mimetype to actionNumberKey(it.label, it.data1) }
+                        .map {
+                            it.mimetype to
+                                (actionNumberKey(it.label, it.data1)?.let(::numberKey) ?: "")
+                        }
                         .toMutableSet()
                     for (row in sweepRows(context)) {
                         if (row.contactId == id) continue
-                        if (row.key !in phoneKeys) continue
-                        if (!seenKinds.add(row.mimetype to row.key)) continue
+                        // Suffix match unifies national and E.164 spellings.
+                        if (phoneDigits.none { pd ->
+                                row.key.endsWith(pd) || pd.endsWith(row.key)
+                            }
+                        ) {
+                            continue
+                        }
+                        if (!seenKinds.add(row.mimetype to numberKey(row.key))) continue
                         appActions += ContactAppAction(
                             row.dataId,
                             row.mimetype,
@@ -393,6 +400,7 @@ object Repo {
             if (android.os.SystemClock.elapsedRealtime() - loadedAt < SWEEP_TTL_MS) return rows
         }
         val rows = mutableListOf<SweepRow>()
+        var queried = false
         context.contentResolver.query(
             ContactsContract.Data.CONTENT_URI,
             arrayOf(
@@ -409,6 +417,7 @@ object Repo {
             null,
             null,
         )?.use { c ->
+            queried = true
             while (c.moveToNext()) {
                 val mimetype = c.getString(1) ?: continue
                 val label = c.getString(4)?.takeIf { it.isNotBlank() } ?: continue
@@ -425,20 +434,40 @@ object Repo {
                 )
             }
         }
-        sweepCache = android.os.SystemClock.elapsedRealtime() to rows
+        // A null cursor (transient provider failure) must not pin an empty
+        // result for a whole TTL window.
+        if (queried) sweepCache = android.os.SystemClock.elapsedRealtime() to rows
         return rows
     }
 
+    /** Digits with national trunk zeros stripped — the comparable core.
+     *  "03 039 056" -> "3039056"; "+961 3 039 056" -> "9613039056". */
+    fun numberDigits(raw: String): String = raw.filter { it.isDigit() }.trimStart('0')
+
+    /** Set/dedupe key: last 7 significant digits — unifies the national
+     *  and E.164 spellings of the same line. */
+    fun numberKey(raw: String): String = numberDigits(raw).takeLast(7)
+
+    /** Same-line test: one significant-digit string suffixes the other
+     *  (national form vs full international form). */
+    fun numbersMatch(a: String, b: String): Boolean {
+        val da = numberDigits(a)
+        val db = numberDigits(b)
+        if (da.isEmpty() || db.isEmpty()) return false
+        if (da.length < 5 || db.length < 5) return da == db
+        return da.endsWith(db) || db.endsWith(da)
+    }
+
     /**
-     * The phone number an app action targets, as a trailing-digits key. The
+     * The phone number an app action targets, as significant digits. The
      * label ("Voice call +961 3 039 056") is preferred because DATA1 may be
      * an app-internal ID (Telegram) rather than a number.
      */
     fun actionNumberKey(label: String, data1: String?): String? {
-        val fromLabel = label.filter { it.isDigit() }
-        if (fromLabel.length >= 5) return fromLabel.takeLast(9)
-        val fromData = (data1 ?: "").substringBefore('@').filter { it.isDigit() }
-        return if (fromData.length >= 5) fromData.takeLast(9) else null
+        val fromLabel = numberDigits(label)
+        if (fromLabel.length >= 5) return fromLabel
+        val fromData = numberDigits((data1 ?: "").substringBefore('@'))
+        return if (fromData.length >= 5) fromData else null
     }
 
     /** Built-in mimetypes that are either handled above or not displayable. */
@@ -603,6 +632,13 @@ object Repo {
     /** Blocked-number management; available to the default dialer. */
     suspend fun blockNumber(context: Context, number: String): Boolean =
         withContext(Dispatchers.IO) {
+            if (number.isBlank()) return@withContext false
+            // The provider doesn't enforce uniqueness — a duplicate row would
+            // survive one "unblock" and keep silently rejecting the caller.
+            val already = runCatching {
+                listBlocked(context).any { numbersMatch(it.second, number) }
+            }.getOrDefault(false)
+            if (already) return@withContext true
             runCatching {
                 val values = android.content.ContentValues().apply {
                     put(

@@ -73,6 +73,10 @@ class WpInCallService : InCallService() {
         scope?.cancel()
         scope = null
         proximityLock?.let { runCatching { if (it.isHeld) it.release() } }
+        // If Telecom unbound without per-call removals, stale dead-binder
+        // calls must not survive into the next session.
+        CallManager.reset()
+        CallManager.service = null
         super.onDestroy()
     }
 
@@ -107,6 +111,14 @@ class WpInCallService : InCallService() {
     }
 
     private fun postOngoingNotification(call: Call) {
+        // Conference parents carry no handle — label them properly instead
+        // of falling through to "unknown".
+        if (call.details.hasProperty(Call.Details.PROPERTY_CONFERENCE)) {
+            postOngoingNotificationNow(
+                getString(com.fancyshark.wpdialer.R.string.call_conference),
+            )
+            return
+        }
         val number = call.details.handle?.schemeSpecificPart
             ?: getString(com.fancyshark.wpdialer.R.string.call_unknown)
         val s = scope ?: run {
@@ -187,11 +199,14 @@ class WpInCallService : InCallService() {
     override fun onCallRemoved(call: Call) {
         call.unregisterCallback(notifyCallback)
         CallManager.onCallRemoved(call)
-        // A surviving ringing call keeps (or regains) its notification.
+        // A surviving ringing call keeps (or regains) its notification —
+        // but never relight a screen the user deliberately blanked (same
+        // guard as onInCallUiVisibility).
         val stillRinging = CallManager.ringingCall()
+        val pm = getSystemService(android.os.PowerManager::class.java)
         if (stillRinging == null) {
             cancelIncomingNotification()
-        } else if (!inCallUiVisible) {
+        } else if (!inCallUiVisible && pm?.isInteractive != false) {
             postIncomingNotification(stillRinging)
         }
         if (CallManager.call.value == null) cancelOngoingNotification()
@@ -233,14 +248,33 @@ class WpInCallService : InCallService() {
             val photo = photoUri?.let { uri ->
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                     runCatching {
+                        // Bounds-decode then subsample: a full-resolution
+                        // display photo can exceed the binder limit inside
+                        // RemoteViews, silently killing the whole ringing UI.
+                        val opts = android.graphics.BitmapFactory.Options()
+                        opts.inJustDecodeBounds = true
                         contentResolver.openInputStream(android.net.Uri.parse(uri))?.use {
-                            android.graphics.BitmapFactory.decodeStream(it)
+                            android.graphics.BitmapFactory.decodeStream(it, null, opts)
+                        }
+                        val target = 256
+                        var sample = 1
+                        while (opts.outWidth / (sample * 2) >= target &&
+                            opts.outHeight / (sample * 2) >= target
+                        ) {
+                            sample *= 2
+                        }
+                        val decode = android.graphics.BitmapFactory.Options()
+                        decode.inSampleSize = sample
+                        contentResolver.openInputStream(android.net.Uri.parse(uri))?.use {
+                            android.graphics.BitmapFactory.decodeStream(it, null, decode)
                         }
                     }.getOrNull()
                 }
             }
-            // The lookup may finish after the call was answered or missed.
-            if (CallManager.stateOf(call) == Call.STATE_RINGING) {
+            // The lookup may finish after the call was answered/missed or
+            // after our own in-call UI came to the foreground (fast
+            // pause/resume) — don't stack a banner on top of it.
+            if (CallManager.stateOf(call) == Call.STATE_RINGING && !inCallUiVisible) {
                 postIncomingNotificationNow(number, name ?: number, photo)
             }
         }

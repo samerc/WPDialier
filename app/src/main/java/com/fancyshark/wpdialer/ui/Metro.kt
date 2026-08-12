@@ -403,6 +403,7 @@ fun MetroAppBar(
     var expanded by remember { mutableStateOf(false) }
     val accent by AccentStore.accent.collectAsState()
     val swipeDown by rememberUpdatedState(onSwipeDown)
+    val menuExpanded by rememberUpdatedState(expanded)
     Column(
         modifier
             .fillMaxWidth()
@@ -420,7 +421,11 @@ fun MetroAppBar(
                                 // Low bar on purpose: the strip is only ~60dp
                                 // tall and system edge gestures can steal long
                                 // swipes, so a short flick must be enough.
-                                if (total > 28.dp.toPx()) swipeDown?.invoke()
+                                // Not while the "..." menu is open — a flick
+                                // there is a dismiss, not a reach.
+                                if (total > 28.dp.toPx() && !menuExpanded) {
+                                    swipeDown?.invoke()
+                                }
                             },
                         )
                     }

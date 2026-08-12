@@ -110,6 +110,14 @@ purge it).
   by number match (label preferred over DATA1, which can be an app user ID).
 - Adaptive-icon foreground art is offset for the safe zone — notifications
   need the separate centered `ic_notification` drawable.
+- Number comparison: ALWAYS use `Repo.numbersMatch` (suffix match on
+  trunk-zero-stripped digits) or `Repo.numberKey` (7-digit key) — never
+  raw takeLast(N); national "03 039 056" and E.164 "+961 3 039 056" must
+  unify. SimPrefs is keyed by numberKey (aggregate contact IDs are
+  unstable across re-aggregation — never persist them).
+- Manifest-receiver work that outlives onReceive needs goAsync() — the
+  process loses its priority boost the moment onReceive returns.
+- AppPrefs list separator is U+0001 (legacy "|;|" still decoded).
 
 ## Phase 1 closed (2026-08-04); phase 2 in progress
 

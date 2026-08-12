@@ -46,6 +46,23 @@ fun SetupWizardScreen(
     onFinish: () -> Unit,
 ) {
     var step by rememberSaveable { mutableIntStateOf(0) }
+    val wizardContext = androidx.compose.ui.platform.LocalContext.current
+    LaunchedEffect(Unit) {
+        // Lets MainActivity distinguish a pre-wizard install from a user
+        // whose process died mid-wizard (the latter must resume, not skip).
+        com.fancyshark.wpdialer.data.AppPrefs.markWizardSeen(wizardContext)
+    }
+    // Back must not fight the auto-advance below — it jumps straight to the
+    // nearest previous page whose ask is still open (or the welcome page),
+    // instead of decrementing into a page that instantly re-advances.
+    fun stepBack() {
+        step = when {
+            step > 3 && !canUseFullScreen -> 3
+            step > 2 && !permissionsGranted -> 2
+            step > 1 && !isDefaultDialer -> 1
+            else -> 0
+        }
+    }
 
     // Advance automatically when the system grant lands, and skip pages
     // whose ask is already satisfied.
@@ -59,7 +76,7 @@ fun SetupWizardScreen(
         if (step == 3 && canUseFullScreen) step = 4
     }
 
-    BackHandler(enabled = step > 0) { step-- }
+    BackHandler(enabled = step > 0) { stepBack() }
 
     Column(
         Modifier

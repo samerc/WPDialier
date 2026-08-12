@@ -7,7 +7,18 @@ import kotlinx.coroutines.flow.StateFlow
 /** App-level user preferences beyond accent/font/haptics. */
 object AppPrefs {
 
-    private const val SEPARATOR = "|;|"
+    // A control char can't be typed or pasted from normal text, so entries
+    // can never synthesize a separator at a join boundary (the old "|;|"
+    // could: "a|;" + "|b" round-tripped as corrupt entries).
+    private const val SEPARATOR = "\u0001"
+    private const val LEGACY_SEPARATOR = "|;|"
+
+    private fun decodeList(flat: String?): List<String>? = flat
+        ?.let { s ->
+            if (s.contains(SEPARATOR)) s.split(SEPARATOR) else s.split(LEGACY_SEPARATOR)
+        }
+        ?.filter { it.isNotBlank() }
+        ?.takeIf { it.isNotEmpty() }
 
     val DEFAULT_REJECT_MESSAGES = listOf(
         "I'll call you back.",
@@ -43,6 +54,12 @@ object AppPrefs {
     private val _setupDone = MutableStateFlow(false)
     val setupDone: StateFlow<Boolean> = _setupDone
 
+    /** The wizard has been shown at least once — distinguishes a pre-wizard
+     *  install (grandfather it) from a user killed mid-wizard (resume it). */
+    @Volatile
+    var wizardSeen = false
+        private set
+
     private val _speedDialNumbers = MutableStateFlow<List<String>>(emptyList())
     val speedDialNumbers: StateFlow<List<String>> = _speedDialNumbers
 
@@ -51,9 +68,7 @@ object AppPrefs {
 
     fun init(context: Context) {
         val p = prefs(context)
-        _rejectMessages.value = p.getString("reject_msgs", null)
-            ?.split(SEPARATOR)?.filter { it.isNotBlank() }
-            ?.takeIf { it.isNotEmpty() }
+        _rejectMessages.value = decodeList(p.getString("reject_msgs", null))
             ?: DEFAULT_REJECT_MESSAGES
         _globalSim.value = p.getString("sim_global", null)
         _light.value = p.getBoolean("theme_light", false)
@@ -62,8 +77,8 @@ object AppPrefs {
         _oneHandedLists.value = p.getBoolean("one_handed_lists", false)
         _reachGesture.value = p.getBoolean("reach_gesture", false)
         _setupDone.value = p.getBoolean("setup_done", false)
-        _speedDialNumbers.value = p.getString("speed_dial", null)
-            ?.split(SEPARATOR)?.filter { it.isNotBlank() } ?: emptyList()
+        wizardSeen = p.getBoolean("wizard_seen", false)
+        _speedDialNumbers.value = decodeList(p.getString("speed_dial", null)) ?: emptyList()
     }
 
     fun setRelativeTimes(context: Context, on: Boolean) {
@@ -84,6 +99,12 @@ object AppPrefs {
     fun setSetupDone(context: Context, done: Boolean) {
         _setupDone.value = done
         prefs(context).edit().putBoolean("setup_done", done).apply()
+    }
+
+    fun markWizardSeen(context: Context) {
+        if (wizardSeen) return
+        wizardSeen = true
+        prefs(context).edit().putBoolean("wizard_seen", true).apply()
     }
 
     fun addSpeedDial(context: Context, number: String) {

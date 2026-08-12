@@ -58,8 +58,12 @@ object CallManager {
     private fun recompute() {
         // After a merge, telecom keeps the child calls in the list with a
         // conference parent — only top-level calls drive the UI.
+        // Rank ties (e.g. two held calls) keep the current primary sticky —
+        // otherwise holding the active call would flip the UI (and hangup/
+        // unhold targets) to the OTHER held call.
+        val current = _call.value
         val live = calls.filter { stateOf(it) != Call.STATE_DISCONNECTED && it.parent == null }
-            .sortedBy { rank(it) }
+            .sortedWith(compareBy({ rank(it) }, { if (it === current) 0 else 1 }))
         // If only a ringing call exists it is primary (the incoming screen);
         // otherwise a ringing call behind an ongoing one is the second call.
         _call.value = live.firstOrNull()
@@ -81,6 +85,14 @@ object CallManager {
 
     fun onCallAdded(call: Call) {
         userDismissedUi = false
+        if (calls.isEmpty()) {
+            // A fresh call session: drop any audio-route state a late
+            // endpoint callback repopulated after the previous session's
+            // reset (stale speaker would also disable the proximity lock).
+            _endpoint.value = null
+            _availableEndpoints.value = emptyList()
+            _muted.value = false
+        }
         if (call !in calls) {
             calls += call
             call.registerCallback(callback)
@@ -91,6 +103,18 @@ object CallManager {
     fun onCallRemoved(call: Call) {
         call.unregisterCallback(callback)
         calls.remove(call)
+        recompute()
+    }
+
+    /**
+     * Full teardown when the in-call service is destroyed. If Telecom
+     * unbinds without delivering per-call removals, stale (dead-binder)
+     * calls would otherwise poison every later call session.
+     */
+    fun reset() {
+        calls.forEach { runCatching { it.unregisterCallback(callback) } }
+        calls.clear()
+        dtmfCall = null
         recompute()
     }
 
@@ -188,7 +212,18 @@ object CallManager {
         runCatching { active.conference(held) }
     }
 
-    fun startDtmf(digit: Char) = _call.value?.playDtmfTone(digit)
+    // The stop must go to the same call the tone started on — resolving
+    // _call.value twice lets a mid-press primary swap latch the tone.
+    private var dtmfCall: Call? = null
 
-    fun stopDtmf() = _call.value?.stopDtmfTone()
+    fun startDtmf(digit: Char) {
+        val c = _call.value ?: return
+        dtmfCall = c
+        runCatching { c.playDtmfTone(digit) }
+    }
+
+    fun stopDtmf() {
+        dtmfCall?.let { runCatching { it.stopDtmfTone() } }
+        dtmfCall = null
+    }
 }

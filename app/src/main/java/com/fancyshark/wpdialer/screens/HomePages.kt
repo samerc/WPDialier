@@ -175,12 +175,23 @@ fun HistoryPage(
                             expanded = menuForId == item.id,
                             onDismissRequest = { menuForId = null },
                         ) {
-                            listOf(
-                                stringResource(com.fancyshark.wpdialer.R.string.home_details) to { onDetails(item) },
-                                stringResource(com.fancyshark.wpdialer.R.string.home_delete) to { onDelete(group.toList()) },
-                                stringResource(com.fancyshark.wpdialer.R.string.home_add_to_speed_dial) to { onAddSpeedDial(item.number) },
-                                stringResource(com.fancyshark.wpdialer.R.string.home_block) to { onBlock(item.number) },
-                            ).forEach { (label, action) ->
+                            // Withheld/private calls have no number — only
+                            // delete makes sense (blocking "" would insert a
+                            // junk row, details would aggregate all of them).
+                            (
+                                if (item.number.isBlank()) {
+                                    listOf(
+                                        stringResource(com.fancyshark.wpdialer.R.string.home_delete) to { onDelete(group.toList()) },
+                                    )
+                                } else {
+                                    listOf(
+                                        stringResource(com.fancyshark.wpdialer.R.string.home_details) to { onDetails(item) },
+                                        stringResource(com.fancyshark.wpdialer.R.string.home_delete) to { onDelete(group.toList()) },
+                                        stringResource(com.fancyshark.wpdialer.R.string.home_add_to_speed_dial) to { onAddSpeedDial(item.number) },
+                                        stringResource(com.fancyshark.wpdialer.R.string.home_block) to { onBlock(item.number) },
+                                    )
+                                }
+                                ).forEach { (label, action) ->
                                 androidx.compose.material3.DropdownMenuItem(
                                     text = {
                                         Text(

@@ -28,16 +28,25 @@ object Sims {
         handle.componentName.flattenToString() + "/" + handle.id
 }
 
-/** Per-contact preferred SIM, stored by contact id. */
+/**
+ * Per-contact preferred SIM, keyed by the number's significant digits.
+ * Aggregate contact ids are unstable across re-aggregation/sync — an id
+ * key could silently route another contact's calls to the wrong SIM.
+ */
 object SimPrefs {
 
-    fun get(context: Context, contactId: Long): String? =
-        context.getSharedPreferences("wp", Context.MODE_PRIVATE)
-            .getString("sim_$contactId", null)
+    private fun key(number: String): String? =
+        Repo.numberKey(number).takeIf { it.isNotEmpty() }?.let { "simn_$it" }
 
-    fun set(context: Context, contactId: Long, flat: String?) {
+    fun get(context: Context, number: String): String? =
+        key(number)?.let {
+            context.getSharedPreferences("wp", Context.MODE_PRIVATE).getString(it, null)
+        }
+
+    fun set(context: Context, number: String, flat: String?) {
+        val k = key(number) ?: return
         val prefs = context.getSharedPreferences("wp", Context.MODE_PRIVATE).edit()
-        if (flat == null) prefs.remove("sim_$contactId") else prefs.putString("sim_$contactId", flat)
+        if (flat == null) prefs.remove(k) else prefs.putString(k, flat)
         prefs.apply()
     }
 }

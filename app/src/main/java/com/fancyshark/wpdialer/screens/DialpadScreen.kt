@@ -219,7 +219,11 @@ fun DialpadScreen(
                 entries.mapNotNull { p -> dialRank(p, input)?.let { it to p.entry } }
                     .sortedBy { it.first }
                     .map { it.second }
-                    .distinctBy { it.contactId to it.number.filter(Char::isDigit).takeLast(9) }
+                    .distinctBy {
+                        it.contactId to
+                            com.fancyshark.wpdialer.data.Repo.numberKey(it.number)
+                                .ifEmpty { it.number }
+                    }
                     .take(50)
             }
         }
