@@ -60,6 +60,12 @@ import com.fancyshark.wpdialer.ui.Selawik
 import com.fancyshark.wpdialer.ui.Metro
 import com.fancyshark.wpdialer.ui.MetroButton
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+
+// Digits sent as DTMF during the current keypad session, echoed above the
+// pad. File-level so both the activity (hardware keys) and the composables
+// can append.
+private val dtmfTyped = MutableStateFlow("")
 
 class InCallActivity : ComponentActivity() {
 
@@ -122,6 +128,7 @@ class InCallActivity : ComponentActivity() {
         val dtmf = dtmfChar(keyCode)
         if (dtmf != null && CallManager.state.value == Call.STATE_ACTIVE) {
             CallManager.startDtmf(dtmf)
+            dtmfTyped.value += dtmf
             return true
         }
         return super.onKeyDown(keyCode, event)
@@ -477,6 +484,17 @@ private fun ActiveScreen(
         Column(Modifier.padding(horizontal = 24.dp)) {
 
         if (showKeypad) {
+            // Echo the digits sent so far — IVR menus ("press 1 for…") give
+            // no other feedback that the press registered.
+            val typed by dtmfTyped.collectAsState()
+            Text(
+                if (typed.isEmpty()) " " else typed.takeLast(18),
+                color = Metro.Foreground,
+                fontSize = 30.sp,
+                fontWeight = FontWeight.Light,
+                maxLines = 1,
+                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+            )
             DtmfPad()
         } else {
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -559,7 +577,11 @@ private fun ActiveScreen(
                 stringResource(com.fancyshark.wpdialer.R.string.call_keypad),
                 showKeypad, accent,
                 modifier = Modifier.weight(1f),
-            ) { showKeypad = !showKeypad }
+            ) {
+                showKeypad = !showKeypad
+                // Each keypad session starts with a clean digit echo.
+                if (showKeypad) dtmfTyped.value = ""
+            }
         }
         Spacer(Modifier.height(16.dp))
         }
@@ -612,6 +634,7 @@ private fun DtmfPad() {
                                     detectTapGestures(
                                         onPress = {
                                             CallManager.startDtmf(key[0])
+                                            dtmfTyped.value += key
                                             tryAwaitRelease()
                                             CallManager.stopDtmf()
                                         },

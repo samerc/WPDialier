@@ -202,68 +202,10 @@ class WpInCallService : InCallService() {
     }
 
     private fun postMissedNotification(call: Call) {
-        val nm = getSystemService(NotificationManager::class.java)
-        nm.createNotificationChannel(
-            NotificationChannel(
-                MISSED_CHANNEL_ID,
-                getString(com.fancyshark.wpdialer.R.string.notif_channel_missed),
-                NotificationManager.IMPORTANCE_DEFAULT,
-            ),
-        )
         val number = call.details.handle?.schemeSpecificPart ?: return
-        val telUri = android.net.Uri.fromParts("tel", number, null)
-        // Explicit intent into our own dialpad (prefilled) — an implicit
-        // ACTION_CALL PendingIntent could be won by any dialer-filter app,
-        // and would bypass our SIM-preference flow.
-        val callBack = PendingIntent.getActivity(
-            this, number.hashCode(),
-            Intent(this, com.fancyshark.wpdialer.MainActivity::class.java)
-                .setAction(Intent.ACTION_DIAL)
-                .setData(telUri)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-        )
-        val text = PendingIntent.getActivity(
-            this, number.hashCode() + 1,
-            Intent(Intent.ACTION_SENDTO, android.net.Uri.fromParts("smsto", number, null)),
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-        )
-        val open = PendingIntent.getActivity(
-            this, number.hashCode() + 2,
-            Intent(this, com.fancyshark.wpdialer.MainActivity::class.java),
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-        )
-        com.fancyshark.wpdialer.ui.AccentStore.init(this)
-        val notification = Notification.Builder(this, MISSED_CHANNEL_ID)
-            .setSmallIcon(
-                android.graphics.drawable.Icon.createWithResource(
-                    this, com.fancyshark.wpdialer.R.drawable.ic_notification,
-                ),
-            )
-            .setColor(com.fancyshark.wpdialer.ui.AccentStore.accent.value.color.toArgb())
-            .setContentTitle(getString(com.fancyshark.wpdialer.R.string.notif_missed_call))
-            .setContentText(number)
-            .setCategory(Notification.CATEGORY_MISSED_CALL)
-            .setContentIntent(open)
-            .setAutoCancel(true)
-            .addAction(
-                Notification.Action.Builder(
-                    null,
-                    getString(com.fancyshark.wpdialer.R.string.notif_call_back),
-                    callBack,
-                ).build(),
-            )
-            .addAction(
-                Notification.Action.Builder(
-                    null,
-                    getString(com.fancyshark.wpdialer.R.string.notif_text),
-                    text,
-                ).build(),
-            )
-            .build()
-        // Tag by number with a fixed ID outside the call-notification ID
-        // space (1/2) — number.hashCode() as the ID could collide with them.
-        runCatching { nm.notify(number, MISSED_NOTIFICATION_ID, notification) }
+        // Shared with the Telecom missed-call broadcast path; resolves the
+        // contact name before posting.
+        MissedCalls.post(this, number)
     }
 
     override fun onCallEndpointChanged(callEndpoint: CallEndpoint) {
@@ -399,10 +341,8 @@ class WpInCallService : InCallService() {
 
     companion object {
         private const val CHANNEL_ID = "incoming_calls"
-        private const val MISSED_CHANNEL_ID = "missed_calls"
         private const val ONGOING_CHANNEL_ID = "ongoing_calls"
         private const val NOTIFICATION_ID = 1
         private const val ONGOING_NOTIFICATION_ID = 2
-        private const val MISSED_NOTIFICATION_ID = 3
     }
 }

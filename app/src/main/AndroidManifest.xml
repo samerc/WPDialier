@@ -82,7 +82,14 @@
 
         <receiver
             android:name=".call.CallActionReceiver"
-            android:exported="false" />
+            android:exported="false">
+            <!-- Telecom targets the default dialer's receiver directly; the
+                 filter's presence is what suppresses the system's own
+                 missed-call notification. -->
+            <intent-filter>
+                <action android:name="android.telecom.action.SHOW_MISSED_CALLS_NOTIFICATION" />
+            </intent-filter>
+        </receiver>
 
         <service
             android:name=".call.WpInCallService"

@@ -133,7 +133,13 @@ fun DialpadScreen(
         DialpadBus.events.collect { event ->
             when (event) {
                 "del" -> number = number.dropLast(1)
-                "call" -> if (number.isNotBlank()) onCall(number)
+                "call" -> if (number.isNotBlank()) {
+                    // Consume the number once dialed — coming back to the
+                    // dialpad after the call should start fresh.
+                    val n = number
+                    number = ""
+                    onCall(n)
+                }
                 else -> {
                     beep(event)
                     Haptics.tick(context)
@@ -226,7 +232,10 @@ fun DialpadScreen(
                 Column(
                     Modifier
                         .fillMaxWidth()
-                        .clickable { onCall(entry.number) }
+                        .clickable {
+                            number = ""
+                            onCall(entry.number)
+                        }
                         .padding(horizontal = 10.dp, vertical = 6.dp),
                 ) {
                     Text(
@@ -276,7 +285,11 @@ fun DialpadScreen(
         Spacer(Modifier.height(5.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
             CallTile(accent, modifier = Modifier.weight(2f)) {
-                if (number.isNotBlank()) onCall(number)
+                if (number.isNotBlank()) {
+                    val n = number
+                    number = ""
+                    onCall(n)
+                }
             }
             SaveTile(accent, modifier = Modifier.weight(1f)) {
                 if (number.isNotBlank()) onSave(number)
