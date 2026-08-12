@@ -1,17 +1,27 @@
 package com.fancyshark.wpdialer.call
 
+import android.os.Build
 import android.os.OutcomeReceiver
 import android.telecom.Call
+import android.telecom.CallAudioState
 import android.telecom.CallEndpoint
 import android.telecom.CallEndpointException
 import android.telecom.VideoProfile
+import androidx.annotation.RequiresApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
 /**
+ * Platform-neutral audio route. Fed by the [CallEndpoint] callbacks on
+ * Android 14+ and by the legacy [CallAudioState] callback on Android 13
+ * (the endpoint API doesn't exist there).
+ */
+enum class AudioRoute { EARPIECE, SPEAKER, BLUETOOTH, WIRED_HEADSET, STREAMING, UNKNOWN }
+
+/**
  * Tracks the calls delivered by [WpInCallService]. Supports one primary call
  * plus a secondary (waiting or held) call: answer-and-hold, swap, and
- * reject-with-text. Audio routing uses the Android 14+ [CallEndpoint] API.
+ * reject-with-text.
  */
 object CallManager {
 
@@ -31,11 +41,15 @@ object CallManager {
     private val _secondState = MutableStateFlow(Call.STATE_DISCONNECTED)
     val secondState: StateFlow<Int> = _secondState
 
-    private val _endpoint = MutableStateFlow<CallEndpoint?>(null)
-    val endpoint: StateFlow<CallEndpoint?> = _endpoint
+    private val _route = MutableStateFlow<AudioRoute?>(null)
+    val route: StateFlow<AudioRoute?> = _route
 
-    private val _availableEndpoints = MutableStateFlow<List<CallEndpoint>>(emptyList())
-    val availableEndpoints: StateFlow<List<CallEndpoint>> = _availableEndpoints
+    private val _availableRoutes = MutableStateFlow<Set<AudioRoute>>(emptySet())
+    val availableRoutes: StateFlow<Set<AudioRoute>> = _availableRoutes
+
+    // Raw endpoints kept only on 34+ — requestCallEndpointChange needs the
+    // actual CallEndpoint object, not just its type.
+    private var endpoints: List<CallEndpoint> = emptyList()
 
     private val _muted = MutableStateFlow(false)
     val muted: StateFlow<Boolean> = _muted
@@ -72,8 +86,9 @@ object CallManager {
         _secondState.value = live.getOrNull(1)?.let { stateOf(it) } ?: Call.STATE_DISCONNECTED
         if (live.isEmpty()) {
             // Audio-route state must not leak into the next call.
-            _endpoint.value = null
-            _availableEndpoints.value = emptyList()
+            _route.value = null
+            _availableRoutes.value = emptySet()
+            endpoints = emptyList()
             _muted.value = false
         }
     }
@@ -89,8 +104,9 @@ object CallManager {
             // A fresh call session: drop any audio-route state a late
             // endpoint callback repopulated after the previous session's
             // reset (stale speaker would also disable the proximity lock).
-            _endpoint.value = null
-            _availableEndpoints.value = emptyList()
+            _route.value = null
+            _availableRoutes.value = emptySet()
+            endpoints = emptyList()
             _muted.value = false
         }
         if (call !in calls) {
@@ -118,12 +134,44 @@ object CallManager {
         recompute()
     }
 
-    fun updateEndpoint(endpoint: CallEndpoint?) {
-        _endpoint.value = endpoint
+    @RequiresApi(34)
+    private fun routeOf(endpointType: Int): AudioRoute = when (endpointType) {
+        CallEndpoint.TYPE_EARPIECE -> AudioRoute.EARPIECE
+        CallEndpoint.TYPE_SPEAKER -> AudioRoute.SPEAKER
+        CallEndpoint.TYPE_BLUETOOTH -> AudioRoute.BLUETOOTH
+        CallEndpoint.TYPE_WIRED_HEADSET -> AudioRoute.WIRED_HEADSET
+        CallEndpoint.TYPE_STREAMING -> AudioRoute.STREAMING
+        else -> AudioRoute.UNKNOWN
     }
 
-    fun updateAvailableEndpoints(endpoints: List<CallEndpoint>) {
-        _availableEndpoints.value = endpoints
+    @RequiresApi(34)
+    fun updateEndpoint(endpoint: CallEndpoint?) {
+        _route.value = endpoint?.let { routeOf(it.endpointType) }
+    }
+
+    @RequiresApi(34)
+    fun updateAvailableEndpoints(list: List<CallEndpoint>) {
+        endpoints = list
+        _availableRoutes.value = list.mapTo(mutableSetOf()) { routeOf(it.endpointType) }
+    }
+
+    /** Android 13 path: route, supported routes, and mute all arrive here. */
+    fun updateAudioState(state: CallAudioState) {
+        _route.value = when (state.route) {
+            CallAudioState.ROUTE_SPEAKER -> AudioRoute.SPEAKER
+            CallAudioState.ROUTE_BLUETOOTH -> AudioRoute.BLUETOOTH
+            CallAudioState.ROUTE_WIRED_HEADSET -> AudioRoute.WIRED_HEADSET
+            CallAudioState.ROUTE_EARPIECE -> AudioRoute.EARPIECE
+            else -> AudioRoute.UNKNOWN
+        }
+        val mask = state.supportedRouteMask
+        _availableRoutes.value = buildSet {
+            if (mask and CallAudioState.ROUTE_EARPIECE != 0) add(AudioRoute.EARPIECE)
+            if (mask and CallAudioState.ROUTE_SPEAKER != 0) add(AudioRoute.SPEAKER)
+            if (mask and CallAudioState.ROUTE_BLUETOOTH != 0) add(AudioRoute.BLUETOOTH)
+            if (mask and CallAudioState.ROUTE_WIRED_HEADSET != 0) add(AudioRoute.WIRED_HEADSET)
+        }
+        _muted.value = state.isMuted
     }
 
     fun updateMuted(muted: Boolean) {
@@ -161,33 +209,50 @@ object CallManager {
     fun setMuted(muted: Boolean) = service?.setMuted(muted)
 
     fun setSpeaker(on: Boolean) {
-        val available = _availableEndpoints.value
-        requestRoute(
-            if (on) {
-                available.firstOrNull { it.endpointType == CallEndpoint.TYPE_SPEAKER }
-            } else {
-                defaultRoute()
-            },
-        )
+        if (Build.VERSION.SDK_INT >= 34) {
+            requestRoute(
+                if (on) {
+                    endpoints.firstOrNull { it.endpointType == CallEndpoint.TYPE_SPEAKER }
+                } else {
+                    defaultRoute()
+                },
+            )
+        } else {
+            setAudioRouteCompat(
+                if (on) CallAudioState.ROUTE_SPEAKER else CallAudioState.ROUTE_WIRED_OR_EARPIECE,
+            )
+        }
     }
 
     fun setBluetooth(on: Boolean) {
-        val available = _availableEndpoints.value
-        requestRoute(
-            if (on) {
-                available.firstOrNull { it.endpointType == CallEndpoint.TYPE_BLUETOOTH }
-            } else {
-                defaultRoute()
-            },
-        )
+        if (Build.VERSION.SDK_INT >= 34) {
+            requestRoute(
+                if (on) {
+                    endpoints.firstOrNull { it.endpointType == CallEndpoint.TYPE_BLUETOOTH }
+                } else {
+                    defaultRoute()
+                },
+            )
+        } else {
+            setAudioRouteCompat(
+                if (on) CallAudioState.ROUTE_BLUETOOTH else CallAudioState.ROUTE_WIRED_OR_EARPIECE,
+            )
+        }
     }
 
-    private fun defaultRoute(): CallEndpoint? {
-        val available = _availableEndpoints.value
-        return available.firstOrNull { it.endpointType == CallEndpoint.TYPE_WIRED_HEADSET }
-            ?: available.firstOrNull { it.endpointType == CallEndpoint.TYPE_EARPIECE }
+    // Android 13: setAudioRoute is deprecated (34+) but the only routing API
+    // there; WIRED_OR_EARPIECE lets the platform pick wired when present.
+    @Suppress("DEPRECATION")
+    private fun setAudioRouteCompat(route: Int) {
+        service?.setAudioRoute(route)
     }
 
+    @RequiresApi(34)
+    private fun defaultRoute(): CallEndpoint? =
+        endpoints.firstOrNull { it.endpointType == CallEndpoint.TYPE_WIRED_HEADSET }
+            ?: endpoints.firstOrNull { it.endpointType == CallEndpoint.TYPE_EARPIECE }
+
+    @RequiresApi(34)
     private fun requestRoute(target: CallEndpoint?) {
         val svc = service ?: return
         if (target == null) return

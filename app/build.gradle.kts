@@ -21,7 +21,10 @@ android {
 
     defaultConfig {
         applicationId = "com.fancyshark.wpdialer"
-        minSdk = 34
+        // 33 floor: Android 13 keeps per-app languages, notification
+        // permission, and themed icons. Audio routing has a CallAudioState
+        // compat path for 33 (CallEndpoint is 34+).
+        minSdk = 33
         targetSdk = 36
         versionCode = 2
         versionName = "1.0.1"

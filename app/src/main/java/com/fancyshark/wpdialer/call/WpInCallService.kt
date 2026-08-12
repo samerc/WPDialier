@@ -42,15 +42,15 @@ class WpInCallService : InCallService() {
         scope = s
         s.launch {
             combine(
-                CallManager.state, CallManager.secondState, CallManager.endpoint,
-            ) { first, second, endpoint ->
+                CallManager.state, CallManager.secondState, CallManager.route,
+            ) { first, second, route ->
                 val inCall = listOf(first, second).any {
                     it == Call.STATE_ACTIVE || it == Call.STATE_DIALING ||
                         it == Call.STATE_CONNECTING || it == Call.STATE_HOLDING
                 }
-                val onEarpiece = endpoint == null ||
-                    endpoint.endpointType == CallEndpoint.TYPE_EARPIECE ||
-                    endpoint.endpointType == CallEndpoint.TYPE_UNKNOWN
+                val onEarpiece = route == null ||
+                    route == AudioRoute.EARPIECE ||
+                    route == AudioRoute.UNKNOWN
                 inCall && onEarpiece
             }.distinctUntilChanged().collect { hold -> setProximityHeld(hold) }
         }
@@ -223,16 +223,27 @@ class WpInCallService : InCallService() {
         MissedCalls.post(this, number)
     }
 
+    // Android 14+ delivers audio state through these two + onMuteStateChanged.
+    @androidx.annotation.RequiresApi(34)
     override fun onCallEndpointChanged(callEndpoint: CallEndpoint) {
         CallManager.updateEndpoint(callEndpoint)
     }
 
+    @androidx.annotation.RequiresApi(34)
     override fun onAvailableCallEndpointsChanged(availableEndpoints: List<CallEndpoint>) {
         CallManager.updateAvailableEndpoints(availableEndpoints)
     }
 
     override fun onMuteStateChanged(isMuted: Boolean) {
         CallManager.updateMuted(isMuted)
+    }
+
+    // Android 13 has no CallEndpoint API — routes and mute arrive here. On
+    // 14+ this legacy callback is ignored so it can't race the endpoint one.
+    @Deprecated("Deprecated in Java")
+    override fun onCallAudioStateChanged(audioState: android.telecom.CallAudioState) {
+        if (android.os.Build.VERSION.SDK_INT >= 34) return
+        CallManager.updateAudioState(audioState)
     }
 
     private fun postIncomingNotification(call: Call) {

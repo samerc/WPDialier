@@ -311,7 +311,10 @@ class MainActivity : ComponentActivity() {
         allCorePermissionsGranted.value = corePermissions().all {
             checkSelfPermission(it) == PackageManager.PERMISSION_GRANTED
         }
-        canUseFullScreen.value =
+        // canUseFullScreenIntent is API 34+; on Android 13 the permission is
+        // a normal install-time grant, so it's always "on" (wizard step and
+        // its 34+ settings deep link auto-skip).
+        canUseFullScreen.value = android.os.Build.VERSION.SDK_INT < 34 ||
             getSystemService(android.app.NotificationManager::class.java)
                 ?.canUseFullScreenIntent() != false
     }
@@ -912,7 +915,9 @@ class MainActivity : ComponentActivity() {
                         onRequestRole = { requestDefaultDialer() },
                         onRequestPermissions = { permissionLauncher.launch(corePermissions()) },
                         onOpenBannerSetting = {
-                            runCatching {
+                            // Unreachable on Android 13 (the wizard step
+                            // auto-skips) — the FSI settings page is 34+.
+                            if (android.os.Build.VERSION.SDK_INT >= 34) runCatching {
                                 startActivity(
                                     Intent(
                                         android.provider.Settings

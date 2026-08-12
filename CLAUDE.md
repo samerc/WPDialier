@@ -26,11 +26,16 @@ purge it).
 - Test device: user's OnePlus 10 Pro (NE2213, Android 16) over USB. Screenshots via
   `adb shell screencap` + `adb pull` (PowerShell `>` redirection corrupts binary).
   Downscale screenshots before Reading them (System.Drawing) to save context.
-- minSdk 34, target/compile 36. NEXT TASK (user-approved 2026-08-12):
-  lower minSdk to 33 — needs a CallAudioState/setAudioRoute compat path
-  for audio routing (CallEndpoint is 34+) and Build.VERSION guards on
-  canUseFullScreenIntent + its settings deep link (34+; on 33 FSI is
-  always granted, wizard skips the step). Android 13 is the floor —
+- minSdk 33, target/compile 36. Android 13 support (2026-08-12): audio
+  routing goes through the platform-neutral `AudioRoute` enum in
+  CallManager — fed by CallEndpoint callbacks on 34+ (raw endpoints kept
+  privately for requestCallEndpointChange) and by the legacy
+  onCallAudioStateChanged/setAudioRoute path on 33 (the 33 callback also
+  carries mute; on 34+ it's ignored to avoid racing the endpoint one).
+  canUseFullScreenIntent + its settings deep link are 34-guarded (on 33
+  FSI is install-time granted → wizard step auto-skips). The 33 route
+  path is UNTESTED on hardware — the Android-13 beta tester is the test
+  vehicle (user's OnePlus is Android 16). Android 13 is the floor —
   going lower loses per-app languages etc. Cat S22 Flip tester
   (Android 11) stays out of reach.
 
@@ -203,9 +208,9 @@ free — decision: v1.0 free, v1.1 adds Play Billing tip jar; account
 registered in CANADA). All content declarations done (data safety =
 nothing collected, call-log declaration = default phone handler, FSI
 pre-grant = yes). v1 (1.0) uploaded to closed track "Beta", in
-review; v1.0.1 (versionCode 2) AAB built but NOT uploaded — the
-minSdk-33 work ships inside it (rebuild + re-hand-over, en/fr/ar
-release notes already drafted, add a line about Android 13 support).
+review; v1.0.1 (versionCode 2, minSdk 33 included) AAB rebuilt
+2026-08-12, READY TO UPLOAD — en/fr/ar release notes drafted incl.
+Android 13 line.
 12-tester/14-day rule applies (new personal account). Declaration video optional — postponed (script ready:
 banner->role dialog->history->T9->delete; re-stage demo data +
 `cmd role add-role-holder` to Google first). Testers invited via

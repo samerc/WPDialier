@@ -2,7 +2,6 @@
 
 import android.os.Bundle
 import android.telecom.Call
-import android.telecom.CallEndpoint
 import androidx.activity.ComponentActivity
 import androidx.activity.addCallback
 import androidx.activity.compose.setContent
@@ -352,8 +351,8 @@ private fun ActiveScreen(
     accent: Color,
     photoUri: String? = null,
 ) {
-    val endpoint by CallManager.endpoint.collectAsState()
-    val available by CallManager.availableEndpoints.collectAsState()
+    val route by CallManager.route.collectAsState()
+    val available by CallManager.availableRoutes.collectAsState()
     val muted by CallManager.muted.collectAsState()
     val call by CallManager.call.collectAsState()
     var showKeypad by remember { mutableStateOf(false) }
@@ -363,9 +362,9 @@ private fun ActiveScreen(
     // digits from this call must survive opening the on-screen pad.
     LaunchedEffect(call) { dtmfTyped.value = "" }
 
-    val speakerOn = endpoint?.endpointType == CallEndpoint.TYPE_SPEAKER
-    val bluetoothOn = endpoint?.endpointType == CallEndpoint.TYPE_BLUETOOTH
-    val bluetoothAvailable = available.any { it.endpointType == CallEndpoint.TYPE_BLUETOOTH }
+    val speakerOn = route == AudioRoute.SPEAKER
+    val bluetoothOn = route == AudioRoute.BLUETOOTH
+    val bluetoothAvailable = AudioRoute.BLUETOOTH in available
     val held = state == Call.STATE_HOLDING
 
     // Tick once a second while connected so the timer advances.
