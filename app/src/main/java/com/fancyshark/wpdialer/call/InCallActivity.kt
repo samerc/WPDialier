@@ -163,12 +163,16 @@ private fun InCallRoot(onFinished: () -> Unit) {
     val caller by produceState<Pair<String?, String?>>(null to null, number) {
         value = Repo.lookupCaller(context, number)
     }
+    // Saved contact first; else Telecom's name (its own contact match, then
+    // the network-provided CNAP name) — keeps a name on screen where our
+    // lookup finds nothing.
+    val resolvedName = caller.first ?: CallManager.telecomName(call)
     val unknownLabel = stringResource(com.fancyshark.wpdialer.R.string.call_unknown)
     val isConference =
         call?.details?.hasProperty(Call.Details.PROPERTY_CONFERENCE) == true
     val displayName = when {
         isConference -> stringResource(com.fancyshark.wpdialer.R.string.call_conference)
-        else -> caller.first ?: number.ifBlank { unknownLabel }
+        else -> resolvedName ?: number.ifBlank { unknownLabel }
     }
     // The call object vanishes on disconnect before the ended screen shows —
     // keep the last caller name so it doesn't fall back to "unknown".
@@ -190,7 +194,7 @@ private fun InCallRoot(onFinished: () -> Unit) {
             }
             state == Call.STATE_RINGING -> {
                 IncomingScreen(
-                    contactName = caller.first,
+                    contactName = resolvedName,
                     number = number,
                     photoUri = caller.second,
                     accent = accent.color,
@@ -464,6 +468,7 @@ private fun ActiveScreen(
                 )
                 Text(
                     secondCaller.first
+                        ?: CallManager.telecomName(secondCall)
                         ?: secondNumber.ifBlank {
                             stringResource(com.fancyshark.wpdialer.R.string.call_unknown)
                         },

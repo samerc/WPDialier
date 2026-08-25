@@ -27,7 +27,12 @@ object MissedCalls {
     @Volatile
     private var generation = 0
 
-    fun post(context: Context, number: String, onDone: (() -> Unit)? = null) {
+    fun post(
+        context: Context,
+        number: String,
+        fallbackName: String? = null,
+        onDone: (() -> Unit)? = null,
+    ) {
         val app = context.applicationContext
         val gen = generation
         // Detached scope on purpose: the in-call service is torn down right
@@ -37,7 +42,7 @@ object MissedCalls {
             try {
                 val name = runCatching {
                     com.fancyshark.wpdialer.data.Repo.lookupCaller(app, number).first
-                }.getOrNull()
+                }.getOrNull() ?: fallbackName
                 if (gen == generation) postNow(app, number, name)
             } finally {
                 onDone?.invoke()

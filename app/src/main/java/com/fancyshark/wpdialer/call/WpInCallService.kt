@@ -122,7 +122,7 @@ class WpInCallService : InCallService() {
         val number = call.details.handle?.schemeSpecificPart
             ?: getString(com.fancyshark.wpdialer.R.string.call_unknown)
         val s = scope ?: run {
-            postOngoingNotificationNow(number)
+            postOngoingNotificationNow(CallManager.telecomName(call) ?: number)
             return
         }
         s.launch {
@@ -130,7 +130,7 @@ class WpInCallService : InCallService() {
                 .lookupCaller(this@WpInCallService, number)
             val state = CallManager.stateOf(call)
             if (state != Call.STATE_DISCONNECTED && state != Call.STATE_RINGING) {
-                postOngoingNotificationNow(name ?: number)
+                postOngoingNotificationNow(name ?: CallManager.telecomName(call) ?: number)
             }
         }
     }
@@ -219,8 +219,10 @@ class WpInCallService : InCallService() {
     private fun postMissedNotification(call: Call) {
         val number = call.details.handle?.schemeSpecificPart ?: return
         // Shared with the Telecom missed-call broadcast path; resolves the
-        // contact name before posting.
-        MissedCalls.post(this, number)
+        // contact name before posting. Telecom's name (its contact match,
+        // else the network CNAP name) backs up our lookup — the broadcast
+        // path has no Call object, so only this path can pass it.
+        MissedCalls.post(this, number, fallbackName = CallManager.telecomName(call))
     }
 
     // Android 14+ delivers audio state through these two + onMuteStateChanged.
@@ -250,7 +252,9 @@ class WpInCallService : InCallService() {
         val number = call.details.handle?.schemeSpecificPart
             ?: getString(com.fancyshark.wpdialer.R.string.call_unknown)
         val s = scope ?: run {
-            postIncomingNotificationNow(number, number, null)
+            postIncomingNotificationNow(
+                number, CallManager.telecomName(call) ?: number, null,
+            )
             return
         }
         s.launch {
@@ -286,7 +290,9 @@ class WpInCallService : InCallService() {
             // after our own in-call UI came to the foreground (fast
             // pause/resume) — don't stack a banner on top of it.
             if (CallManager.stateOf(call) == Call.STATE_RINGING && !inCallUiVisible) {
-                postIncomingNotificationNow(number, name ?: number, photo)
+                postIncomingNotificationNow(
+                    number, name ?: CallManager.telecomName(call) ?: number, photo,
+                )
             }
         }
     }

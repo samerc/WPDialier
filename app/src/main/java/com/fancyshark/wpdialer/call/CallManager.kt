@@ -60,6 +60,26 @@ object CallManager {
 
     fun stateOf(call: Call): Int = call.details.state
 
+    /**
+     * Telecom's own name for a call, used when our contacts lookup finds
+     * nothing: the system's contact match first (works even where our query
+     * fails, e.g. contacts permission denied to the app), then the
+     * network-provided caller name (CNAP — mandated in e.g. India) when the
+     * network allows presenting it.
+     */
+    fun telecomName(call: Call?): String? {
+        val d = call?.details ?: return null
+        d.contactDisplayName?.takeIf { it.isNotBlank() }?.let { return it }
+        val cnap = d.callerDisplayName
+        return if (!cnap.isNullOrBlank() &&
+            d.callerDisplayNamePresentation == android.telecom.TelecomManager.PRESENTATION_ALLOWED
+        ) {
+            cnap
+        } else {
+            null
+        }
+    }
+
     /** Ranks calls so the most "active" one is primary. */
     private fun rank(call: Call): Int = when (stateOf(call)) {
         Call.STATE_ACTIVE -> 0
