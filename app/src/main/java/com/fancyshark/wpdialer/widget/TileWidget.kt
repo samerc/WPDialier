@@ -11,6 +11,9 @@ import android.view.View
 import android.widget.RemoteViews
 import androidx.compose.ui.graphics.toArgb
 import com.fancyshark.wpdialer.R
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 /**
  * WP-style start-screen tile: accent square with the app glyph and a live
@@ -24,17 +27,43 @@ class TileWidget : AppWidgetProvider() {
         appWidgetManager: AppWidgetManager,
         appWidgetIds: IntArray,
     ) {
-        appWidgetIds.forEach { push(context, appWidgetManager, it) }
+        // The call-log query must not run on the receiver main thread
+        // (cold provider at boot can eat the whole ANR window).
+        val pending = goAsync()
+        val app = context.applicationContext
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                appWidgetIds.forEach { id ->
+                    runCatching { push(app, appWidgetManager, id) }
+                }
+            } finally {
+                pending.finish()
+            }
+        }
     }
 
     companion object {
 
-        /** Refresh every placed tile; safe no-op when none are placed. */
+        /**
+         * Refresh every placed tile; safe no-op when none are placed.
+         * Dispatches to IO internally — callers may be on the main thread
+         * (accent tap, onResume) and the count is a cross-process query.
+         * NEVER call from inside a manifest-receiver's goAsync window —
+         * the launched work would outlive it; use [updateAllSync] there.
+         */
         fun updateAll(context: Context) {
+            val app = context.applicationContext
+            CoroutineScope(Dispatchers.IO).launch { updateAllSync(app) }
+        }
+
+        /** Inline variant for background threads whose lifetime is managed
+         *  by the caller (goAsync windows, existing IO coroutines). */
+        fun updateAllSync(context: Context) {
+            val app = context.applicationContext
             runCatching {
-                val mgr = AppWidgetManager.getInstance(context) ?: return
-                val ids = mgr.getAppWidgetIds(ComponentName(context, TileWidget::class.java))
-                ids.forEach { push(context, mgr, it) }
+                val mgr = AppWidgetManager.getInstance(app) ?: return
+                val ids = mgr.getAppWidgetIds(ComponentName(app, TileWidget::class.java))
+                ids.forEach { push(app, mgr, it) }
             }
         }
 
@@ -64,13 +93,16 @@ class TileWidget : AppWidgetProvider() {
         }
 
         // Unseen missed calls, same notion the system badge uses. Returns 0
-        // when READ_CALL_LOG is missing (fresh install pre-wizard).
+        // when READ_CALL_LOG is missing (fresh install pre-wizard). is_read
+        // can be NULL on OEM/restored call logs — "IS_READ = 0" alone would
+        // silently exclude those rows (AOSP Dialer guards the same way).
         private fun missedCount(context: Context): Int = runCatching {
             context.contentResolver.query(
                 CallLog.Calls.CONTENT_URI,
                 arrayOf(CallLog.Calls._ID),
                 "${CallLog.Calls.TYPE} = ${CallLog.Calls.MISSED_TYPE} AND " +
-                    "${CallLog.Calls.NEW} = 1 AND ${CallLog.Calls.IS_READ} = 0",
+                    "${CallLog.Calls.NEW} = 1 AND " +
+                    "(${CallLog.Calls.IS_READ} = 0 OR ${CallLog.Calls.IS_READ} IS NULL)",
                 null, null,
             )?.use { it.count } ?: 0
         }.getOrDefault(0)

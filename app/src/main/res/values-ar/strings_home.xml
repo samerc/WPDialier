@@ -2,6 +2,7 @@
 <resources>
     <!-- HomePages.kt -->
     <string name="home_history_empty">لإجراء مكالمة، اضغط على أيقونة أدناه.</string>
+    <string name="home_history_empty_missed">لا توجد مكالمات فائتة</string>
     <string name="home_unknown">غير معروف</string>
     <string name="home_history_subtitle">%1$s، %2$s</string>
     <string name="home_details">التفاصيل</string>

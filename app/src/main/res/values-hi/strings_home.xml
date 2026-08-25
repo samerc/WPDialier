@@ -2,6 +2,7 @@
 <resources>
     <!-- HomePages.kt -->
     <string name="home_history_empty">कॉल करने के लिए, नीचे किसी आइकॉन पर टैप करें।</string>
+    <string name="home_history_empty_missed">कोई छूटी हुई कॉल नहीं</string>
     <string name="home_unknown">अज्ञात</string>
     <string name="home_history_subtitle">%1$s, %2$s</string>
     <string name="home_details">विवरण</string>

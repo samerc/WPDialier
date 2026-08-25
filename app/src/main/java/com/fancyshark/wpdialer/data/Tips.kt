@@ -37,8 +37,15 @@ object Tips {
         if (client != null) return
         val c = BillingClient.newBuilder(context.applicationContext)
             .setListener { result, purchases ->
-                if (result.responseCode == BillingClient.BillingResponseCode.OK) {
-                    purchases?.forEach { consume(it) }
+                when (result.responseCode) {
+                    BillingClient.BillingResponseCode.OK ->
+                        purchases?.forEach { consume(it) }
+                    // A tip from an earlier session that was never consumed
+                    // (process died mid-consume, pending payment completed
+                    // later) — recover it instead of leaving a dead button.
+                    BillingClient.BillingResponseCode.ITEM_ALREADY_OWNED ->
+                        recoverPurchases()
+                    else -> {}
                 }
             }
             .enablePendingPurchases(
@@ -48,14 +55,37 @@ object Tips {
         client = c
         c.startConnection(object : BillingClientStateListener {
             override fun onBillingSetupFinished(result: BillingResult) {
-                if (result.responseCode == BillingClient.BillingResponseCode.OK) query()
+                if (result.responseCode == BillingClient.BillingResponseCode.OK) {
+                    query()
+                    // Consume anything a previous session paid for but never
+                    // consumed — unhandled purchases are auto-refunded by
+                    // Play after 3 days and block re-tipping until then.
+                    recoverPurchases()
+                } else {
+                    // Setup failed (offline, no Play): drop the client so the
+                    // next AboutScreen visit can retry.
+                    runCatching { c.endConnection() }
+                    if (client === c) client = null
+                }
             }
 
             override fun onBillingServiceDisconnected() {
-                // Next AboutScreen visit retries via init() — keep it simple.
-                client = null
+                // Next AboutScreen visit retries via init().
+                runCatching { c.endConnection() }
+                if (client === c) client = null
             }
         })
+    }
+
+    private fun recoverPurchases() {
+        val params = com.android.billingclient.api.QueryPurchasesParams.newBuilder()
+            .setProductType(BillingClient.ProductType.INAPP)
+            .build()
+        client?.queryPurchasesAsync(params) { result, purchases ->
+            if (result.responseCode == BillingClient.BillingResponseCode.OK) {
+                purchases.forEach { consume(it) }
+            }
+        }
     }
 
     private fun query() {

@@ -71,7 +71,7 @@
     <string name="settings_backup_done">paramètres exportés</string>
     <string name="settings_backup_failed">impossible d\'utiliser ce fichier</string>
     <string name="settings_restore_confirm">remplacer les paramètres actuels ?</string>
-    <string name="settings_restore_hint">les couleurs, réglages, réponses SMS, numérotation abrégée et numéros bloqués seront remplacés par le fichier</string>
+    <string name="settings_restore_hint">les couleurs, réglages, réponses SMS et numérotation abrégée seront remplacés par le fichier ; les numéros bloqués sont ajoutés (Dialer 8 doit être votre application téléphone)</string>
     <string name="settings_restore_button">restaurer</string>
     <string name="settings_restore_done">paramètres restaurés</string>
     <string name="settings_setup_title">Configuration</string>

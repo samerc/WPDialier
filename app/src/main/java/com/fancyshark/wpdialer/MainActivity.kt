@@ -239,14 +239,17 @@ class MainActivity : ComponentActivity() {
                 getSystemService(TelecomManager::class.java)?.cancelMissedCallsNotification()
             }
             com.fancyshark.wpdialer.call.MissedCalls.cancelAll(this)
-            // WP live-tile behavior: opening the phone app clears the tile's
-            // missed count. Detached scope — a quick resume/pause must not
-            // cancel the provider write mid-flight.
-            val app = applicationContext
-            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
-                Repo.markMissedSeen(app)
-                com.fancyshark.wpdialer.widget.TileWidget.updateAll(app)
-            }
+        }
+        // WP live-tile behavior: opening the phone app clears the tile's
+        // missed count. NOT role-gated — home shows history either way, and
+        // a role-gated tile would freeze stale when the user switches
+        // default dialers. Detached scope: a quick resume/pause must not
+        // cancel the provider write mid-flight (needs only WRITE_CALL_LOG;
+        // no-ops pre-wizard).
+        val app = applicationContext
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+            Repo.markMissedSeen(app)
+            com.fancyshark.wpdialer.widget.TileWidget.updateAll(app)
         }
         // Reopening the app during a call goes back to the call screen,
         // unless the user backed out of it on purpose.
@@ -586,6 +589,11 @@ class MainActivity : ComponentActivity() {
                                                 }
                                             } else {
                                                 history
+                                            },
+                                            emptyText = if (missedOnly) {
+                                                stringResource(R.string.home_history_empty_missed)
+                                            } else {
+                                                null
                                             },
                                             accent = accent.color,
                                             onCall = { placeCall(it) },

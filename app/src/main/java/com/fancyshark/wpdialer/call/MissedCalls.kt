@@ -79,7 +79,8 @@ object MissedCalls {
             .setAutoCancel(true)
             .build()
         runCatching { nm.notify(SUMMARY_TAG, NOTIFICATION_ID, notification) }
-        com.fancyshark.wpdialer.widget.TileWidget.updateAll(context)
+        // Sync — the receiver's goAsync window must cover the tile refresh.
+        com.fancyshark.wpdialer.widget.TileWidget.updateAllSync(context)
     }
 
     private fun ensureChannel(context: Context, nm: NotificationManager) {
@@ -166,7 +167,9 @@ object MissedCalls {
         // Tag by number with a fixed ID outside the call-notification ID
         // space (1/2) — number.hashCode() as the ID could collide with them.
         runCatching { nm.notify(number, NOTIFICATION_ID, notification) }
-        com.fancyshark.wpdialer.widget.TileWidget.updateAll(context)
+        // Sync: post() runs this inside a goAsync-backed IO coroutine — an
+        // async refresh would outlive the receiver window and get frozen.
+        com.fancyshark.wpdialer.widget.TileWidget.updateAllSync(context)
     }
 
     /** Telecom sends count=0 when the user has seen the call log. */
@@ -178,6 +181,9 @@ object MissedCalls {
                 .filter { it.id == NOTIFICATION_ID }
                 .forEach { nm.cancel(it.tag, NOTIFICATION_ID) }
         }
-        com.fancyshark.wpdialer.widget.TileWidget.updateAll(context)
+        // No tile refresh here: MainActivity.onResume already refreshes on
+        // its IO scope, and the receiver's count==0 branch refreshes inside
+        // its own goAsync window — doing it here would either jank the
+        // resume main thread (sync) or escape the receiver window (async).
     }
 }

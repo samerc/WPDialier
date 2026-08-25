@@ -255,11 +255,17 @@ object CallManager {
             emptyList()
         }
 
-    /** Routes to the i-th Bluetooth device from [bluetoothNames]. */
-    fun selectBluetooth(index: Int) {
+    /**
+     * Routes to the Bluetooth device with this [bluetoothNames] entry.
+     * Matched by name, not index — the endpoint list can change between the
+     * picker rendering and the tap (an index would land on the wrong
+     * device); a vanished name is a safe no-op.
+     */
+    fun selectBluetooth(name: String) {
         if (Build.VERSION.SDK_INT < 34) return
         endpoints.filter { it.endpointType == CallEndpoint.TYPE_BLUETOOTH }
-            .getOrNull(index)?.let { requestRoute(it) }
+            .firstOrNull { it.endpointName.toString() == name }
+            ?.let { requestRoute(it) }
     }
 
     fun setSpeaker(on: Boolean) =

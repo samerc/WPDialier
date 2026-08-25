@@ -71,7 +71,7 @@
     <string name="settings_backup_done">सेटिंग एक्सपोर्ट हो गईं</string>
     <string name="settings_backup_failed">वह फ़ाइल इस्तेमाल नहीं हो सकी</string>
     <string name="settings_restore_confirm">मौजूदा सेटिंग बदलें?</string>
-    <string name="settings_restore_hint">रंग, टॉगल, मैसेज जवाब, स्पीड डायल और ब्लॉक किए गए नंबर फ़ाइल में मौजूद सेटिंग से बदल दिए जाएँगे</string>
+    <string name="settings_restore_hint">रंग, सेटिंग, टेक्स्ट जवाब और स्पीड डायल फ़ाइल से बदल दिए जाएँगे; अवरुद्ध नंबर जोड़े जाते हैं (Dialer 8 आपका फ़ोन ऐप होना चाहिए)</string>
     <string name="settings_restore_button">रीस्टोर करें</string>
     <string name="settings_restore_done">सेटिंग रीस्टोर हो गईं</string>
     <string name="settings_setup_title">सेटअप</string>

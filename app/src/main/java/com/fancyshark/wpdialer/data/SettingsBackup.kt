@@ -77,26 +77,36 @@ object SettingsBackup {
 
     /**
      * Replaces the whole prefs file and re-blocks the exported numbers
-     * (blockNumber dedupes; blocking silently no-ops when not the default
-     * dialer). Callers must re-init the pref-backed stores afterwards.
+     * (blockNumber dedupes and ADDS — it never unblocks, and it no-ops
+     * when not the default dialer; the restore hint says so). Malformed
+     * entries are skipped, never thrown — a hand-edited or corrupted file
+     * must not crash the restore. Callers re-init the pref-backed stores.
+     * Returns false only when nothing could be applied at all.
      */
-    suspend fun apply(context: Context, payload: Payload): Unit =
+    suspend fun apply(context: Context, payload: Payload): Boolean =
         withContext(Dispatchers.IO) {
+            var applied = 0
             val edit = context.getSharedPreferences("wp", Context.MODE_PRIVATE).edit().clear()
             for (i in 0 until payload.prefs.length()) {
-                val e = payload.prefs.getJSONObject(i)
-                val k = e.getString("k")
-                when (e.getString("t")) {
-                    "b" -> edit.putBoolean(k, e.getBoolean("v"))
-                    "i" -> edit.putInt(k, e.getInt("v"))
-                    "l" -> edit.putLong(k, e.getLong("v"))
-                    "f" -> edit.putFloat(k, e.getDouble("v").toFloat())
-                    "s" -> edit.putString(k, e.getString("v"))
+                runCatching {
+                    val e = payload.prefs.getJSONObject(i)
+                    val k = e.getString("k")
+                    when (e.getString("t")) {
+                        "b" -> edit.putBoolean(k, e.getBoolean("v"))
+                        "i" -> edit.putInt(k, e.getInt("v"))
+                        "l" -> edit.putLong(k, e.getLong("v"))
+                        "f" -> edit.putFloat(k, e.getDouble("v").toFloat())
+                        "s" -> edit.putString(k, e.getString("v"))
+                        else -> return@runCatching
+                    }
+                    applied++
                 }
             }
+            if (applied == 0) return@withContext false
             edit.commit() // synchronous: stores re-init right after
             for (i in 0 until payload.blocked.length()) {
-                Repo.blockNumber(context, payload.blocked.getString(i))
+                runCatching { Repo.blockNumber(context, payload.blocked.getString(i)) }
             }
+            true
         }
 }

@@ -63,11 +63,14 @@ fun HistoryPage(
     onBlock: (String) -> Unit,
     onDetails: (HistoryItem) -> Unit,
     onAddSpeedDial: (String) -> Unit,
+    emptyText: String? = null,
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     if (items.isEmpty()) {
         Text(
-            stringResource(com.fancyshark.wpdialer.R.string.home_history_empty),
+            // A filtered-empty list must not read like a wiped call log —
+            // the caller passes filter-specific text when a filter is on.
+            emptyText ?: stringResource(com.fancyshark.wpdialer.R.string.home_history_empty),
             color = Metro.Subtle,
             fontSize = 20.sp,
             fontWeight = FontWeight.Light,

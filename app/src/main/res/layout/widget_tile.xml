@@ -3,10 +3,14 @@
      missed-call count beside it, app label bottom-left. Background color is
      set at runtime from the accent pref; Android 12+ rounds the corners
      itself (WP tiles were square — nothing we can do about that). -->
+<!-- Default cobalt background: the picker preview and the just-placed tile
+     inflate this layout statically (no runtime setBackgroundColor), and a
+     transparent tile reads as broken there. -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:background="#FF0050EF">
 
     <LinearLayout
         android:layout_width="wrap_content"

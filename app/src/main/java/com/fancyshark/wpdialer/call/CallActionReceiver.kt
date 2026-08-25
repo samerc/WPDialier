@@ -3,6 +3,9 @@ package com.fancyshark.wpdialer.call
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 /**
  * Handles answer/decline actions from the incoming-call notification, plus
@@ -25,17 +28,37 @@ class CallActionReceiver : BroadcastReceiver() {
                 val number = intent.getStringExtra(
                     android.telecom.TelecomManager.EXTRA_NOTIFICATION_PHONE_NUMBER,
                 )
+                // goAsync on every branch: this broadcast is often the only
+                // thing that woke the process, and both the name lookup and
+                // the widget's call-log count must finish inside the window
+                // or the app freezer can kill them mid-flight.
                 when {
-                    count == 0 -> MissedCalls.cancelAll(context)
+                    count == 0 -> {
+                        val pending = goAsync()
+                        CoroutineScope(Dispatchers.IO).launch {
+                                try {
+                                    MissedCalls.cancelAll(context)
+                                    com.fancyshark.wpdialer.widget.TileWidget
+                                        .updateAllSync(context)
+                                } finally {
+                                    pending.finish()
+                                }
+                            }
+                    }
                     number != null -> {
-                        // goAsync keeps the process alive through the async
-                        // name lookup — this broadcast is often the only
-                        // thing that woke the process, and without it the
-                        // notification would silently never post.
                         val pending = goAsync()
                         MissedCalls.post(context, number) { pending.finish() }
                     }
-                    else -> MissedCalls.postSummary(context, count)
+                    else -> {
+                        val pending = goAsync()
+                        CoroutineScope(Dispatchers.IO).launch {
+                                try {
+                                    MissedCalls.postSummary(context, count)
+                                } finally {
+                                    pending.finish()
+                                }
+                            }
+                    }
                 }
             }
         }

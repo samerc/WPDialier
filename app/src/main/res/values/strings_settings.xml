@@ -71,7 +71,7 @@
     <string name="settings_backup_done">settings exported</string>
     <string name="settings_backup_failed">couldn\'t use that file</string>
     <string name="settings_restore_confirm">replace current settings?</string>
-    <string name="settings_restore_hint">colors, toggles, text replies, speed dial and blocked numbers will be replaced by the file</string>
+    <string name="settings_restore_hint">colors, toggles, text replies and speed dial will be replaced by the file; blocked numbers are added (Dialer 8 must be your phone app)</string>
     <string name="settings_restore_button">restore</string>
     <string name="settings_restore_done">settings restored</string>
     <string name="settings_setup_title">Setup</string>

@@ -71,7 +71,7 @@
     <string name="settings_backup_done">تم تصدير الإعدادات</string>
     <string name="settings_backup_failed">تعذر استخدام هذا الملف</string>
     <string name="settings_restore_confirm">هل تريد استبدال الإعدادات الحالية؟</string>
-    <string name="settings_restore_hint">سيتم استبدال الألوان والإعدادات والردود النصية والاتصال السريع والأرقام المحظورة بمحتوى الملف</string>
+    <string name="settings_restore_hint">سيتم استبدال الألوان والإعدادات والردود النصية والاتصال السريع بمحتوى الملف؛ وتُضاف الأرقام المحظورة (يجب أن يكون Dialer 8 تطبيق هاتفك)</string>
     <string name="settings_restore_button">استعادة</string>
     <string name="settings_restore_done">تمت استعادة الإعدادات</string>
     <string name="settings_setup_title">الإعداد</string>

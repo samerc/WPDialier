@@ -797,17 +797,26 @@ fun SettingsScreen(
                         modifier = Modifier.weight(1f),
                     ) {
                         restoreScope.launch {
-                            com.fancyshark.wpdialer.data.SettingsBackup.apply(context, payload)
-                            // Every pref-backed store re-reads the restored file.
-                            AppPrefs.init(context)
-                            com.fancyshark.wpdialer.ui.AccentStore.init(context)
-                            com.fancyshark.wpdialer.ui.FontStore.init(context)
-                            com.fancyshark.wpdialer.ui.Haptics.init(context)
-                            Metro.light = AppPrefs.light.value
+                            val ok = runCatching {
+                                com.fancyshark.wpdialer.data.SettingsBackup.apply(context, payload)
+                            }.getOrDefault(false)
+                            if (ok) {
+                                // Every pref-backed store re-reads the restored file.
+                                AppPrefs.init(context)
+                                com.fancyshark.wpdialer.ui.AccentStore.init(context)
+                                com.fancyshark.wpdialer.ui.FontStore.init(context)
+                                com.fancyshark.wpdialer.ui.Haptics.init(context)
+                                Metro.light = AppPrefs.light.value
+                                // The home-screen tile wears the restored accent.
+                                com.fancyshark.wpdialer.widget.TileWidget.updateAll(context)
+                            }
                             pendingRestore = null
                             android.widget.Toast.makeText(
                                 context,
-                                context.getString(R.string.settings_restore_done),
+                                context.getString(
+                                    if (ok) R.string.settings_restore_done
+                                    else R.string.settings_backup_failed,
+                                ),
                                 android.widget.Toast.LENGTH_SHORT,
                             ).show()
                         }

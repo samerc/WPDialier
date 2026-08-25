@@ -2,6 +2,7 @@
 <resources>
     <!-- HomePages.kt -->
     <string name="home_history_empty">Pour passer un appel, appuyez sur une icône ci-dessous.</string>
+    <string name="home_history_empty_missed">aucun appel manqué</string>
     <string name="home_unknown">inconnu</string>
     <string name="home_history_subtitle">%1$s, %2$s</string>
     <string name="home_details">détails</string>

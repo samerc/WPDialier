@@ -282,8 +282,21 @@ fun DialpadScreen(
                                 "0" -> {
                                     { number += "+" }
                                 }
-                                // Standard dialer gesture: hold 1 = voicemail.
-                                "1" -> onVoicemail
+                                // Standard dialer gesture: hold 1 = voicemail —
+                                // but only on an empty pad; mid-number a rested
+                                // thumb must not hijack dialing (types the 1).
+                                "1" -> if (onVoicemail != null) {
+                                    {
+                                        if (number.isEmpty()) {
+                                            Haptics.tick(context)
+                                            onVoicemail()
+                                        } else {
+                                            number += "1"
+                                        }
+                                    }
+                                } else {
+                                    null
+                                }
                                 else -> null
                             },
                         )

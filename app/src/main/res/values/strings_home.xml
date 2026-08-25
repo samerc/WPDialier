@@ -2,6 +2,7 @@
 <resources>
     <!-- HomePages.kt -->
     <string name="home_history_empty">To make a call, tap an icon below.</string>
+    <string name="home_history_empty_missed">no missed calls</string>
     <string name="home_unknown">unknown</string>
     <string name="home_history_subtitle">%1$s, %2$s</string>
     <string name="home_details">details</string>

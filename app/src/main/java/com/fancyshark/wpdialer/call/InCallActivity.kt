@@ -666,7 +666,10 @@ private fun ActiveScreen(
                         }
                         .padding(vertical = 10.dp),
                 )
-                CallManager.bluetoothNames().forEachIndexed { i, deviceName ->
+                // Snapshot at overlay open; selection matches by name so a
+                // list change between render and tap can't misroute.
+                val btDevices = remember { CallManager.bluetoothNames() }
+                btDevices.forEach { deviceName ->
                     Text(
                         deviceName,
                         color = Metro.Foreground,
@@ -675,7 +678,7 @@ private fun ActiveScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable {
-                                CallManager.selectBluetooth(i)
+                                CallManager.selectBluetooth(deviceName)
                                 showBtPicker = false
                             }
                             .padding(vertical = 10.dp),
