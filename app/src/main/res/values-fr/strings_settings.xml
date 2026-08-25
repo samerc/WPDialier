@@ -65,6 +65,15 @@
     <string name="settings_blocked_needs_default">faites de Dialer 8 votre app téléphone pour gérer les numéros bloqués</string>
     <string name="settings_blocked_none">aucun — bloquez des numéros depuis l\'historique</string>
     <string name="settings_unblock">débloquer</string>
+    <string name="settings_backup_title">Sauvegarde</string>
+    <string name="settings_backup_export">exporter les paramètres</string>
+    <string name="settings_backup_restore">restaurer les paramètres</string>
+    <string name="settings_backup_done">paramètres exportés</string>
+    <string name="settings_backup_failed">impossible d\'utiliser ce fichier</string>
+    <string name="settings_restore_confirm">remplacer les paramètres actuels ?</string>
+    <string name="settings_restore_hint">les couleurs, réglages, réponses SMS, numérotation abrégée et numéros bloqués seront remplacés par le fichier</string>
+    <string name="settings_restore_button">restaurer</string>
+    <string name="settings_restore_done">paramètres restaurés</string>
     <string name="settings_setup_title">Configuration</string>
     <string name="settings_setup_rerun">relancer la configuration initiale</string>
     <string name="settings_about_title">À propos</string>

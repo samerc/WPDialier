@@ -65,6 +65,15 @@
     <string name="settings_blocked_needs_default">اجعل Dialer 8 تطبيق هاتفك لإدارة الأرقام المحظورة</string>
     <string name="settings_blocked_none">لا يوجد — احظر الأرقام من قائمة السجل</string>
     <string name="settings_unblock">إلغاء الحظر</string>
+    <string name="settings_backup_title">النسخ الاحتياطي</string>
+    <string name="settings_backup_export">تصدير الإعدادات</string>
+    <string name="settings_backup_restore">استعادة الإعدادات</string>
+    <string name="settings_backup_done">تم تصدير الإعدادات</string>
+    <string name="settings_backup_failed">تعذر استخدام هذا الملف</string>
+    <string name="settings_restore_confirm">هل تريد استبدال الإعدادات الحالية؟</string>
+    <string name="settings_restore_hint">سيتم استبدال الألوان والإعدادات والردود النصية والاتصال السريع والأرقام المحظورة بمحتوى الملف</string>
+    <string name="settings_restore_button">استعادة</string>
+    <string name="settings_restore_done">تمت استعادة الإعدادات</string>
     <string name="settings_setup_title">الإعداد</string>
     <string name="settings_setup_rerun">إعادة تشغيل الإعداد الأولي</string>
     <string name="settings_about_title">حول</string>

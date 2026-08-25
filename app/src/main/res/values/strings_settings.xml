@@ -65,6 +65,15 @@
     <string name="settings_blocked_needs_default">make Dialer 8 your phone app to manage blocked numbers</string>
     <string name="settings_blocked_none">none — block numbers from the history list</string>
     <string name="settings_unblock">unblock</string>
+    <string name="settings_backup_title">Backup</string>
+    <string name="settings_backup_export">export settings</string>
+    <string name="settings_backup_restore">restore settings</string>
+    <string name="settings_backup_done">settings exported</string>
+    <string name="settings_backup_failed">couldn\'t use that file</string>
+    <string name="settings_restore_confirm">replace current settings?</string>
+    <string name="settings_restore_hint">colors, toggles, text replies, speed dial and blocked numbers will be replaced by the file</string>
+    <string name="settings_restore_button">restore</string>
+    <string name="settings_restore_done">settings restored</string>
     <string name="settings_setup_title">Setup</string>
     <string name="settings_setup_rerun">run first-time setup again</string>
     <string name="settings_about_title">About</string>

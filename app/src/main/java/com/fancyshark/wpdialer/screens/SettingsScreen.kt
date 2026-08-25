@@ -128,6 +128,10 @@ fun SettingsScreen(
     var showRepliesEditor by androidx.compose.runtime.remember {
         androidx.compose.runtime.mutableStateOf(false)
     }
+    // A parsed-but-unapplied settings file waiting on the confirm overlay.
+    var pendingRestore by androidx.compose.runtime.remember {
+        androidx.compose.runtime.mutableStateOf<com.fancyshark.wpdialer.data.SettingsBackup.Payload?>(null)
+    }
     val localeManager = androidx.compose.runtime.remember {
         context.getSystemService(android.app.LocaleManager::class.java)
     }
@@ -653,6 +657,72 @@ fun SettingsScreen(
 
         Spacer(Modifier.height(30.dp))
         Text(
+            stringResource(R.string.settings_backup_title),
+            color = accent.color,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.SemiBold,
+        )
+        val backupScope = androidx.compose.runtime.rememberCoroutineScope()
+        fun backupToast(resId: Int) {
+            android.widget.Toast
+                .makeText(context, context.getString(resId), android.widget.Toast.LENGTH_SHORT)
+                .show()
+        }
+        val exportLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+            androidx.activity.result.contract.ActivityResultContracts
+                .CreateDocument(com.fancyshark.wpdialer.data.SettingsBackup.MIME),
+        ) { uri ->
+            if (uri != null) {
+                backupScope.launch {
+                    val ok = com.fancyshark.wpdialer.data.SettingsBackup.exportTo(context, uri)
+                    backupToast(
+                        if (ok) R.string.settings_backup_done else R.string.settings_backup_failed,
+                    )
+                }
+            }
+        }
+        val importLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+            androidx.activity.result.contract.ActivityResultContracts.OpenDocument(),
+        ) { uri ->
+            if (uri != null) {
+                backupScope.launch {
+                    val payload = com.fancyshark.wpdialer.data.SettingsBackup.readFrom(context, uri)
+                    // Applying is destructive — always behind the confirm overlay.
+                    if (payload == null) {
+                        backupToast(R.string.settings_backup_failed)
+                    } else {
+                        pendingRestore = payload
+                    }
+                }
+            }
+        }
+        Text(
+            stringResource(R.string.settings_backup_export),
+            color = Metro.Foreground,
+            fontSize = 22.sp,
+            fontWeight = FontWeight.Light,
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable {
+                    exportLauncher.launch(com.fancyshark.wpdialer.data.SettingsBackup.SUGGESTED_NAME)
+                }
+                .padding(vertical = 8.dp),
+        )
+        Text(
+            stringResource(R.string.settings_backup_restore),
+            color = Metro.Foreground,
+            fontSize = 22.sp,
+            fontWeight = FontWeight.Light,
+            modifier = Modifier
+                .fillMaxWidth()
+                // Broad mime filter: file managers often report json as
+                // octet-stream; validity is checked by the parser instead.
+                .clickable { importLauncher.launch(arrayOf("*/*")) }
+                .padding(vertical = 8.dp),
+        )
+
+        Spacer(Modifier.height(30.dp))
+        Text(
             stringResource(R.string.settings_setup_title),
             color = accent.color,
             fontSize = 14.sp,
@@ -688,6 +758,66 @@ fun SettingsScreen(
         )
 
         Spacer(Modifier.height(30.dp))
+    }
+
+    pendingRestore?.let { payload ->
+        androidx.activity.compose.BackHandler { pendingRestore = null }
+        val restoreScope = androidx.compose.runtime.rememberCoroutineScope()
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(Metro.Background.copy(alpha = 0.97f))
+                .clickable(
+                    interactionSource = androidx.compose.runtime.remember {
+                        androidx.compose.foundation.interaction.MutableInteractionSource()
+                    },
+                    indication = null,
+                ) {},
+            contentAlignment = Alignment.Center,
+        ) {
+            Column(Modifier.padding(horizontal = 24.dp)) {
+                Text(
+                    stringResource(R.string.settings_restore_confirm),
+                    color = Metro.Foreground,
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Light,
+                )
+                Text(
+                    stringResource(R.string.settings_restore_hint),
+                    color = Metro.Subtle,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Light,
+                    modifier = Modifier.padding(top = 8.dp, bottom = 20.dp),
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    MetroButton(
+                        stringResource(R.string.settings_restore_button),
+                        fill = accent.color,
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        restoreScope.launch {
+                            com.fancyshark.wpdialer.data.SettingsBackup.apply(context, payload)
+                            // Every pref-backed store re-reads the restored file.
+                            AppPrefs.init(context)
+                            com.fancyshark.wpdialer.ui.AccentStore.init(context)
+                            com.fancyshark.wpdialer.ui.FontStore.init(context)
+                            com.fancyshark.wpdialer.ui.Haptics.init(context)
+                            Metro.light = AppPrefs.light.value
+                            pendingRestore = null
+                            android.widget.Toast.makeText(
+                                context,
+                                context.getString(R.string.settings_restore_done),
+                                android.widget.Toast.LENGTH_SHORT,
+                            ).show()
+                        }
+                    }
+                    MetroButton(
+                        stringResource(R.string.main_button_cancel),
+                        modifier = Modifier.weight(1f),
+                    ) { pendingRestore = null }
+                }
+            }
+        }
     }
 
     if (showLanguagePicker) {
