@@ -247,12 +247,13 @@ content declarations done (data safety = nothing collected, call-log
 declaration = default phone handler, FSI pre-grant = yes). v1.0.1
 (versionCode 2, minSdk 33) live with beta testers since ~2026-08-13;
 tester feedback confirmed proximity + audio-route fixes work.
-v1.1.0 AAB (versionCode 3, 4.2 MB) built 2026-08-25, READY TO UPLOAD.
-Console TODO for the tip jar: after uploading the v1.1.0 AAB (it adds
-com.android.vending.BILLING), create in-app products tip_small/
-tip_medium/tip_large (suggest CA$2/5/10) — until then the About
-section hides itself. 12-tester/14-day rule applies. Declaration
-video optional — postponed (script in git history). Tester opt-in:
+v1.1.0 (versionCode 3) UPLOADED to closed track "Beta" 2026-08-25
+with en/fr/ar release notes — awaiting review + tester feedback.
+Console TODO for the tip jar: create in-app products tip_small/
+tip_medium/tip_large (suggest CA$2/5/10) — the About section hides
+itself until they exist (by design). 12-tester/14-day rule applies.
+Declaration video optional — postponed (script in git history).
+Tester opt-in:
 https://play.google.com/apps/testing/com.fancyshark.wpdialer
 
 Still untested on hardware: add call/merge/conference live calls,
