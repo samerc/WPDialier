@@ -407,6 +407,8 @@ private fun ActiveScreen(
         value = Repo.lookupCaller(context2, secondNumber)
     }
 
+    var showBtPicker by remember { mutableStateOf(false) }
+    Box(Modifier.fillMaxSize()) {
     Column(Modifier.fillMaxSize()) {
         // WP 8.1 places the caller info on a chrome-gray panel.
         Column(Modifier.fillMaxWidth().background(Metro.Key).padding(24.dp)) {
@@ -555,7 +557,14 @@ private fun ActiveScreen(
                     bluetoothOn, accent,
                     enabled = bluetoothAvailable,
                     modifier = Modifier.weight(1f),
-                ) { CallManager.setBluetooth(!bluetoothOn) }
+                ) {
+                    // Several headsets connected (34+): pick one by name.
+                    if (CallManager.bluetoothNames().size > 1) {
+                        showBtPicker = true
+                    } else {
+                        CallManager.setBluetooth(!bluetoothOn)
+                    }
+                }
             }
             Spacer(Modifier.height(6.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -620,6 +629,61 @@ private fun ActiveScreen(
         }
         Spacer(Modifier.height(16.dp))
         }
+    }
+
+    if (showBtPicker) {
+        androidx.activity.compose.BackHandler { showBtPicker = false }
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(Metro.Background.copy(alpha = 0.97f))
+                .clickable(
+                    interactionSource = remember {
+                        androidx.compose.foundation.interaction.MutableInteractionSource()
+                    },
+                    indication = null,
+                ) { showBtPicker = false },
+        ) {
+            Column(Modifier.align(Alignment.Center).padding(horizontal = 24.dp)) {
+                Text(
+                    stringResource(com.fancyshark.wpdialer.R.string.call_choose_device),
+                    color = Metro.Foreground,
+                    fontSize = 15.sp,
+                    letterSpacing = 2.sp,
+                    modifier = Modifier.padding(bottom = 16.dp),
+                )
+                // "phone" drops Bluetooth entirely (default route).
+                Text(
+                    stringResource(com.fancyshark.wpdialer.R.string.call_device_phone),
+                    color = Metro.Foreground,
+                    fontSize = 26.sp,
+                    fontWeight = FontWeight.Light,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            CallManager.setBluetooth(false)
+                            showBtPicker = false
+                        }
+                        .padding(vertical = 10.dp),
+                )
+                CallManager.bluetoothNames().forEachIndexed { i, deviceName ->
+                    Text(
+                        deviceName,
+                        color = Metro.Foreground,
+                        fontSize = 26.sp,
+                        fontWeight = FontWeight.Light,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                CallManager.selectBluetooth(i)
+                                showBtPicker = false
+                            }
+                            .padding(vertical = 10.dp),
+                    )
+                }
+            }
+        }
+    }
     }
 }
 

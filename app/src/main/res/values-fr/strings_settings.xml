@@ -86,6 +86,12 @@
     <string name="about_tagline">un composeur au style Windows Phone</string>
     <string name="about_version">version</string>
     <string name="about_feedback_subject">Commentaires sur Dialer 8</string>
+    <string name="about_tip_title">soutenir le développement</string>
+    <string name="about_tip_hint">Dialer 8 est gratuit — les pourboires font vivre les mises à jour</string>
+    <string name="about_tip_small">petit pourboire</string>
+    <string name="about_tip_medium">bon pourboire</string>
+    <string name="about_tip_large">généreux pourboire</string>
+    <string name="about_tip_thanks">merci ! ♥</string>
     <string name="about_contact">contact</string>
     <string name="about_privacy">politique de confidentialité</string>
     <string name="about_privacy_hint">tout reste sur votre téléphone — lire la politique</string>

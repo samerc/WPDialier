@@ -86,6 +86,12 @@
     <string name="about_tagline">تطبيق اتصال بنمط Windows Phone</string>
     <string name="about_version">الإصدار</string>
     <string name="about_feedback_subject">ملاحظات حول Dialer 8</string>
+    <string name="about_tip_title">دعم التطوير</string>
+    <string name="about_tip_hint">\u200FDialer 8 مجاني — البقشيش يساعد على استمرار التحديثات</string>
+    <string name="about_tip_small">بقشيش صغير</string>
+    <string name="about_tip_medium">بقشيش متوسط</string>
+    <string name="about_tip_large">بقشيش سخي</string>
+    <string name="about_tip_thanks">شكرًا لك! ♥</string>
     <string name="about_contact">التواصل</string>
     <string name="about_privacy">سياسة الخصوصية</string>
     <string name="about_privacy_hint">كل شيء يبقى على هاتفك — اقرأ السياسة</string>

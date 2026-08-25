@@ -86,6 +86,12 @@
     <string name="about_tagline">a Windows Phone styled dialer</string>
     <string name="about_version">version</string>
     <string name="about_feedback_subject">Dialer 8 feedback</string>
+    <string name="about_tip_title">support development</string>
+    <string name="about_tip_hint">Dialer 8 is free — tips keep updates coming</string>
+    <string name="about_tip_small">small tip</string>
+    <string name="about_tip_medium">nice tip</string>
+    <string name="about_tip_large">generous tip</string>
+    <string name="about_tip_thanks">thank you! ♥</string>
     <string name="about_contact">contact</string>
     <string name="about_privacy">privacy policy</string>
     <string name="about_privacy_hint">everything stays on your phone — read the policy</string>

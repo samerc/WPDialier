@@ -242,6 +242,26 @@ object CallManager {
 
     fun setMuted(muted: Boolean) = service?.setMuted(muted)
 
+    /**
+     * Named Bluetooth devices for the in-call picker. Only the 34+ endpoint
+     * API can address individual devices — on 33 setAudioRoute picks the
+     * platform's active one, so this returns empty and the picker never shows.
+     */
+    fun bluetoothNames(): List<String> =
+        if (Build.VERSION.SDK_INT >= 34) {
+            endpoints.filter { it.endpointType == CallEndpoint.TYPE_BLUETOOTH }
+                .map { it.endpointName.toString() }
+        } else {
+            emptyList()
+        }
+
+    /** Routes to the i-th Bluetooth device from [bluetoothNames]. */
+    fun selectBluetooth(index: Int) {
+        if (Build.VERSION.SDK_INT < 34) return
+        endpoints.filter { it.endpointType == CallEndpoint.TYPE_BLUETOOTH }
+            .getOrNull(index)?.let { requestRoute(it) }
+    }
+
     fun setSpeaker(on: Boolean) =
         setRoute(on, CallEndpoint.TYPE_SPEAKER, CallAudioState.ROUTE_SPEAKER)
 

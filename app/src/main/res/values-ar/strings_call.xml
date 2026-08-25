@@ -21,6 +21,8 @@
     <string name="call_merge">دمج</string>
     <string name="call_keypad">لوحة الأرقام</string>
     <string name="call_dtmf_after_answer">تُرسل الأرقام بعد اتصال المكالمة</string>
+    <string name="call_choose_device">اختيار جهاز</string>
+    <string name="call_device_phone">الهاتف</string>
     <string name="call_end_call">إنهاء المكالمة</string>
 
     <!-- Notifications (WpInCallService, notification_incoming.xml) -->

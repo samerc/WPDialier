@@ -102,5 +102,8 @@ dependencies {
     implementation("androidx.profileinstaller:profileinstaller:1.4.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
     implementation("com.googlecode.libphonenumber:libphonenumber:8.13.55")
+    // Tip jar. Products must exist in Play Console; until then (or on
+    // devices without Play) the query returns nothing and the UI hides.
+    implementation("com.android.billingclient:billing-ktx:7.1.1")
     implementation("org.osmdroid:osmdroid-android:6.1.20")
 }
