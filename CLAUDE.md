@@ -26,6 +26,20 @@ purge it).
 - Test device: user's OnePlus 10 Pro (NE2213, Android 16) over USB. Screenshots via
   `adb shell screencap` + `adb pull` (PowerShell `>` redirection corrupts binary).
   Downscale screenshots before Reading them (System.Drawing) to save context.
+- Emulator (set up 2026-08-25): AVD `wp33` = Android 13 / API 33
+  google_apis x86_64, AEHD hypervisor driver installed (dev machine is a
+  physical Lenovo laptop, VT-x on). Boot:
+  `C:\android-sdk\emulator\emulator.exe -avd wp33 -no-window -gpu
+  swiftshader_indirect -no-snapshot -memory 2048` (stop Gradle daemons
+  first — only ~12 GB RAM). Root adb works (`adb root`), `pm grant` and
+  `cmd role add-role-holder` both work (no ColorOS blocks), calls are
+  simulated with `adb emu gsm call/accept/cancel <number>`. First boot
+  throws SystemUI ANRs (software GPU) — tap Wait / pkill systemui. The
+  emulator has ONLY a speaker route (no earpiece), so speaker-off taps
+  legitimately re-route back to speaker. API-33 paths verified here
+  2026-08-25: FSI wizard auto-skip, banner/answer, setAudioRoute+mute
+  via CallAudioState, DTMF echo, missed-call flow, what's-new,
+  missed-only filter, hold-1 voicemail, Hindi rendering.
 - minSdk 33, target/compile 36. Android 13 support (2026-08-12): audio
   routing goes through the platform-neutral `AudioRoute` enum in
   CallManager — fed by CallEndpoint callbacks on 34+ (raw endpoints kept
