@@ -100,6 +100,12 @@ object MissedCalls {
         fallbackName: String? = null,
     ) {
         val nm = context.getSystemService(NotificationManager::class.java) ?: return
+        // Tag by numberKey, never the raw string: the service path posts the
+        // raw handle ("5552223333") while Telecom's broadcast delivers a
+        // FORMATTED number ("(555) 222-3333") for the same call — raw tags
+        // gave one missed call two notifications (seen on the API 33
+        // emulator). numberKey unifies them, per the project number rule.
+        val tag = com.fancyshark.wpdialer.data.Repo.numberKey(number).ifEmpty { number }
         // The service path and the Telecom broadcast both post for the same
         // miss. If our contacts lookup failed but a notification for this
         // number is already showing (possibly with the real name resolved),
@@ -107,7 +113,7 @@ object MissedCalls {
         // (it only fills fresh posts), so the guard checks the lookup name.
         if (name == null &&
             runCatching {
-                nm.activeNotifications.any { it.id == NOTIFICATION_ID && it.tag == number }
+                nm.activeNotifications.any { it.id == NOTIFICATION_ID && it.tag == tag }
             }.getOrDefault(false)
         ) {
             return
@@ -164,9 +170,9 @@ object MissedCalls {
                 ).build(),
             )
             .build()
-        // Tag by number with a fixed ID outside the call-notification ID
-        // space (1/2) — number.hashCode() as the ID could collide with them.
-        runCatching { nm.notify(number, NOTIFICATION_ID, notification) }
+        // Fixed ID outside the call-notification ID space (1/2) —
+        // number.hashCode() as the ID could collide with them.
+        runCatching { nm.notify(tag, NOTIFICATION_ID, notification) }
         // Sync: post() runs this inside a goAsync-backed IO coroutine — an
         // async refresh would outlive the receiver window and get frozen.
         com.fancyshark.wpdialer.widget.TileWidget.updateAllSync(context)
