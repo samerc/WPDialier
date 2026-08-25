@@ -75,6 +75,7 @@ class WpInCallService : InCallService() {
         proximityLock?.let { runCatching { if (it.isHeld) it.release() } }
         // If Telecom unbound without per-call removals, stale dead-binder
         // calls must not survive into the next session.
+        lastTelecomName.clear()
         CallManager.reset()
         CallManager.service = null
         super.onDestroy()
@@ -83,7 +84,27 @@ class WpInCallService : InCallService() {
     // Whether our in-call activity is currently in the foreground.
     private var inCallUiVisible = false
 
+    // Last telecom-provided name posted per call — gates the details-driven
+    // reposts below to actual name arrivals (details updates can be chatty).
+    private val lastTelecomName = HashMap<Call, String?>()
+
     private val notifyCallback = object : Call.Callback() {
+        // Telecom resolves its contact match / CNAP name asynchronously and
+        // delivers it here after onCallAdded — an already-posted number-only
+        // notification must pick it up.
+        override fun onDetailsChanged(call: Call, details: Call.Details) {
+            val name = CallManager.telecomName(call)
+            if (name == null || name == lastTelecomName[call]) return
+            lastTelecomName[call] = name
+            when (CallManager.stateOf(call)) {
+                Call.STATE_RINGING ->
+                    if (!inCallUiVisible) postIncomingNotification(call)
+                Call.STATE_ACTIVE, Call.STATE_DIALING, Call.STATE_CONNECTING ->
+                    postOngoingNotification(call)
+                else -> {}
+            }
+        }
+
         override fun onStateChanged(call: Call, newState: Int) {
             // Another call's state change must not kill the notification of a
             // call that is still ringing (e.g. hanging up A while B rings).
@@ -198,6 +219,7 @@ class WpInCallService : InCallService() {
 
     override fun onCallRemoved(call: Call) {
         call.unregisterCallback(notifyCallback)
+        lastTelecomName.remove(call)
         CallManager.onCallRemoved(call)
         // A surviving ringing call keeps (or regains) its notification —
         // but never relight a screen the user deliberately blanked (same

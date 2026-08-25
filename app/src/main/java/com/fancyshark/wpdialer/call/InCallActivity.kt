@@ -165,8 +165,12 @@ private fun InCallRoot(onFinished: () -> Unit) {
     }
     // Saved contact first; else Telecom's name (its own contact match, then
     // the network-provided CNAP name) — keeps a name on screen where our
-    // lookup finds nothing.
-    val resolvedName = caller.first ?: CallManager.telecomName(call)
+    // lookup finds nothing. Telecom fills its name in asynchronously, so the
+    // read is keyed to detailsTick to recompute when it arrives mid-ring.
+    val detailsTick by CallManager.detailsTick.collectAsState()
+    val resolvedName = remember(caller, call, detailsTick) {
+        caller.first ?: CallManager.telecomName(call)
+    }
     val unknownLabel = stringResource(com.fancyshark.wpdialer.R.string.call_unknown)
     val isConference =
         call?.details?.hasProperty(Call.Details.PROPERTY_CONFERENCE) == true
@@ -195,6 +199,10 @@ private fun InCallRoot(onFinished: () -> Unit) {
             state == Call.STATE_RINGING -> {
                 IncomingScreen(
                     contactName = resolvedName,
+                    // Telecom/CNAP names are unverified network strings — only
+                    // a real saved contact earns the contact tile, and unsaved
+                    // callers keep their country line.
+                    isSavedContact = caller.first != null,
                     number = number,
                     photoUri = caller.second,
                     accent = accent.color,
@@ -234,13 +242,14 @@ private fun EndedScreen(name: String, onFinished: () -> Unit) {
 @Composable
 private fun IncomingScreen(
     contactName: String?,
+    isSavedContact: Boolean,
     number: String,
     photoUri: String?,
     accent: Color,
 ) {
     val context = LocalContext.current
-    val country by produceState<String?>(null, number, contactName) {
-        if (contactName == null) value = Repo.callerCountry(context, number)
+    val country by produceState<String?>(null, number, isSavedContact) {
+        if (!isSavedContact) value = Repo.callerCountry(context, number)
     }
 
     Column(Modifier.fillMaxSize().padding(24.dp)) {
@@ -262,7 +271,7 @@ private fun IncomingScreen(
             Modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            if (contactName != null) {
+            if (isSavedContact && contactName != null) {
                 ContactTile(contactName, photoUri, accent, 148.dp)
                 Spacer(Modifier.height(24.dp))
             }
@@ -287,7 +296,7 @@ private fun IncomingScreen(
                     textAlign = TextAlign.Center,
                 )
             }
-            if (contactName == null && country != null) {
+            if (!isSavedContact && country != null) {
                 Spacer(Modifier.height(6.dp))
                 Text(
                     country ?: "",
@@ -466,9 +475,14 @@ private fun ActiveScreen(
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Light,
                 )
+                // Keyed to detailsTick: Telecom's name may arrive mid-ring.
+                val secondTick by CallManager.detailsTick.collectAsState()
+                val secondTelecomName = remember(secondCall, secondTick) {
+                    CallManager.telecomName(secondCall)
+                }
                 Text(
                     secondCaller.first
-                        ?: CallManager.telecomName(secondCall)
+                        ?: secondTelecomName
                         ?: secondNumber.ifBlank {
                             stringResource(com.fancyshark.wpdialer.R.string.call_unknown)
                         },

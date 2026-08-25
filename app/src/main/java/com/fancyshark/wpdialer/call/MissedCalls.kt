@@ -42,8 +42,8 @@ object MissedCalls {
             try {
                 val name = runCatching {
                     com.fancyshark.wpdialer.data.Repo.lookupCaller(app, number).first
-                }.getOrNull() ?: fallbackName
-                if (gen == generation) postNow(app, number, name)
+                }.getOrNull()
+                if (gen == generation) postNow(app, number, name, fallbackName)
             } finally {
                 onDone?.invoke()
             }
@@ -91,12 +91,18 @@ object MissedCalls {
         )
     }
 
-    private fun postNow(context: Context, number: String, name: String?) {
+    private fun postNow(
+        context: Context,
+        number: String,
+        name: String?,
+        fallbackName: String? = null,
+    ) {
         val nm = context.getSystemService(NotificationManager::class.java) ?: return
         // The service path and the Telecom broadcast both post for the same
-        // miss. If our lookup failed but a notification for this number is
-        // already showing (possibly with the name resolved), keep it —
-        // replacing would downgrade name -> number.
+        // miss. If our contacts lookup failed but a notification for this
+        // number is already showing (possibly with the real name resolved),
+        // keep it — a telecom/CNAP fallbackName must not overwrite it either
+        // (it only fills fresh posts), so the guard checks the lookup name.
         if (name == null &&
             runCatching {
                 nm.activeNotifications.any { it.id == NOTIFICATION_ID && it.tag == number }
@@ -104,6 +110,7 @@ object MissedCalls {
         ) {
             return
         }
+        val display = name ?: fallbackName
         ensureChannel(context, nm)
         val telUri = android.net.Uri.fromParts("tel", number, null)
         // Explicit intent into our own dialpad (prefilled) — an implicit
@@ -136,7 +143,7 @@ object MissedCalls {
             )
             .setColor(com.fancyshark.wpdialer.ui.AccentStore.accent.value.color.toArgb())
             .setContentTitle(context.getString(com.fancyshark.wpdialer.R.string.notif_missed_call))
-            .setContentText(name ?: com.fancyshark.wpdialer.data.Repo.pretty(context, number))
+            .setContentText(display ?: com.fancyshark.wpdialer.data.Repo.pretty(context, number))
             .setCategory(Notification.CATEGORY_MISSED_CALL)
             .setContentIntent(open)
             .setAutoCancel(true)

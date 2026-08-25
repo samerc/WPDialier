@@ -54,8 +54,17 @@ object CallManager {
     private val _muted = MutableStateFlow(false)
     val muted: StateFlow<Boolean> = _muted
 
+    // Telecom fills contactDisplayName/CNAP asynchronously after onCallAdded
+    // and delivers it via onDetailsChanged — the Call reference in the flows
+    // doesn't change, so UI reading telecomName() must key off this tick.
+    private val _detailsTick = MutableStateFlow(0)
+    val detailsTick: StateFlow<Int> = _detailsTick
+
     private val callback = object : Call.Callback() {
         override fun onStateChanged(call: Call, newState: Int) = recompute()
+        override fun onDetailsChanged(call: Call, details: Call.Details) {
+            _detailsTick.value += 1
+        }
     }
 
     fun stateOf(call: Call): Int = call.details.state
@@ -105,10 +114,12 @@ object CallManager {
         _secondCall.value = live.getOrNull(1)
         _secondState.value = live.getOrNull(1)?.let { stateOf(it) } ?: Call.STATE_DISCONNECTED
         if (live.isEmpty()) {
-            // Audio-route state must not leak into the next call.
+            // Per-call audio state must not leak into the next call. The
+            // available endpoints stay: they describe device hardware, and
+            // Telecom only re-delivers them when they actually change — a
+            // back-to-back call within one service binding would otherwise
+            // see an empty list and dead speaker/bluetooth controls.
             _route.value = null
-            _availableRoutes.value = emptySet()
-            endpoints = emptyList()
             _muted.value = false
         }
     }
@@ -121,12 +132,11 @@ object CallManager {
     fun onCallAdded(call: Call) {
         userDismissedUi = false
         if (calls.isEmpty()) {
-            // A fresh call session: drop any audio-route state a late
-            // endpoint callback repopulated after the previous session's
-            // reset (stale speaker would also disable the proximity lock).
+            // A fresh call session: drop any per-call route state a late
+            // callback repopulated after the previous session's reset (stale
+            // speaker would also disable the proximity lock). Available
+            // endpoints are device-level — kept (see recompute).
             _route.value = null
-            _availableRoutes.value = emptySet()
-            endpoints = emptyList()
             _muted.value = false
         }
         if (call !in calls) {
@@ -151,6 +161,10 @@ object CallManager {
         calls.forEach { runCatching { it.unregisterCallback(callback) } }
         calls.clear()
         dtmfCall = null
+        // Full unbind: the next service binding re-delivers the endpoint
+        // list, so here (unlike between back-to-back calls) it's safe to drop.
+        endpoints = emptyList()
+        _availableRoutes.value = emptySet()
         recompute()
     }
 
@@ -228,34 +242,24 @@ object CallManager {
 
     fun setMuted(muted: Boolean) = service?.setMuted(muted)
 
-    fun setSpeaker(on: Boolean) {
-        if (Build.VERSION.SDK_INT >= 34) {
-            requestRoute(
-                if (on) {
-                    endpoints.firstOrNull { it.endpointType == CallEndpoint.TYPE_SPEAKER }
-                } else {
-                    defaultRoute()
-                },
-            )
-        } else {
-            setAudioRouteCompat(
-                if (on) CallAudioState.ROUTE_SPEAKER else CallAudioState.ROUTE_WIRED_OR_EARPIECE,
-            )
-        }
-    }
+    fun setSpeaker(on: Boolean) =
+        setRoute(on, CallEndpoint.TYPE_SPEAKER, CallAudioState.ROUTE_SPEAKER)
 
-    fun setBluetooth(on: Boolean) {
+    fun setBluetooth(on: Boolean) =
+        setRoute(on, CallEndpoint.TYPE_BLUETOOTH, CallAudioState.ROUTE_BLUETOOTH)
+
+    private fun setRoute(on: Boolean, endpointType: Int, legacyRoute: Int) {
         if (Build.VERSION.SDK_INT >= 34) {
             requestRoute(
                 if (on) {
-                    endpoints.firstOrNull { it.endpointType == CallEndpoint.TYPE_BLUETOOTH }
+                    endpoints.firstOrNull { it.endpointType == endpointType }
                 } else {
                     defaultRoute()
                 },
             )
         } else {
             setAudioRouteCompat(
-                if (on) CallAudioState.ROUTE_BLUETOOTH else CallAudioState.ROUTE_WIRED_OR_EARPIECE,
+                if (on) legacyRoute else CallAudioState.ROUTE_WIRED_OR_EARPIECE,
             )
         }
     }
