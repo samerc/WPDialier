@@ -19,4 +19,15 @@
     <string name="wizard_skip">अभी छोड़ें</string>
     <string name="wizard_start">शुरू करें</string>
     <string name="main_make_default_banner">Dialer 8 को अपना फ़ोन ऐप बनाने के लिए टैप करें</string>
+
+    <!-- What's new -->
+    <string name="whatsnew_title">नया क्या है</string>
+    <string name="whatsnew_version">संस्करण %1$s</string>
+    <string name="whatsnew_1_tile">होम स्क्रीन टाइल जिस पर छूटी हुई कॉल की संख्या दिखती है</string>
+    <string name="whatsnew_1_backup">सेटिंग का बैकअप और पुनर्स्थापना</string>
+    <string name="whatsnew_1_filter">सिर्फ़ छूटी हुई कॉल देखने के लिए फ़िल्टर</string>
+    <string name="whatsnew_1_voicemail">वॉइसमेल के लिए 1 दबाए रखें</string>
+    <string name="whatsnew_1_bluetooth">कॉल के लिए ब्लूटूथ डिवाइस चुनें</string>
+    <string name="whatsnew_1_hindi">अब हिन्दी में उपलब्ध</string>
+    <string name="whatsnew_done">ठीक है</string>
 </resources>

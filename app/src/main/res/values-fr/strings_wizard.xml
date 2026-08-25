@@ -19,4 +19,15 @@
     <string name="wizard_skip">passer pour l\'instant</string>
     <string name="wizard_start">commencer</string>
     <string name="main_make_default_banner">touchez pour faire de Dialer 8 votre app téléphone</string>
+
+    <!-- What's new -->
+    <string name="whatsnew_title">nouveautés</string>
+    <string name="whatsnew_version">version %1$s</string>
+    <string name="whatsnew_1_tile">tuile d\'accueil avec vos appels manqués</string>
+    <string name="whatsnew_1_backup">sauvegarde et restauration des paramètres</string>
+    <string name="whatsnew_1_filter">filtre « appels manqués » dans l\'historique</string>
+    <string name="whatsnew_1_voicemail">maintenez 1 pour la messagerie vocale</string>
+    <string name="whatsnew_1_bluetooth">choix de l\'appareil Bluetooth en appel</string>
+    <string name="whatsnew_1_hindi">désormais disponible en hindi</string>
+    <string name="whatsnew_done">compris</string>
 </resources>

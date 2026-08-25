@@ -170,6 +170,10 @@ class MainActivity : ComponentActivity() {
     private val dialNonce = MutableStateFlow(0)
     private val refreshTick = MutableStateFlow(0)
     private val simRequest = MutableStateFlow<SimRequest?>(null)
+    // One-shot what's-new page after an app update (never on fresh install).
+    private val showWhatsNew = MutableStateFlow(false)
+    private var appVersionCode = 0
+    private var appVersionName = ""
 
     private lateinit var permissionLauncher: ActivityResultLauncher<Array<String>>
     private lateinit var roleLauncher: ActivityResultLauncher<Intent>
@@ -202,6 +206,24 @@ class MainActivity : ComponentActivity() {
             isDefaultDialer.value
         ) {
             com.fancyshark.wpdialer.data.AppPrefs.setSetupDone(this, true)
+        }
+        // What's-new bookkeeping (after grandfathering, which decides whether
+        // this is an update or a fresh install). Fresh installs get the
+        // wizard as their intro — mark the page seen silently; anyone whose
+        // stored version trails the running one sees it once.
+        runCatching {
+            val info = packageManager.getPackageInfo(packageName, 0)
+            appVersionCode = info.longVersionCode.toInt()
+            appVersionName = info.versionName ?: ""
+        }
+        run {
+            val p = getSharedPreferences("wp", MODE_PRIVATE)
+            val seen = p.getInt("whats_new_seen", 0)
+            if (seen == 0 && !com.fancyshark.wpdialer.data.AppPrefs.setupDone.value) {
+                p.edit().putInt("whats_new_seen", appVersionCode).apply()
+            } else if (seen < appVersionCode) {
+                showWhatsNew.value = true
+            }
         }
         // Only on a fresh launch — recreation (locale change) redelivers the
         // original intent, which must not re-fire a stale dial request.
@@ -965,6 +987,22 @@ class MainActivity : ComponentActivity() {
                             refreshTick.value += 1
                         },
                     )
+                }
+
+                // First open after an update: one-shot what's-new page.
+                // Fresh installs never see it (onCreate marks it seen when
+                // the wizard is still pending), and the wizard renders on
+                // top if both would somehow show.
+                val whatsNewVisible by showWhatsNew.collectAsState()
+                if (setupDone && whatsNewVisible) {
+                    com.fancyshark.wpdialer.screens.WhatsNewScreen(
+                        accent = accent.color,
+                        versionName = appVersionName,
+                    ) {
+                        getSharedPreferences("wp", MODE_PRIVATE).edit()
+                            .putInt("whats_new_seen", appVersionCode).apply()
+                        showWhatsNew.value = false
+                    }
                 }
             }
             }

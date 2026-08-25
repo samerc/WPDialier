@@ -19,4 +19,15 @@
     <string name="wizard_skip">skip for now</string>
     <string name="wizard_start">start</string>
     <string name="main_make_default_banner">tap to make Dialer 8 your phone app</string>
+
+    <!-- What's new (one-shot page after updates) -->
+    <string name="whatsnew_title">what\'s new</string>
+    <string name="whatsnew_version">version %1$s</string>
+    <string name="whatsnew_1_tile">home-screen tile with your missed-call count</string>
+    <string name="whatsnew_1_backup">back up and restore your settings</string>
+    <string name="whatsnew_1_filter">filter history to missed calls only</string>
+    <string name="whatsnew_1_voicemail">hold 1 on the dialpad for voicemail</string>
+    <string name="whatsnew_1_bluetooth">pick which Bluetooth device takes the call</string>
+    <string name="whatsnew_1_hindi">now available in Hindi</string>
+    <string name="whatsnew_done">got it</string>
 </resources>

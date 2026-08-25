@@ -19,4 +19,15 @@
     <string name="wizard_skip">التخطي الآن</string>
     <string name="wizard_start">ابدأ</string>
     <string name="main_make_default_banner">انقر لجعل Dialer 8 تطبيق هاتفك</string>
+
+    <!-- What's new -->
+    <string name="whatsnew_title">الجديد</string>
+    <string name="whatsnew_version">الإصدار %1$s</string>
+    <string name="whatsnew_1_tile">مربع للشاشة الرئيسية يعرض عدد المكالمات الفائتة</string>
+    <string name="whatsnew_1_backup">نسخ احتياطي واستعادة للإعدادات</string>
+    <string name="whatsnew_1_filter">تصفية السجل للمكالمات الفائتة فقط</string>
+    <string name="whatsnew_1_voicemail">اضغط مطولًا على 1 للبريد الصوتي</string>
+    <string name="whatsnew_1_bluetooth">اختيار جهاز البلوتوث أثناء المكالمة</string>
+    <string name="whatsnew_1_hindi">متوفر الآن باللغة الهندية</string>
+    <string name="whatsnew_done">حسنًا</string>
 </resources>
