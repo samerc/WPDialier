@@ -203,21 +203,46 @@ fix, blocked-list needs-default hint, blank-number menu guard,
 profile overlay hides app bar, resume-keyed Google-dialer check,
 reach flick ignored while app-bar menu open.
 
+Shipped 2026-08-25 (v1.1.0, versionCode 3, commits 264541e..3d098cc):
+history missed-only filter (app-bar menu toggle), voicemail hold-1,
+pre-answer keypad hint, settings backup/restore (data/SettingsBackup:
+type-tagged JSON of the whole "wp" prefs file + blocked list, SAF
+pickers, confirm overlay, store re-init), WP live-tile widget
+(widget/TileWidget: accent RemoteViews tile + missed count from
+NEW/IS_READ flags; updates on missed events/accent change/app open —
+Repo.markMissedSeen clears WP-style; zero-timer), Bluetooth device
+picker (34+ only — 33 setAudioRoute can't address devices), Play
+Billing tip jar (data/Tips + About section; consumables tip_small/
+medium/large; SELF-HIDING until products exist in Console; billing-ktx
+pulls a pre-1.3 fragment → androidx.fragment 1.8.6 pinned or release
+lint fails), full Hindi locale (values-hi, locales_config, picker).
+Earlier same week: caller-name fallback chain (lookupCaller >
+Call.Details contactDisplayName > CNAP callerDisplayName gated on
+PRESENTATION_ALLOWED > number) made REACTIVE via CallManager.
+detailsTick (onDetailsChanged — Telecom fills names async; Call
+StateFlows dedupe the instance so a tick flow is required) + service
+reposts notifications on name arrival (per-call gate); endpoints kept
+across back-to-back calls (device-level state; Telecom only re-sends
+on change), wiped only on unbind; CNAP names don't get the contact
+tile or suppress the country line; missed-call downgrade guard checks
+lookup name only.
+
 PLAY STATE: app created in Console ("Dialer 8", Communication,
-free — decision: v1.0 free, v1.1 adds Play Billing tip jar; account
-registered in CANADA). All content declarations done (data safety =
-nothing collected, call-log declaration = default phone handler, FSI
-pre-grant = yes). v1 (1.0) uploaded to closed track "Beta", in
-review; v1.0.1 (versionCode 2, minSdk 33 included) AAB rebuilt
-2026-08-12, READY TO UPLOAD — en/fr/ar release notes drafted incl.
-Android 13 line.
-12-tester/14-day rule applies (new personal account). Declaration video optional — postponed (script ready:
-banner->role dialog->history->T9->delete; re-stage demo data +
-`cmd role add-role-holder` to Google first). Testers invited via
-opt-in link https://play.google.com/apps/testing/com.fancyshark.wpdialer
+free — v1.0 free, v1.1 = tip jar; account registered in CANADA). All
+content declarations done (data safety = nothing collected, call-log
+declaration = default phone handler, FSI pre-grant = yes). v1.0.1
+(versionCode 2, minSdk 33) live with beta testers since ~2026-08-13;
+tester feedback confirmed proximity + audio-route fixes work.
+v1.1.0 AAB (versionCode 3, 4.2 MB) built 2026-08-25, READY TO UPLOAD.
+Console TODO for the tip jar: after uploading the v1.1.0 AAB (it adds
+com.android.vending.BILLING), create in-app products tip_small/
+tip_medium/tip_large (suggest CA$2/5/10) — until then the About
+section hides itself. 12-tester/14-day rule applies. Declaration
+video optional — postponed (script in git history). Tester opt-in:
+https://play.google.com/apps/testing/com.fancyshark.wpdialer
 
 Still untested on hardware: add call/merge/conference live calls,
-in-call SIM label, D-pad on the tester's Cat S22 Flip. Remaining
-phase-2 candidates: live-tile widget, settings backup/restore
-(explicit export — auto-backup now disabled), Play Billing tip jar
-(v1.1).
+in-call SIM label, Android-13 route path (tester is the vehicle),
+v1.1 features (widget, backup, BT picker, Hindi rendering), D-pad.
+Remaining candidates: shared caller-name resolver cleanup (chain is
+hand-repeated at ~6 sites), history filter persistence if users ask.
