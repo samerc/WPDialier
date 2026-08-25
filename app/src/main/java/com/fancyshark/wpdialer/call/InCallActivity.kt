@@ -512,6 +512,17 @@ private fun ActiveScreen(
         Column(Modifier.padding(horizontal = 24.dp)) {
 
         if (showKeypad) {
+            // A tester read pre-answer DTMF silence as a bug — the network
+            // only carries tones once the call connects, so say so.
+            if (state == Call.STATE_DIALING || state == Call.STATE_CONNECTING) {
+                Text(
+                    stringResource(com.fancyshark.wpdialer.R.string.call_dtmf_after_answer),
+                    color = Metro.Subtle,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Light,
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
+                )
+            }
             // Echo the digits sent so far — IVR menus ("press 1 for…") give
             // no other feedback that the press registered.
             val typed by dtmfTyped.collectAsState()

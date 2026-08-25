@@ -106,6 +106,7 @@ fun DialpadScreen(
     accent: Color,
     onCall: (String) -> Unit,
     onSave: (String) -> Unit,
+    onVoicemail: (() -> Unit)? = null,
 ) {
     var number by rememberSaveable { mutableStateOf(initial) }
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -277,9 +278,14 @@ fun DialpadScreen(
                                 Haptics.tick(context)
                                 number += digit
                             },
-                            onLongPress = if (digit == "0") {
-                                { number += "+" }
-                            } else null,
+                            onLongPress = when (digit) {
+                                "0" -> {
+                                    { number += "+" }
+                                }
+                                // Standard dialer gesture: hold 1 = voicemail.
+                                "1" -> onVoicemail
+                                else -> null
+                            },
                         )
                     }
                 }

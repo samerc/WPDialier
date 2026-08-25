@@ -20,6 +20,7 @@
     <string name="call_swap">swap</string>
     <string name="call_merge">merge</string>
     <string name="call_keypad">keypad</string>
+    <string name="call_dtmf_after_answer">keys are sent once the call connects</string>
     <string name="call_end_call">end call</string>
 
     <!-- Notifications (WpInCallService, notification_incoming.xml) -->

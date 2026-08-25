@@ -561,13 +561,24 @@ class MainActivity : ComponentActivity() {
                                     )
                                 }
                             }
+                            // WP-style history filter: session-scoped, toggled
+                            // from the app-bar menu.
+                            var missedOnly by androidx.compose.runtime.saveable
+                                .rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
                             Pivot(
                                 title = stringResource(R.string.main_pivot_title),
                                 modifier = Modifier.weight(1f),
                                 pages = listOf<Pair<String, @Composable () -> Unit>>(
                                     stringResource(R.string.main_page_history) to {
                                         HistoryPage(
-                                            items = history,
+                                            items = if (missedOnly) {
+                                                history.filter {
+                                                    it.type ==
+                                                        android.provider.CallLog.Calls.MISSED_TYPE
+                                                }
+                                            } else {
+                                                history
+                                            },
                                             accent = accent.color,
                                             onCall = { placeCall(it) },
                                             onText = { sendText(it) },
@@ -626,6 +637,10 @@ class MainActivity : ComponentActivity() {
                                 ),
                                 menu = listOf(
                                     stringResource(R.string.main_menu_settings) to { push(Screen.Settings) },
+                                    stringResource(
+                                        if (missedOnly) R.string.main_menu_all_calls
+                                        else R.string.main_menu_missed_only,
+                                    ) to { missedOnly = !missedOnly },
                                     stringResource(R.string.main_menu_delete_all_history) to { confirmClearHistory = true },
                                 ),
                                 onSwipeDown = if (reachEnabled) {
@@ -641,6 +656,7 @@ class MainActivity : ComponentActivity() {
                             accent = accent.color,
                             onCall = { placeCall(it) },
                             onSave = { push(Screen.NewContact(it)) },
+                            onVoicemail = { callVoicemail() },
                         )
 
                         is Screen.Contact -> ContactDetailScreen(

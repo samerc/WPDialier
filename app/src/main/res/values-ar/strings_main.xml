@@ -13,6 +13,8 @@
     <string name="main_action_new">جديد</string>
     <string name="main_menu_settings">الإعدادات</string>
     <string name="main_menu_delete_all_history">حذف كل السجل</string>
+    <string name="main_menu_missed_only">المكالمات الفائتة فقط</string>
+    <string name="main_menu_all_calls">كل المكالمات</string>
 
     <!-- Confirm overlays -->
     <string name="main_confirm_delete_calls">هل تريد حذف %1$d من المكالمات؟</string>

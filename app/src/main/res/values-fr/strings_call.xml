@@ -20,6 +20,7 @@
     <string name="call_swap">permuter</string>
     <string name="call_merge">fusionner</string>
     <string name="call_keypad">clavier</string>
+    <string name="call_dtmf_after_answer">les touches sont envoyées une fois l\'appel établi</string>
     <string name="call_end_call">raccrocher</string>
 
     <!-- Notifications (WpInCallService, notification_incoming.xml) -->
