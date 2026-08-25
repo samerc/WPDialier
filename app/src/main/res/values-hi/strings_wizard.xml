@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="wizard_app_title">DIALER 8</string>
+    <string name="wizard_welcome_title">स्वागत है</string>
+    <string name="wizard_welcome_body">Metro स्टाइल का फ़ोन ऐप — तेज़, फ़्लैट और एक नज़र में साफ़। बस कुछ आसान चरण, और आप कॉल करने के लिए तैयार हैं।</string>
+    <string name="wizard_role_title">आपका फ़ोन ऐप</string>
+    <string name="wizard_role_body">Dialer 8 आपके डिफ़ॉल्ट फ़ोन ऐप के रूप में काम करता है: यह आपकी कॉल डायल करता है, दिखाता है कि कौन कॉल कर रहा है, और आपका कॉल इतिहास रखता है। आप फ़ोन की सेटिंग में जाकर कभी भी वापस बदल सकते हैं।</string>
+    <string name="wizard_role_button">इसे मेरा फ़ोन ऐप बनाएँ</string>
+    <string name="wizard_perms_title">अनुमतियाँ</string>
+    <string name="wizard_perms_body">नाम और इतिहास दिखाने के लिए, Dialer 8 को आपके संपर्कों, कॉल लॉग और सूचनाओं का एक्सेस चाहिए।</string>
+    <string name="wizard_perms_privacy">सब कुछ आपके फ़ोन पर ही रहता है। कुछ भी इकट्ठा, अपलोड या शेयर नहीं किया जाता — परिचय पेज पर निजता नीति देखें।</string>
+    <string name="wizard_perms_button">अनुमतियाँ दें</string>
+    <string name="wizard_banner_title">इनकमिंग कॉल</string>
+    <string name="wizard_banner_body">इस ऐप के लिए फ़ुल-स्क्रीन कॉल अलर्ट बंद हैं, इसलिए इनकमिंग कॉल सिर्फ़ एक छोटी सूचना के रूप में दिखेंगी। कॉल ठीक से बजें, इसके लिए यह सेटिंग चालू करें।</string>
+    <string name="wizard_banner_button">सेटिंग खोलें</string>
+    <string name="wizard_done_title">सब तैयार है</string>
+    <string name="wizard_done_body">आप तैयार हैं। बाद में सब कुछ सेटिंग में बदला जा सकता है।</string>
+    <string name="wizard_next">आगे</string>
+    <string name="wizard_skip">अभी छोड़ें</string>
+    <string name="wizard_start">शुरू करें</string>
+    <string name="main_make_default_banner">Dialer 8 को अपना फ़ोन ऐप बनाने के लिए टैप करें</string>
+</resources>

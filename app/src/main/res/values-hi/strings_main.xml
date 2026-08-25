@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Home pivot -->
+    <string name="main_pivot_title">फ़ोन</string>
+    <string name="main_page_history">इतिहास</string>
+    <string name="main_page_speed_dial">स्पीड डायल</string>
+    <string name="main_page_people">लोग</string>
+
+    <!-- App bar actions and menu -->
+    <string name="main_action_voicemail">वॉइसमेल</string>
+    <string name="main_action_keypad">कीपैड</string>
+    <string name="main_action_search">खोजें</string>
+    <string name="main_action_new">नया</string>
+    <string name="main_menu_settings">सेटिंग</string>
+    <string name="main_menu_delete_all_history">पूरा इतिहास मिटाएँ</string>
+    <string name="main_menu_missed_only">सिर्फ़ छूटी हुई कॉल</string>
+    <string name="main_menu_all_calls">सभी कॉल</string>
+
+    <!-- Confirm overlays -->
+    <string name="main_confirm_delete_calls">%1$d कॉल मिटाएँ?</string>
+    <string name="main_confirm_delete_call">यह कॉल मिटाएँ?</string>
+    <string name="main_confirm_delete_all_history">कॉल का पूरा इतिहास मिटाएँ?</string>
+    <string name="main_confirm_cant_undo">इसे वापस नहीं लाया जा सकता</string>
+    <string name="main_button_delete">मिटाएँ</string>
+    <string name="main_button_cancel">रद्द करें</string>
+
+    <!-- SIM picker overlay -->
+    <string name="main_choose_sim_title">सिम चुनें</string>
+    <string name="main_choose_sim_remember">इस संपर्क के लिए हमेशा यही इस्तेमाल करें</string>
+
+    <!-- Misc -->
+    <string name="main_return_to_call">कॉल पर लौटने के लिए टैप करें</string>
+    <string name="main_toast_no_voicemail">इस सिम पर कोई वॉइसमेल नंबर सेट नहीं है</string>
+    <string name="main_confirm_block">यह नंबर ब्लॉक करें?</string>
+    <string name="main_button_block">ब्लॉक करें</string>
+
+    <!-- Home-screen tile widget -->
+    <string name="widget_tile_label">Dialer 8 टाइल</string>
+    <string name="widget_tile_description">छूटी हुई कॉल की संख्या दिखाने वाली Windows Phone स्टाइल टाइल</string>
+</resources>

@@ -26,8 +26,8 @@ android {
         // compat path for 33 (CallEndpoint is 34+).
         minSdk = 33
         targetSdk = 36
-        versionCode = 2
-        versionName = "1.0.1"
+        versionCode = 3
+        versionName = "1.1.0"
     }
 
     signingConfigs {
@@ -105,5 +105,8 @@ dependencies {
     // Tip jar. Products must exist in Play Console; until then (or on
     // devices without Play) the query returns nothing and the UI hides.
     implementation("com.android.billingclient:billing-ktx:7.1.1")
+    // Billing pulls in a pre-1.3 androidx.fragment transitively, which
+    // trips the ActivityResult lint check on release builds — pin current.
+    implementation("androidx.fragment:fragment:1.8.6")
     implementation("org.osmdroid:osmdroid-android:6.1.20")
 }

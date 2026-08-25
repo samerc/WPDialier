@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Contact type keys (display only; keys stay English as data) -->
+    <string name="type_mobile">मोबाइल</string>
+    <string name="type_home">घर</string>
+    <string name="type_work">कार्यालय</string>
+    <string name="type_main">मुख्य</string>
+    <string name="type_other">अन्य</string>
+    <string name="type_custom">कस्टम</string>
+    <string name="type_personal">निजी</string>
+    <string name="type_birthday">जन्मदिन</string>
+    <string name="type_anniversary">सालगिरह</string>
+    <string name="account_kind_phone">फ़ोन</string>
+    <!-- ContactDetailScreen.kt -->
+    <string name="contact_edit">बदलाव करें</string>
+    <string name="contact_pin">पिन करें</string>
+    <string name="contact_unpin">अनपिन करें</string>
+    <string name="contact_share">शेयर करें</string>
+    <string name="contact_share_chooser">संपर्क शेयर करें</string>
+    <string name="contact_delete">मिटाएँ</string>
+    <string name="contact_delete_confirm">%1$s को मिटाएँ?</string>
+    <string name="contact_cancel">रद्द करें</string>
+    <string name="contact_profile">प्रोफ़ाइल</string>
+    <string name="contact_no_phone_numbers">कोई फ़ोन नंबर नहीं</string>
+    <string name="contact_call_label">%1$s पर कॉल करें</string>
+    <string name="contact_text_label">%1$s पर मैसेज करें</string>
+    <string name="contact_email_label">%1$s पर ईमेल करें</string>
+    <string name="contact_website">वेबसाइट</string>
+    <string name="contact_company">कंपनी</string>
+    <string name="contact_nickname">उपनाम</string>
+    <string name="contact_map_address">पता मैप पर देखें</string>
+    <string name="contact_preferred_sim">पसंदीदा सिम</string>
+    <string name="contact_not_set">सेट नहीं है</string>
+    <string name="contact_ringtone">रिंगटोन</string>
+    <string name="contact_ringtone_default">डिफ़ॉल्ट</string>
+    <string name="contact_note">नोट</string>
+    <string name="contact_history">इतिहास</string>
+    <string name="contact_preferred_sim_caps">पसंदीदा सिम</string>
+    <string name="contact_no_preference">कोई प्राथमिकता नहीं</string>
+
+    <!-- NewContactScreen.kt -->
+    <string name="newcontact_title">नया %1$s संपर्क</string>
+    <string name="newcontact_name">नाम</string>
+    <string name="newcontact_change_photo">फ़ोटो बदलें</string>
+    <string name="newcontact_save_to">इसमें सेव करें</string>
+    <string name="newcontact_country">देश (फ़ोन नंबर के लिए)</string>
+    <string name="newcontact_phone">फ़ोन</string>
+    <string name="newcontact_number">नंबर</string>
+    <string name="newcontact_email">ईमेल</string>
+    <string name="newcontact_email_address">ईमेल पता</string>
+    <string name="newcontact_date">तारीख़</string>
+    <string name="newcontact_pick_a_date">तारीख़ चुनें</string>
+    <string name="newcontact_custom_label">कस्टम लेबल</string>
+    <string name="newcontact_add_date">तारीख़ जोड़ें</string>
+    <string name="newcontact_add_typed">%1$s जोड़ें</string>
+    <string name="newcontact_address">पता</string>
+    <string name="newcontact_street_city_country">सड़क, शहर, देश</string>
+    <string name="newcontact_pick_on_map">मैप पर चुनें</string>
+    <string name="newcontact_locating">स्थान ढूँढा जा रहा है...</string>
+    <string name="newcontact_use_current_location">मौजूदा स्थान इस्तेमाल करें</string>
+    <string name="newcontact_note">नोट</string>
+    <string name="newcontact_save_failed">संपर्क सेव नहीं हो सका — खाता जाँचकर फिर से कोशिश करें</string>
+    <string name="newcontact_saving">सेव हो रहा है...</string>
+    <string name="newcontact_save">सेव करें</string>
+    <string name="newcontact_cancel">रद्द करें</string>
+    <string name="newcontact_save_to_caps">इसमें सेव करें</string>
+    <string name="newcontact_country_caps">देश</string>
+    <string name="newcontact_search">खोजें</string>
+    <string name="newcontact_pick_a_location">स्थान चुनें</string>
+    <string name="newcontact_pin">पिन</string>
+    <string name="newcontact_resolving">पता निकाला जा रहा है...</string>
+    <string name="newcontact_use_this_location">यह स्थान इस्तेमाल करें</string>
+
+    <!-- EditContactScreen.kt -->
+    <string name="editcontact_title_kind">%1$s संपर्क में बदलाव करें</string>
+    <string name="editcontact_title">संपर्क में बदलाव करें</string>
+    <string name="editcontact_saved_to">%1$s में सेव किया गया</string>
+    <string name="editcontact_name">नाम</string>
+    <string name="editcontact_change_photo">फ़ोटो बदलें</string>
+    <string name="editcontact_phone_label">फ़ोन (%1$s)</string>
+    <string name="editcontact_number">नंबर</string>
+    <string name="editcontact_add_phone">फ़ोन जोड़ें</string>
+    <string name="editcontact_email">ईमेल</string>
+    <string name="editcontact_email_address">ईमेल पता</string>
+    <string name="editcontact_other">अन्य</string>
+    <string name="editcontact_custom_label">कस्टम लेबल</string>
+    <string name="editcontact_add_email">ईमेल जोड़ें</string>
+    <string name="editcontact_date">तारीख़</string>
+    <string name="editcontact_pick_a_date">तारीख़ चुनें</string>
+    <string name="editcontact_add_date">तारीख़ जोड़ें</string>
+    <string name="editcontact_address">पता</string>
+    <string name="editcontact_street_city_country">सड़क, शहर, देश</string>
+    <string name="editcontact_note">नोट</string>
+    <string name="editcontact_save_failed">बदलाव सेव नहीं हो सके — फिर से कोशिश करें</string>
+    <string name="editcontact_saving">सेव हो रहा है...</string>
+    <string name="editcontact_save">सेव करें</string>
+    <string name="editcontact_cancel">रद्द करें</string>
+</resources>

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Call log entry types (full form) -->
+    <string name="data_call_incoming">इनकमिंग कॉल</string>
+    <string name="data_call_outgoing">आउटगोइंग कॉल</string>
+    <string name="data_call_missed">छूटी हुई कॉल</string>
+    <string name="data_call_declined">अस्वीकृत कॉल</string>
+    <string name="data_call_voicemail">वॉइसमेल</string>
+    <string name="data_call_blocked">ब्लॉक की गई कॉल</string>
+    <string name="data_call_generic">कॉल</string>
+
+    <!-- Call log entry types (short form for history sublines) -->
+    <string name="data_call_incoming_short">इनकमिंग</string>
+    <string name="data_call_outgoing_short">आउटगोइंग</string>
+    <string name="data_call_missed_short">छूटी हुई</string>
+    <string name="data_call_declined_short">अस्वीकृत</string>
+    <string name="data_call_voicemail_short">वॉइसमेल</string>
+    <string name="data_call_blocked_short">ब्लॉक की गई</string>
+    <string name="data_call_generic_short">कॉल</string>
+
+    <!-- Contact event types -->
+    <string name="data_event_birthday">जन्मदिन</string>
+    <string name="data_event_anniversary">सालगिरह</string>
+    <string name="data_event_date">तारीख़</string>
+
+    <!-- Fallback name for a third-party contact action's app -->
+    <string name="data_app_fallback">ऐप</string>
+</resources>

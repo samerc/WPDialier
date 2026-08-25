@@ -145,6 +145,7 @@ fun SettingsScreen(
         "" to stringResource(R.string.settings_language_system),
         "en" to "English",
         "fr" to "français",
+        "hi" to "हिन्दी",
         "ar" to "العربية",
     )
     fun langSelected(tag: String): Boolean =
