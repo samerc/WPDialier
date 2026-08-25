@@ -239,6 +239,14 @@ class MainActivity : ComponentActivity() {
                 getSystemService(TelecomManager::class.java)?.cancelMissedCallsNotification()
             }
             com.fancyshark.wpdialer.call.MissedCalls.cancelAll(this)
+            // WP live-tile behavior: opening the phone app clears the tile's
+            // missed count. Detached scope — a quick resume/pause must not
+            // cancel the provider write mid-flight.
+            val app = applicationContext
+            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                Repo.markMissedSeen(app)
+                com.fancyshark.wpdialer.widget.TileWidget.updateAll(app)
+            }
         }
         // Reopening the app during a call goes back to the call screen,
         // unless the user backed out of it on purpose.

@@ -95,6 +95,18 @@
             </intent-filter>
         </receiver>
 
+        <receiver
+            android:name=".widget.TileWidget"
+            android:exported="false"
+            android:label="@string/widget_tile_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_tile_info" />
+        </receiver>
+
         <service
             android:name=".call.WpInCallService"
             android:exported="true"

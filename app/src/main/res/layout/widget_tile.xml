@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- WP start-screen tile: flat accent square, centered glyph with the live
+     missed-call count beside it, app label bottom-left. Background color is
+     set at runtime from the accent pref; Android 12+ rounds the corners
+     itself (WP tiles were square — nothing we can do about that). -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <ImageView
+            android:id="@+id/widget_icon"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:src="@drawable/ic_notification"
+            android:tint="#FFFFFFFF"
+            android:contentDescription="@string/app_name" />
+
+        <TextView
+            android:id="@+id/widget_count"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="10dp"
+            android:textColor="#FFFFFFFF"
+            android:textSize="36sp"
+            android:fontFamily="@font/selawkl"
+            android:visibility="gone" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/widget_label"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|start"
+        android:layout_margin="10dp"
+        android:text="@string/widget_tile_label_on_tile"
+        android:textColor="#FFFFFFFF"
+        android:textSize="13sp"
+        android:fontFamily="@font/selawk" />
+</FrameLayout>

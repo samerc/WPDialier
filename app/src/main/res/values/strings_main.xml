@@ -33,4 +33,10 @@
     <string name="main_toast_no_voicemail">no voicemail number set up on this SIM</string>
     <string name="main_confirm_block">block this number?</string>
     <string name="main_button_block">block</string>
+
+    <!-- Home-screen tile widget -->
+    <string name="widget_tile_label">Dialer 8 tile</string>
+    <string name="widget_tile_description">Windows Phone style tile with your missed-call count</string>
+    <!-- WP start-screen tiles said "Phone"; never translated as it is part of the look. -->
+    <string name="widget_tile_label_on_tile" translatable="false">Phone</string>
 </resources>

@@ -215,6 +215,8 @@ object AccentStore {
         _accent.value = accent
         context.getSharedPreferences("wp", Context.MODE_PRIVATE)
             .edit().putString("accent", accent.name).apply()
+        // The home-screen tile widget is painted in the accent color.
+        com.fancyshark.wpdialer.widget.TileWidget.updateAll(context)
     }
 }
 

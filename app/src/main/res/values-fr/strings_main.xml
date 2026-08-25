@@ -33,4 +33,8 @@
     <string name="main_toast_no_voicemail">aucun numéro de messagerie vocale configuré sur cette SIM</string>
     <string name="main_confirm_block">bloquer ce numéro ?</string>
     <string name="main_button_block">bloquer</string>
+
+    <!-- Home-screen tile widget -->
+    <string name="widget_tile_label">Tuile Dialer 8</string>
+    <string name="widget_tile_description">Tuile façon Windows Phone avec vos appels manqués</string>
 </resources>

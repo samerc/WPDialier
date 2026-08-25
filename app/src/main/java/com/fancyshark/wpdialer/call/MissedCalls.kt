@@ -79,6 +79,7 @@ object MissedCalls {
             .setAutoCancel(true)
             .build()
         runCatching { nm.notify(SUMMARY_TAG, NOTIFICATION_ID, notification) }
+        com.fancyshark.wpdialer.widget.TileWidget.updateAll(context)
     }
 
     private fun ensureChannel(context: Context, nm: NotificationManager) {
@@ -165,6 +166,7 @@ object MissedCalls {
         // Tag by number with a fixed ID outside the call-notification ID
         // space (1/2) — number.hashCode() as the ID could collide with them.
         runCatching { nm.notify(number, NOTIFICATION_ID, notification) }
+        com.fancyshark.wpdialer.widget.TileWidget.updateAll(context)
     }
 
     /** Telecom sends count=0 when the user has seen the call log. */
@@ -176,5 +178,6 @@ object MissedCalls {
                 .filter { it.id == NOTIFICATION_ID }
                 .forEach { nm.cancel(it.tag, NOTIFICATION_ID) }
         }
+        com.fancyshark.wpdialer.widget.TileWidget.updateAll(context)
     }
 }

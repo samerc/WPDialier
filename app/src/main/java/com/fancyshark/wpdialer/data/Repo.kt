@@ -596,6 +596,25 @@ object Repo {
         return "⁦$formatted⁩"
     }
 
+    /**
+     * Opening the app counts as seeing missed calls (home IS history) —
+     * clears the NEW/unread flags the tile widget and system badges count.
+     */
+    suspend fun markMissedSeen(context: Context): Unit = withContext(Dispatchers.IO) {
+        runCatching {
+            val values = android.content.ContentValues().apply {
+                put(CallLog.Calls.NEW, 0)
+                put(CallLog.Calls.IS_READ, 1)
+            }
+            context.contentResolver.update(
+                CallLog.Calls.CONTENT_URI, values,
+                "${CallLog.Calls.TYPE} = ${CallLog.Calls.MISSED_TYPE} AND " +
+                    "(${CallLog.Calls.NEW} = 1 OR ${CallLog.Calls.IS_READ} = 0)",
+                null,
+            )
+        }
+    }
+
     suspend fun clearHistory(context: Context): Boolean = withContext(Dispatchers.IO) {
         runCatching {
             context.contentResolver.delete(CallLog.Calls.CONTENT_URI, null, null) >= 0
