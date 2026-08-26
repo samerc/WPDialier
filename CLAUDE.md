@@ -262,12 +262,13 @@ content declarations done (data safety = nothing collected, call-log
 declaration = default phone handler, FSI pre-grant = yes). v1.0.1
 (versionCode 2, minSdk 33) live with beta testers since ~2026-08-13;
 tester feedback confirmed proximity + audio-route fixes work.
-v1.1.0 (versionCode 3) uploaded to closed track "Beta" 2026-08-25 —
-but SUPERSEDED: v1.1.1 (versionCode 4, built 2026-08-26) carries the
-billing-9 mandate (Play rejects billing <8 uploads from Aug 31) and
-fixes a broadcast ANR v1.1.0 shipped (call-log query in the count=0
-missed-call branch — hit on the starved emulator, plausible on slow
-phones). READY TO UPLOAD, replaces v1.1.0 in review.
+v1.1.1 (versionCode 4) LIVE on closed track "Beta" since 2026-08-26
+(replaced v1.1.0, which never reached testers — the old billing lib
+was flagged as an actual POLICY VIOLATION that silently blocked it;
+v1.1.1's billing 9 cleared it, Console confirmed "violation
+addressed" + policy status clean). v1.1.1 also fixes a broadcast ANR
+v1.1.0 shipped (call-log query in the count=0 missed-call branch).
+Awaiting tester feedback on the v1.1 features.
 Console TODO for the tip jar: create in-app products tip_small/
 tip_medium/tip_large (suggest CA$2/5/10) — the About section hides
 itself until they exist (by design). 12-tester/14-day rule applies.
