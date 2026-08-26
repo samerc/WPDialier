@@ -12,9 +12,19 @@ purge it).
 
 ## Build & install
 
-- Gradle is NOT on PATH: `C:\gradle\gradle-8.13\bin\gradle.bat`, with `JAVA_HOME=C:\jdk-21`
+- Gradle is NOT on PATH: `C:\gradle\gradle-9.7.1\bin\gradle.bat`, with `JAVA_HOME=C:\jdk-21`
+  (8.13 still at C:\gradle\gradle-8.13 but the project needs 9.x since AGP 9)
 - Android SDK at `C:\android-sdk` (see `local.properties`, untracked); adb: `C:\android-sdk\platform-tools\adb.exe`
-- Build: `$env:JAVA_HOME='C:\jdk-21'; & C:\gradle\gradle-8.13\bin\gradle.bat -p "<repo>" assembleDebug`
+- Build: `$env:JAVA_HOME='C:\jdk-21'; & C:\gradle\gradle-9.7.1\bin\gradle.bat -p "<repo>" assembleDebug`
+- Toolchain (refreshed 2026-08-26 for the Play Billing 8+ mandate):
+  Gradle 9.7.1 / AGP 9.3.2 / Kotlin 2.4.10 / billing-ktx 9.1.0 /
+  compose-bom 2026.08.00 (needs compileSdk 37; targetSdk stays 36).
+  AGP 9 wants built-in Kotlin — we keep external KGP via
+  `android.builtInKotlin=false` + `android.newDsl=false` in
+  gradle.properties (migration to built-in Kotlin is the eventual path).
+  kotlinOptions is GONE in Kotlin 2.4 — jvmTarget lives in a top-level
+  kotlin { compilerOptions } block. Only 12 GB RAM on this laptop:
+  `gradle --stop` before running the emulator, and never both at once.
 - Install: `adb install -r app\build\outputs\apk\debug\app-debug.apk`
 - Release: `assembleRelease` — R8 + resource shrinking, signed via untracked
   `keystore.properties` + `release.keystore` in the repo root (gitignored,
@@ -141,7 +151,12 @@ purge it).
   unify. SimPrefs is keyed by numberKey (aggregate contact IDs are
   unstable across re-aggregation — never persist them).
 - Manifest-receiver work that outlives onReceive needs goAsync() — the
-  process loses its priority boost the moment onReceive returns.
+  process loses its priority boost the moment onReceive returns. But
+  goAsync does NOT extend the ~10s broadcast ANR deadline: heavy work
+  (call-log queries) inside the window ANR'd a slow device. Telecom
+  fires SHOW_MISSED_CALLS_NOTIFICATION count=0 on EVERY app open (our
+  own cancelMissedCallsNotification triggers it) — keep that branch
+  minimal.
 - AppPrefs list separator is U+0001 (legacy "|;|" still decoded).
 
 ## Phase 1 closed (2026-08-04); phase 2 in progress
@@ -247,8 +262,12 @@ content declarations done (data safety = nothing collected, call-log
 declaration = default phone handler, FSI pre-grant = yes). v1.0.1
 (versionCode 2, minSdk 33) live with beta testers since ~2026-08-13;
 tester feedback confirmed proximity + audio-route fixes work.
-v1.1.0 (versionCode 3) UPLOADED to closed track "Beta" 2026-08-25
-with en/fr/ar release notes — awaiting review + tester feedback.
+v1.1.0 (versionCode 3) uploaded to closed track "Beta" 2026-08-25 —
+but SUPERSEDED: v1.1.1 (versionCode 4, built 2026-08-26) carries the
+billing-9 mandate (Play rejects billing <8 uploads from Aug 31) and
+fixes a broadcast ANR v1.1.0 shipped (call-log query in the count=0
+missed-call branch — hit on the starved emulator, plausible on slow
+phones). READY TO UPLOAD, replaces v1.1.0 in review.
 Console TODO for the tip jar: create in-app products tip_small/
 tip_medium/tip_large (suggest CA$2/5/10) — the About section hides
 itself until they exist (by design). 12-tester/14-day rule applies.

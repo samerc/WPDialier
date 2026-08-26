@@ -99,9 +99,12 @@ object Tips {
                 },
             )
             .build()
-        client?.queryProductDetailsAsync(params) { result, details ->
+        // Billing 8: the listener delivers a QueryProductDetailsResult
+        // wrapper instead of a bare list.
+        client?.queryProductDetailsAsync(params) { result, detailsResult ->
             if (result.responseCode == BillingClient.BillingResponseCode.OK) {
-                _products.value = details.sortedBy { PRODUCT_IDS.indexOf(it.productId) }
+                _products.value = detailsResult.productDetailsList
+                    .sortedBy { PRODUCT_IDS.indexOf(it.productId) }
             }
         }
     }

@@ -34,16 +34,18 @@ class CallActionReceiver : BroadcastReceiver() {
                 // or the app freezer can kill them mid-flight.
                 when {
                     count == 0 -> {
+                        // No tile update here: Telecom fires count=0 on every
+                        // app open (our own cancelMissedCallsNotification),
+                        // and onResume already repaints the tile — a call-log
+                        // query inside this broadcast ANR'd a starved device.
                         val pending = goAsync()
                         CoroutineScope(Dispatchers.IO).launch {
-                                try {
-                                    MissedCalls.cancelAll(context)
-                                    com.fancyshark.wpdialer.widget.TileWidget
-                                        .updateAllSync(context)
-                                } finally {
-                                    pending.finish()
-                                }
+                            try {
+                                MissedCalls.cancelAll(context)
+                            } finally {
+                                pending.finish()
                             }
+                        }
                     }
                     number != null -> {
                         val pending = goAsync()

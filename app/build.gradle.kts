@@ -16,8 +16,10 @@ val keystoreProps = Properties().apply {
 
 android {
     namespace = "com.fancyshark.wpdialer"
-    // 36: Play requires new apps to target the latest API (deadline Aug 2026).
-    compileSdk = 36
+    // 37: required by the 2026.08 Compose BOM. targetSdk stays 36 (Play's
+    // current requirement) — compileSdk only raises the API surface we
+    // compile against, not runtime behavior.
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.fancyshark.wpdialer"
@@ -26,8 +28,8 @@ android {
         // compat path for 33 (CallEndpoint is 34+).
         minSdk = 33
         targetSdk = 36
-        versionCode = 3
-        versionName = "1.1.0"
+        versionCode = 4
+        versionName = "1.1.1"
     }
 
     signingConfigs {
@@ -72,9 +74,6 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions {
-        jvmTarget = "17"
-    }
     buildFeatures {
         compose = true
     }
@@ -88,25 +87,35 @@ android {
     }
 }
 
+// Kotlin 2.x compilerOptions DSL (kotlinOptions was removed in Kotlin 2.4).
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+    }
+}
+
 dependencies {
-    implementation(platform("androidx.compose:compose-bom:2025.05.00"))
-    implementation("androidx.core:core-ktx:1.16.0")
-    implementation("androidx.activity:activity-compose:1.10.1")
+    implementation(platform("androidx.compose:compose-bom:2026.08.00"))
+    implementation("androidx.core:core-ktx:1.19.0")
+    implementation("androidx.activity:activity-compose:1.13.0")
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.material3:material3")
+    // icons-extended is frozen upstream at 1.7.8 (final release).
     implementation("androidx.compose.material:material-icons-extended:1.7.8")
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.9.0")
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.11.0")
     // Installs the baseline profiles bundled with the Compose libraries so
     // ART pre-compiles the hot paths — faster cold start and first scroll.
     implementation("androidx.profileinstaller:profileinstaller:1.4.1")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
-    implementation("com.googlecode.libphonenumber:libphonenumber:8.13.55")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
+    implementation("com.googlecode.libphonenumber:libphonenumber:9.0.37")
     // Tip jar. Products must exist in Play Console; until then (or on
     // devices without Play) the query returns nothing and the UI hides.
-    implementation("com.android.billingclient:billing-ktx:7.1.1")
+    // 8+ is a Play hard requirement for uploads from Aug 31, 2026; 9.x is
+    // Google's current recommendation (needs the Kotlin 2.3+ toolchain).
+    implementation("com.android.billingclient:billing-ktx:9.1.0")
     // Billing pulls in a pre-1.3 androidx.fragment transitively, which
     // trips the ActivityResult lint check on release builds — pin current.
-    implementation("androidx.fragment:fragment:1.8.6")
+    implementation("androidx.fragment:fragment:1.9.0")
     implementation("org.osmdroid:osmdroid-android:6.1.20")
 }
