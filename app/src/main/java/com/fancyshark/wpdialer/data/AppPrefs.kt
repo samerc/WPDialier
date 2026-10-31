@@ -66,19 +66,28 @@ object AppPrefs {
     private fun prefs(context: Context) =
         context.getSharedPreferences("wp", Context.MODE_PRIVATE)
 
+    // A wrong-typed stored value (hand-edited backup, older build) makes the
+    // typed getters throw ClassCastException — fall back to the default
+    // instead of crashing on every launch.
+    private fun android.content.SharedPreferences.bool(key: String, def: Boolean): Boolean =
+        runCatching { getBoolean(key, def) }.getOrDefault(def)
+
+    private fun android.content.SharedPreferences.str(key: String): String? =
+        runCatching { getString(key, null) }.getOrNull()
+
     fun init(context: Context) {
         val p = prefs(context)
-        _rejectMessages.value = decodeList(p.getString("reject_msgs", null))
+        _rejectMessages.value = decodeList(p.str("reject_msgs"))
             ?: DEFAULT_REJECT_MESSAGES
-        _globalSim.value = p.getString("sim_global", null)
-        _light.value = p.getBoolean("theme_light", false)
-        _tilt.value = p.getBoolean("tilt", true)
-        _relativeTimes.value = p.getBoolean("relative_times", false)
-        _oneHandedLists.value = p.getBoolean("one_handed_lists", false)
-        _reachGesture.value = p.getBoolean("reach_gesture", false)
-        _setupDone.value = p.getBoolean("setup_done", false)
-        wizardSeen = p.getBoolean("wizard_seen", false)
-        _speedDialNumbers.value = decodeList(p.getString("speed_dial", null)) ?: emptyList()
+        _globalSim.value = p.str("sim_global")
+        _light.value = p.bool("theme_light", false)
+        _tilt.value = p.bool("tilt", true)
+        _relativeTimes.value = p.bool("relative_times", false)
+        _oneHandedLists.value = p.bool("one_handed_lists", false)
+        _reachGesture.value = p.bool("reach_gesture", false)
+        _setupDone.value = p.bool("setup_done", false)
+        wizardSeen = p.bool("wizard_seen", false)
+        _speedDialNumbers.value = decodeList(p.str("speed_dial")) ?: emptyList()
     }
 
     fun setRelativeTimes(context: Context, on: Boolean) {

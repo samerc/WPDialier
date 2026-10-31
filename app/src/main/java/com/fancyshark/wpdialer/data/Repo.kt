@@ -309,10 +309,11 @@ object Repo {
             // to match on). Sweep third-party rows from other contacts and
             // attach any whose action label carries one of our numbers.
             runCatching {
-                val phoneDigits = phones
-                    .map { numberDigits(it.number) }
-                    .filter { it.length >= 5 }
-                if (phoneDigits.isNotEmpty()) {
+                val region = Countries.defaultRegionCode(context)
+                val phoneForms = phones
+                    .map { numberDigits(it.number) to internationalForm(it.number, region) }
+                    .filter { it.first.length >= 7 }
+                if (phoneForms.isNotEmpty()) {
                     val seenKinds = appActions
                         .map {
                             it.mimetype to
@@ -321,9 +322,10 @@ object Repo {
                         .toMutableSet()
                     for (row in sweepRows(context)) {
                         if (row.contactId == id) continue
-                        // Suffix match unifies national and E.164 spellings.
-                        if (phoneDigits.none { pd ->
-                                row.key.endsWith(pd) || pd.endsWith(row.key)
+                        // Exact E.164 when both sides are international;
+                        // suffix only unifies a national spelling.
+                        if (phoneForms.none { (pd, pIntl) ->
+                                sweepMatch(pd, pIntl, row.key, row.intl)
                             }
                         ) {
                             continue
@@ -386,6 +388,8 @@ object Repo {
         val data1: String?,
         val accountType: String?,
         val key: String,
+        /** E.164 when the label writes the number internationally. */
+        val intl: String?,
     )
 
     // The sibling-action sweep reads every third-party Data row in the
@@ -400,6 +404,7 @@ object Repo {
             if (android.os.SystemClock.elapsedRealtime() - loadedAt < SWEEP_TTL_MS) return rows
         }
         val rows = mutableListOf<SweepRow>()
+        val region = Countries.defaultRegionCode(context)
         var queried = false
         context.contentResolver.query(
             ContactsContract.Data.CONTENT_URI,
@@ -431,6 +436,8 @@ object Repo {
                     c.getString(2),
                     c.getString(5),
                     key,
+                    // DATA1-derived keys may be app user IDs — no E.164 claim.
+                    if (textDigits(label).length >= 5) labelInternationalForm(label, region) else null,
                 )
             }
         }
@@ -440,23 +447,67 @@ object Repo {
         return rows
     }
 
+    /** The dialable network part: everything before the first post-dial
+     *  pause/wait ("5551234,123#" -> "5551234") — extension digits must
+     *  never leak into comparisons or keys. */
+    fun networkPortion(raw: String): String {
+        val cut = raw.indexOfFirst { it == ',' || it == ';' || it in "pPwW" }
+        return if (cut < 0) raw else raw.substring(0, cut)
+    }
+
+    /** USSD / service codes ("*123#") aren't phone numbers — their digits
+     *  carry meaning in position, so they only ever match exactly. */
+    private fun isOpaque(net: String): Boolean = net.any { it == '*' || it == '#' }
+
+    private fun opaqueForm(net: String): String =
+        net.filterNot { it.isWhitespace() || it in "-()." }
+
     /** Digits with national trunk zeros stripped — the comparable core.
      *  "03 039 056" -> "3039056"; "+961 3 039 056" -> "9613039056". */
-    fun numberDigits(raw: String): String = raw.filter { it.isDigit() }.trimStart('0')
+    fun numberDigits(raw: String): String =
+        networkPortion(raw).filter { it.isDigit() }.trimStart('0')
 
     /** Set/dedupe key: last 7 significant digits — unifies the national
-     *  and E.164 spellings of the same line. */
-    fun numberKey(raw: String): String = numberDigits(raw).takeLast(7)
+     *  and E.164 spellings of the same line. Service codes key as their
+     *  full cleaned string ("*123#" must not collide with "123"). */
+    fun numberKey(raw: String): String {
+        val net = networkPortion(raw)
+        if (isOpaque(net)) return opaqueForm(net)
+        return numberDigits(net).takeLast(7)
+    }
 
     /** Same-line test: one significant-digit string suffixes the other
      *  (national form vs full international form). */
     fun numbersMatch(a: String, b: String): Boolean {
-        val da = numberDigits(a)
-        val db = numberDigits(b)
+        val na = networkPortion(a)
+        val nb = networkPortion(b)
+        if (isOpaque(na) || isOpaque(nb)) {
+            val oa = opaqueForm(na)
+            return oa.isNotEmpty() && oa == opaqueForm(nb)
+        }
+        val da = numberDigits(na)
+        val db = numberDigits(nb)
         if (da.isEmpty() || db.isEmpty()) return false
         if (da.length < 5 || db.length < 5) return da == db
         return da.endsWith(db) || db.endsWith(da)
     }
+
+    /**
+     * Exact identity for storage keys (blocked list, SIM prefs): strict
+     * E.164 when the number parses, else digits with any leading "+" —
+     * never a suffix, so "+1 212 555 1234" and "+1 646 555 1234" differ.
+     */
+    fun exactNumberKey(context: Context, raw: String): String {
+        val net = networkPortion(raw).trim()
+        if (isOpaque(net)) return opaqueForm(net)
+        Countries.e164OrNull(net, Countries.defaultRegionCode(context))?.let { return it }
+        val digits = net.filter { it.isDigit() }
+        return if (net.startsWith("+")) "+$digits" else digits
+    }
+
+    // Digits of free text (app-action labels like "WhatsApp voice call +961
+    // ..."): no post-dial cut — "p"/"w" here are letters, not pauses.
+    private fun textDigits(raw: String): String = raw.filter { it.isDigit() }.trimStart('0')
 
     /**
      * The phone number an app action targets, as significant digits. The
@@ -464,11 +515,58 @@ object Repo {
      * an app-internal ID (Telegram) rather than a number.
      */
     fun actionNumberKey(label: String, data1: String?): String? {
-        val fromLabel = numberDigits(label)
+        val fromLabel = textDigits(label)
         if (fromLabel.length >= 5) return fromLabel
-        val fromData = numberDigits((data1 ?: "").substringBefore('@'))
+        val fromData = textDigits((data1 ?: "").substringBefore('@'))
         return if (fromData.length >= 5) fromData else null
     }
+
+    private val LABEL_NUMBER = Regex("""\+?\d[\d\s().\-]*\d""")
+
+    /**
+     * E.164 of a number written in international form ("+961 ...", "00961
+     * ..."); null for national spellings, whose country is a guess — those
+     * fall back to suffix matching.
+     */
+    private fun internationalForm(raw: String, region: String): String? {
+        val net = networkPortion(raw).trim()
+        val digits = when {
+            net.startsWith("+") -> net.filter { it.isDigit() }
+            net.startsWith("00") -> net.filter { it.isDigit() }.drop(2)
+            else -> return null
+        }
+        if (digits.length < 7) return null
+        return Countries.e164OrNull("+$digits", region) ?: "+$digits"
+    }
+
+    /** [internationalForm] of the longest number-looking run in a label. */
+    private fun labelInternationalForm(label: String, region: String): String? =
+        LABEL_NUMBER.findAll(label)
+            .maxByOrNull { m -> m.value.count { it.isDigit() } }
+            ?.let { internationalForm(it.value, region) }
+
+    /**
+     * Sweep matching: at least 7 significant digits on both sides; exact
+     * E.164 when both are written internationally (suffixes would merge
+     * "+1 555 1234567" with "+44 555 1234567"); suffix only when one side
+     * is national.
+     */
+    private fun sweepMatch(aDigits: String, aIntl: String?, bDigits: String, bIntl: String?): Boolean {
+        if (aDigits.length < 7 || bDigits.length < 7) return false
+        if (aIntl != null && bIntl != null) return aIntl == bIntl
+        return aDigits.endsWith(bDigits) || bDigits.endsWith(aDigits)
+    }
+
+    /** Drops in-memory provider caches — call after any contacts write so
+     *  the next profile open sees fresh sibling rows. */
+    fun invalidateCaches() {
+        sweepCache = null
+        synchronized(this) { callerCacheAt = 0L }
+    }
+
+    private var callerCache = HashMap<String, CallerMatch>()
+    private var callerCacheAt = 0L
+    private const val CALLER_TTL_MS = 60_000L
 
     /** Built-in mimetypes that are either handled above or not displayable. */
     private val STANDARD_MIMETYPES = setOf(
@@ -529,11 +627,76 @@ object Repo {
 
     private fun formatEventDate(raw: String): String = tryFormatEventDate(raw) ?: raw
 
+    private const val HISTORY_LIMIT = 300
+
+    /** Current contacts-provider identity of a number, for call-log refresh. */
+    private sealed interface CallerMatch {
+        /** Lookup failed (no READ_CONTACTS, provider down) — trust the cache. */
+        data object Unknown : CallerMatch
+        data object NoContact : CallerMatch
+        data class Contact(
+            val name: String?,
+            val type: Int?,
+            val label: String?,
+            val lookupUri: String?,
+        ) : CallerMatch
+    }
+
+    private fun matchCaller(context: Context, number: String): CallerMatch = runCatching {
+        val uri = Uri.withAppendedPath(
+            ContactsContract.PhoneLookup.CONTENT_FILTER_URI,
+            Uri.encode(number),
+        )
+        context.contentResolver.query(
+            uri,
+            arrayOf(
+                ContactsContract.PhoneLookup.DISPLAY_NAME,
+                ContactsContract.PhoneLookup.TYPE,
+                ContactsContract.PhoneLookup.LABEL,
+                ContactsContract.PhoneLookup.CONTACT_ID,
+                ContactsContract.PhoneLookup.LOOKUP_KEY,
+            ),
+            null, null, null,
+        )?.use { c ->
+            if (!c.moveToFirst()) return@runCatching CallerMatch.NoContact
+            val lookupUri = c.getString(4)?.let { key ->
+                ContactsContract.Contacts.getLookupUri(c.getLong(3), key)?.toString()
+            }
+            CallerMatch.Contact(
+                c.getString(0),
+                if (c.isNull(1)) null else c.getInt(1),
+                c.getString(2),
+                lookupUri,
+            )
+        } ?: CallerMatch.Unknown
+    }.getOrDefault(CallerMatch.Unknown)
+
+    /**
+     * Newest [HISTORY_LIMIT] calls. CACHED_NAME is only written when the call
+     * lands, so renamed/deleted contacts would show stale names forever —
+     * each distinct number is re-resolved once per load and drifted rows are
+     * written back (WRITE_CALL_LOG, held as default dialer).
+     */
     suspend fun loadHistory(context: Context): List<HistoryItem> = withContext(Dispatchers.IO) {
         val out = mutableListOf<HistoryItem>()
+        // Telecom-set CACHED_LOOKUP_URI per row: non-null means the name came
+        // from a contact (vs a CNAP name, which a lookup miss must not erase).
+        val lookupUris = mutableListOf<String?>()
         runCatching {
+            val args = android.os.Bundle().apply {
+                putString(
+                    android.content.ContentResolver.QUERY_ARG_SQL_SORT_ORDER,
+                    "${CallLog.Calls.DATE} DESC",
+                )
+                putInt(android.content.ContentResolver.QUERY_ARG_LIMIT, HISTORY_LIMIT)
+            }
+            // The call-log provider ignores QUERY_ARG_LIMIT on some builds;
+            // its own "limit" URI parameter is the long-standing contract.
+            val uri = CallLog.Calls.CONTENT_URI.buildUpon()
+                .appendQueryParameter(CallLog.Calls.LIMIT_PARAM_KEY, HISTORY_LIMIT.toString())
+                .build()
             context.contentResolver.query(
-                CallLog.Calls.CONTENT_URI,
+                uri,
                 arrayOf(
                     CallLog.Calls._ID,
                     CallLog.Calls.NUMBER,
@@ -541,12 +704,12 @@ object Repo {
                     CallLog.Calls.TYPE,
                     CallLog.Calls.DATE,
                     CallLog.Calls.DURATION,
+                    CallLog.Calls.CACHED_LOOKUP_URI,
                 ),
+                args,
                 null,
-                null,
-                "${CallLog.Calls.DATE} DESC",
             )?.use { c ->
-                while (c.moveToNext() && out.size < 300) {
+                while (c.moveToNext() && out.size < HISTORY_LIMIT) {
                     out += HistoryItem(
                         id = c.getLong(0),
                         number = c.getString(1) ?: "",
@@ -555,10 +718,69 @@ object Repo {
                         date = c.getLong(4),
                         duration = c.getLong(5),
                     )
+                    lookupUris += c.getString(6)
                 }
             }
         }
-        out
+        // One lookup per distinct number, not per row — and memoized across
+        // loads (history reloads on every resume; ~100 lookups each time
+        // would delay the list). Our own contact writes invalidate it; edits
+        // made in other apps show up within the TTL.
+        val matches = synchronized(this) {
+            if (android.os.SystemClock.elapsedRealtime() - callerCacheAt > CALLER_TTL_MS) {
+                callerCache = HashMap()
+                callerCacheAt = android.os.SystemClock.elapsedRealtime()
+            }
+            callerCache
+        }
+        val stale = LinkedHashMap<String, CallerMatch>()
+        val refreshed = out.mapIndexed { i, item ->
+            if (item.number.isBlank()) return@mapIndexed item
+            val match = synchronized(matches) { matches[item.number] }
+                ?: matchCaller(context, item.number).also { m ->
+                    // Failed lookups aren't cached — retry next load.
+                    if (m != CallerMatch.Unknown) synchronized(matches) { matches[item.number] = m }
+                }
+            val name = when (match) {
+                CallerMatch.Unknown -> item.name
+                // Only clear names that came from a (now deleted) contact.
+                CallerMatch.NoContact -> if (lookupUris[i] != null) null else item.name
+                is CallerMatch.Contact -> match.name ?: item.name
+            }
+            if (name != item.name) {
+                stale[item.number] = match
+                item.copy(name = name)
+            } else item
+        }
+        if (stale.isNotEmpty()) {
+            runCatching {
+                stale.forEach { (number, match) ->
+                    val values = android.content.ContentValues()
+                    var selection = "${CallLog.Calls.NUMBER} = ?"
+                    when (match) {
+                        is CallerMatch.Contact -> {
+                            values.put(CallLog.Calls.CACHED_NAME, match.name)
+                            match.type?.let { values.put(CallLog.Calls.CACHED_NUMBER_TYPE, it) }
+                            values.put(CallLog.Calls.CACHED_NUMBER_LABEL, match.label)
+                            match.lookupUri?.let { values.put(CallLog.Calls.CACHED_LOOKUP_URI, it) }
+                        }
+                        else -> {
+                            values.putNull(CallLog.Calls.CACHED_NAME)
+                            values.putNull(CallLog.Calls.CACHED_NUMBER_TYPE)
+                            values.putNull(CallLog.Calls.CACHED_NUMBER_LABEL)
+                            values.putNull(CallLog.Calls.CACHED_LOOKUP_URI)
+                            selection += " AND ${CallLog.Calls.CACHED_LOOKUP_URI} IS NOT NULL"
+                        }
+                    }
+                    runCatching {
+                        context.contentResolver.update(
+                            CallLog.Calls.CONTENT_URI, values, selection, arrayOf(number),
+                        )
+                    }
+                }
+            }
+        }
+        refreshed
     }
 
     /** Returns display name + photo uri for a phone number, if it belongs to a contact. */
@@ -630,7 +852,7 @@ object Repo {
                     ),
                     null, null,
                 ) > 0
-            }.getOrDefault(false)
+            }.getOrDefault(false).also { invalidateCaches() }
         }
 
     suspend fun setStarred(context: Context, id: Long, starred: Boolean): Boolean =
@@ -654,8 +876,11 @@ object Repo {
             if (number.isBlank()) return@withContext false
             // The provider doesn't enforce uniqueness — a duplicate row would
             // survive one "unblock" and keep silently rejecting the caller.
+            // Exact identity, not a suffix match — blocking one number must
+            // never no-op because a different line shares its trailing digits.
+            val key = exactNumberKey(context, number)
             val already = runCatching {
-                listBlocked(context).any { numbersMatch(it.second, number) }
+                listBlocked(context).any { exactNumberKey(context, it.second) == key }
             }.getOrDefault(false)
             if (already) return@withContext true
             runCatching {
@@ -733,16 +958,14 @@ object Repo {
     /**
      * Resolves the country a phone number belongs to (e.g. "Germany"), for
      * showing callers that aren't in the contacts. Local numbers without a
-     * country prefix resolve via the current network's country.
+     * country prefix resolve via the same default region [pretty] formats
+     * with (SIM first), so the country line and the number agree.
      */
     suspend fun callerCountry(context: Context, number: String): String? =
         withContext(Dispatchers.IO) {
             if (number.isBlank()) return@withContext null
             runCatching {
-                val telephony = context.getSystemService(android.telephony.TelephonyManager::class.java)
-                val defaultRegion = telephony?.networkCountryIso
-                    ?.takeIf { it.isNotBlank() }?.uppercase()
-                    ?: java.util.Locale.getDefault().country.ifBlank { "US" }
+                val defaultRegion = Countries.defaultRegionCode(context)
                 val util = com.google.i18n.phonenumbers.PhoneNumberUtil.getInstance()
                 val parsed = util.parse(number, defaultRegion)
                 val region = util.getRegionCodeForNumber(parsed) ?: return@withContext null

@@ -52,4 +52,20 @@ object Countries {
             } else number
         }.getOrDefault(number)
     }
+
+    /**
+     * Strict E.164 ("+9613039056") when [number] parses to a valid number
+     * (national forms resolve via [regionCode]); null otherwise — unlike
+     * [toInternational], never echoes the input back.
+     */
+    fun e164OrNull(number: String, regionCode: String): String? {
+        if (number.isBlank()) return null
+        return runCatching {
+            val util = PhoneNumberUtil.getInstance()
+            val parsed = util.parse(number, regionCode)
+            if (util.isValidNumber(parsed)) {
+                util.format(parsed, PhoneNumberUtil.PhoneNumberFormat.E164)
+            } else null
+        }.getOrNull()
+    }
 }

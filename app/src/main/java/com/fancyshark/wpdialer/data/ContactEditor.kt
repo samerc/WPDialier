@@ -37,7 +37,19 @@ data class ContactAccount(val name: String?, val type: String?) {
         get() = if (name.isNullOrBlank()) kindLabel else "$kindLabel · $name"
 }
 
-data class EditPhone(val dataId: Long?, val number: String, val label: String)
+/**
+ * [label] is the display string ("mobile", "work", a custom label). [type] /
+ * [customLabel] are what save writes: null type keeps the row's current type
+ * (TYPE_MOBILE for new rows); a non-blank [customLabel] with a null or
+ * TYPE_CUSTOM type saves as TYPE_CUSTOM with that LABEL.
+ */
+data class EditPhone(
+    val dataId: Long?,
+    val number: String,
+    val label: String,
+    val type: Int? = null,
+    val customLabel: String? = null,
+)
 
 data class EditEmail(
     val dataId: Long?,
@@ -78,6 +90,7 @@ object ContactEditor {
     suspend fun loadEditable(context: Context, contactId: Long): EditableContact? =
         withContext(Dispatchers.IO) {
             val raws = mutableListOf<EditRawContact>()
+            val adapters = contactSyncAdapters()
             runCatching {
                 context.contentResolver.query(
                     ContactsContract.RawContacts.CONTENT_URI,
@@ -94,8 +107,7 @@ object ContactEditor {
                         // Never surface raw contacts owned by read-only sync
                         // accounts (WhatsApp, Telegram, ...) — editing them
                         // fights their sync adapters and gets reverted.
-                        val type = c.getString(2)?.lowercase().orEmpty()
-                        if (READ_ONLY_ACCOUNT_MARKERS.any { type.contains(it) }) continue
+                        if (isReadOnly(c.getString(2), adapters)) continue
                         raws += loadRawContact(
                             context,
                             rawContactId = c.getLong(0),
@@ -146,7 +158,14 @@ object ContactEditor {
                         val label = Phone.getTypeLabel(
                             context.resources, c.getInt(3), c.getString(4),
                         ).toString().lowercase()
-                        phones += EditPhone(c.getLong(0), c.getString(2) ?: "", label)
+                        val type = if (c.isNull(3)) null else c.getInt(3)
+                        phones += EditPhone(
+                            c.getLong(0),
+                            c.getString(2) ?: "",
+                            label,
+                            type,
+                            if (type == Phone.TYPE_CUSTOM) c.getString(4) else null,
+                        )
                     }
                     Email.CONTENT_ITEM_TYPE -> {
                         emails += EditEmail(
@@ -226,30 +245,34 @@ object ContactEditor {
                 raw.phones.forEach { phone ->
                     if (phone.dataId == null) {
                         if (phone.number.isNotBlank()) {
-                            ops += ContentProviderOperation
-                                .newInsert(ContactsContract.Data.CONTENT_URI)
-                                .withValue(ContactsContract.Data.RAW_CONTACT_ID, raw.rawContactId)
-                                .withValue(
-                                    ContactsContract.Data.MIMETYPE,
-                                    Phone.CONTENT_ITEM_TYPE,
-                                )
+                            val (type, label) = phoneTypeAndLabel(phone, Phone.TYPE_MOBILE)
+                            ops += insertRow(raw.rawContactId, Phone.CONTENT_ITEM_TYPE)
                                 .withValue(Phone.NUMBER, phone.number)
-                                .withValue(Phone.TYPE, Phone.TYPE_MOBILE)
+                                .withValue(Phone.TYPE, type)
+                                .withValue(Phone.LABEL, label)
                                 .build()
                         }
                     } else {
                         val origPhone = orig.phones.firstOrNull { it.dataId == phone.dataId }
                         if (phone.number.isBlank()) {
                             ops += deleteDataRow(phone.dataId)
-                        } else if (origPhone != null && origPhone.number != phone.number) {
-                            ops += ContentProviderOperation
-                                .newUpdate(ContactsContract.Data.CONTENT_URI)
-                                .withSelection(
-                                    "${ContactsContract.Data._ID} = ?",
-                                    arrayOf(phone.dataId.toString()),
-                                )
-                                .withValue(Phone.NUMBER, phone.number)
-                                .build()
+                        } else if (origPhone != null) {
+                            val numberChanged = origPhone.number != phone.number
+                            val typeChanged = phone.type != null && phone.type != origPhone.type
+                            val labelChanged =
+                                phone.customLabel.orEmpty() != origPhone.customLabel.orEmpty()
+                            if (numberChanged || typeChanged || labelChanged) {
+                                val update = updateDataRow(phone.dataId)
+                                    .withValue(Phone.NUMBER, phone.number)
+                                if (typeChanged || labelChanged) {
+                                    val (type, label) = phoneTypeAndLabel(
+                                        phone, origPhone.type ?: Phone.TYPE_MOBILE,
+                                    )
+                                    update.withValue(Phone.TYPE, type)
+                                        .withValue(Phone.LABEL, label)
+                                }
+                                ops += update.build()
+                            }
                         }
                     }
                 }
@@ -399,8 +422,15 @@ object ContactEditor {
             if (ops.isEmpty()) return@withContext true
             runCatching {
                 context.contentResolver.applyBatch(ContactsContract.AUTHORITY, ops)
-            }.isSuccess
+            }.isSuccess.also { Repo.invalidateCaches() }
         }
+
+    /** TYPE/LABEL pair to write for [phone]; LABEL is only set for TYPE_CUSTOM. */
+    private fun phoneTypeAndLabel(phone: EditPhone, fallbackType: Int): Pair<Int, String?> {
+        val custom = phone.customLabel?.takeIf { it.isNotBlank() }
+        val type = phone.type ?: if (custom != null) Phone.TYPE_CUSTOM else fallbackType
+        return if (type == Phone.TYPE_CUSTOM) type to (custom ?: "custom") else type to null
+    }
 
     private fun deleteDataRow(dataId: Long): ContentProviderOperation =
         ContentProviderOperation
@@ -421,21 +451,55 @@ object ContactEditor {
 
     /**
      * Account types owned by messaging apps that expose read-only contact
-     * lists; hidden from the "save to" picker.
+     * lists; hidden from the "save to" picker. Fallback for adapters that
+     * (wrongly) claim upload support.
      */
     private val READ_ONLY_ACCOUNT_MARKERS = listOf(
         "whatsapp", "telegram", "viber", "signal", "threema", "skype",
         "org.thoughtcrime", "com.facebook", "linkedin", "tachyon",
     )
 
+    /** Contacts-authority sync adapters: account type -> supports uploading. */
+    private fun contactSyncAdapters(): Map<String, Boolean> = runCatching {
+        android.content.ContentResolver.getSyncAdapterTypes()
+            .filter { it.authority == ContactsContract.AUTHORITY }
+            // Several adapters per type: writable if any of them uploads.
+            .groupBy { it.accountType }
+            .mapValues { (_, list) -> list.any { it.supportsUploading() } }
+    }.getOrDefault(emptyMap())
+
     /**
-     * Accounts a new contact can be saved to: local phone storage plus every
-     * writable sync account that already stores contacts on this device.
+     * Read-only when the account's contacts sync adapter can't upload (the
+     * platform's own signal), or a known messaging app. Types without any
+     * adapter (local/OEM phone storage) count as writable.
+     */
+    private fun isReadOnly(type: String?, adapters: Map<String, Boolean>): Boolean {
+        if (type == null) return false
+        if (adapters[type] == false) return true
+        val lower = type.lowercase()
+        return READ_ONLY_ACCOUNT_MARKERS.any { lower.contains(it) }
+    }
+
+    /**
+     * Accounts a new contact can be saved to: local phone storage, every
+     * device account with a writable contacts sync adapter (even one that
+     * holds no contacts yet), plus any writable account already seen in raw
+     * contacts (adapter-less OEM types).
      */
     suspend fun listAccounts(context: Context): List<ContactAccount> =
         withContext(Dispatchers.IO) {
+            val adapters = contactSyncAdapters()
             val accounts = LinkedHashSet<ContactAccount>()
             accounts += ContactAccount(null, null)
+            runCatching {
+                // Contacts-syncing account types are visible without
+                // GET_ACCOUNTS to an app holding READ_CONTACTS.
+                android.accounts.AccountManager.get(context).accounts.forEach { a ->
+                    if (adapters[a.type] == true && !isReadOnly(a.type, adapters)) {
+                        accounts += ContactAccount(a.name, a.type)
+                    }
+                }
+            }
             runCatching {
                 context.contentResolver.query(
                     ContactsContract.RawContacts.CONTENT_URI,
@@ -449,8 +513,7 @@ object ContactEditor {
                 )?.use { c ->
                     while (c.moveToNext()) {
                         val type = c.getString(1) ?: continue
-                        val lower = type.lowercase()
-                        if (READ_ONLY_ACCOUNT_MARKERS.any { lower.contains(it) }) continue
+                        if (isReadOnly(type, adapters)) continue
                         accounts += ContactAccount(c.getString(0), type)
                     }
                 }
@@ -550,6 +613,6 @@ object ContactEditor {
         }
         runCatching {
             context.contentResolver.applyBatch(ContactsContract.AUTHORITY, ops)
-        }.isSuccess
+        }.isSuccess.also { Repo.invalidateCaches() }
     }
 }

@@ -31,8 +31,14 @@ object Tips {
     private val _thanked = MutableStateFlow(false)
     val thanked: StateFlow<Boolean> = _thanked
 
+    @Volatile
     private var client: BillingClient? = null
 
+    /**
+     * Idempotent and cheap: a no-op while a client exists (connecting or
+     * connected), so it's safe from every onResume; a failed/disconnected
+     * client is dropped, which makes the next call retry.
+     */
     fun init(context: Context) {
         if (client != null) return
         val c = BillingClient.newBuilder(context.applicationContext)
