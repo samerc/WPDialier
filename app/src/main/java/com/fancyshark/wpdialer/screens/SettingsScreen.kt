@@ -41,7 +41,17 @@ import com.fancyshark.wpdialer.ui.FontStore
 import com.fancyshark.wpdialer.ui.Haptics
 import com.fancyshark.wpdialer.ui.Metro
 import com.fancyshark.wpdialer.ui.MetroButton
+import com.fancyshark.wpdialer.ui.MetroCloseMark
+import com.fancyshark.wpdialer.ui.MetroConfirm
+import com.fancyshark.wpdialer.ui.MetroDialog
 import com.fancyshark.wpdialer.ui.MetroTextBox
+import com.fancyshark.wpdialer.ui.hiddenFromAccessibility
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import com.fancyshark.wpdialer.ui.WpAccents
 import kotlinx.coroutines.launch
 
@@ -74,14 +84,31 @@ private fun accentDisplayName(name: String): String {
     return stringResource(id)
 }
 
-/** The WP settings toggle: On/Off label + bordered track with square thumb. */
+/**
+ * The WP settings toggle: accent title, On/Off label + bordered track with
+ * square thumb. One switch for TalkBack ("title, switch, on"), the title
+ * included in the tap target.
+ */
 @Composable
-private fun WpToggleRow(checked: Boolean, accent: Color, onChange: (Boolean) -> Unit) {
+private fun WpToggleRow(
+    title: String,
+    checked: Boolean,
+    accent: Color,
+    onChange: (Boolean) -> Unit,
+) {
+    Column(
+        Modifier.toggleable(value = checked, role = Role.Switch, onValueChange = onChange),
+    ) {
+    Text(
+        title,
+        color = Metro.textAccent(accent),
+        fontSize = 14.sp,
+        fontWeight = FontWeight.SemiBold,
+        letterSpacing = 1.sp,
+    )
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
-            .padding(top = 8.dp)
-            .clickable { onChange(!checked) },
+        modifier = Modifier.padding(top = 8.dp),
     ) {
         Text(
             if (checked) {
@@ -95,7 +122,9 @@ private fun WpToggleRow(checked: Boolean, accent: Color, onChange: (Boolean) -> 
             maxLines = 1,
             modifier = Modifier
                 .widthIn(min = 52.dp)
-                .padding(end = 10.dp),
+                .padding(end = 10.dp)
+                // The switch state is announced already.
+                .clearAndSetSemantics {},
         )
         Box(
             Modifier
@@ -112,6 +141,7 @@ private fun WpToggleRow(checked: Boolean, accent: Color, onChange: (Boolean) -> 
             )
         }
     }
+    }
 }
 
 @Composable
@@ -120,8 +150,11 @@ fun SettingsScreen(
     isDefaultDialer: Boolean,
     onRequestDefault: () -> Unit,
     onAbout: () -> Unit = {},
+    onRerunSetup: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
+    val resources = androidx.compose.ui.platform.LocalResources.current
+    val accentText = Metro.textAccent(accent.color)
     var showLanguagePicker by androidx.compose.runtime.remember {
         androidx.compose.runtime.mutableStateOf(false)
     }
@@ -131,6 +164,17 @@ fun SettingsScreen(
     // A parsed-but-unapplied settings file waiting on the confirm overlay.
     var pendingRestore by androidx.compose.runtime.remember {
         androidx.compose.runtime.mutableStateOf<com.fancyshark.wpdialer.data.SettingsBackup.Payload?>(null)
+    }
+    // Index into the replies list awaiting the delete confirm.
+    var confirmDeleteReply by androidx.compose.runtime.remember {
+        androidx.compose.runtime.mutableStateOf<Int?>(null)
+    }
+    var blockedTick by androidx.compose.runtime.remember {
+        androidx.compose.runtime.mutableIntStateOf(0)
+    }
+    // (provider row id, number) awaiting the unblock confirm.
+    var confirmUnblock by androidx.compose.runtime.remember {
+        androidx.compose.runtime.mutableStateOf<Pair<Long, String>?>(null)
     }
     val localeManager = androidx.compose.runtime.remember {
         context.getSystemService(android.app.LocaleManager::class.java)
@@ -152,10 +196,13 @@ fun SettingsScreen(
         if (tag.isEmpty()) currentLangTag.isEmpty() else currentLangTag.startsWith(tag)
     val replies by AppPrefs.rejectMessages.collectAsState()
 
+    val overlayOpen = showLanguagePicker || showRepliesEditor || pendingRestore != null ||
+        confirmDeleteReply != null || confirmUnblock != null
     Box(Modifier.fillMaxSize()) {
     Column(
         Modifier
             .fillMaxSize()
+            .hiddenFromAccessibility(overlayOpen)
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp),
     ) {
@@ -176,14 +223,14 @@ fun SettingsScreen(
 
         Text(
             stringResource(R.string.settings_accent_title),
-            color = accent.color,
+            color = accentText,
             fontSize = 14.sp,
             fontWeight = FontWeight.SemiBold,
             letterSpacing = 1.sp,
         )
         Text(
             accentDisplayName(accent.name),
-            color = accent.color,
+            color = accentText,
             fontSize = 22.sp,
             fontWeight = FontWeight.Light,
             modifier = Modifier.padding(top = 2.dp, bottom = 10.dp),
@@ -192,6 +239,7 @@ fun SettingsScreen(
             WpAccents.chunked(5).forEach { row ->
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     row.forEach { option ->
+                        val swatchName = accentDisplayName(option.name)
                         Box(
                             Modifier
                                 .size(56.dp)
@@ -201,7 +249,11 @@ fun SettingsScreen(
                                         Modifier.border(3.dp, Metro.Foreground)
                                     } else Modifier,
                                 )
-                                .clickable { AccentStore.set(context, option) },
+                                .selectable(
+                                    selected = option.name == accent.name,
+                                    role = Role.RadioButton,
+                                ) { AccentStore.set(context, option) }
+                                .semantics { contentDescription = swatchName },
                         )
                     }
                 }
@@ -210,48 +262,8 @@ fun SettingsScreen(
 
         Spacer(Modifier.height(30.dp))
         val haptics by Haptics.enabled.collectAsState()
-        Text(
-            stringResource(R.string.settings_haptic_title),
-            color = accent.color,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.SemiBold,
-            letterSpacing = 1.sp,
-        )
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .padding(top = 8.dp)
-                .clickable { Haptics.set(context, !haptics) },
-        ) {
-            Text(
-                if (haptics) {
-                    stringResource(R.string.settings_toggle_on)
-                } else {
-                    stringResource(R.string.settings_toggle_off)
-                },
-                color = Metro.Foreground,
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Light,
-                maxLines = 1,
-                modifier = Modifier
-                    .widthIn(min = 52.dp)
-                    .padding(end = 10.dp),
-            )
-            // WP-style toggle: bordered track, square thumb, accent when on.
-            Box(
-                Modifier
-                    .size(width = 58.dp, height = 26.dp)
-                    .border(2.dp, Metro.Foreground)
-                    .background(if (haptics) accent.color else Color.Transparent),
-            ) {
-                Box(
-                    Modifier
-                        .align(if (haptics) Alignment.CenterEnd else Alignment.CenterStart)
-                        .padding(3.dp)
-                        .size(width = 18.dp, height = 20.dp)
-                        .background(Metro.Foreground),
-                )
-            }
+        WpToggleRow(stringResource(R.string.settings_haptic_title), haptics, accent.color) {
+            Haptics.set(context, it)
         }
         Text(
             stringResource(R.string.settings_haptic_hint),
@@ -275,7 +287,7 @@ fun SettingsScreen(
                                 else -> R.string.settings_haptic_high
                             },
                         ),
-                        color = if (level == i) accent.color else Metro.Subtle,
+                        color = if (level == i) accentText else Metro.Subtle,
                         fontSize = 20.sp,
                         fontWeight = if (level == i) FontWeight.Normal else FontWeight.Light,
                         modifier = Modifier.clickable {
@@ -291,7 +303,7 @@ fun SettingsScreen(
         val selawik by FontStore.selawik.collectAsState()
         Text(
             stringResource(R.string.settings_font_title),
-            color = accent.color,
+            color = accentText,
             fontSize = 14.sp,
             fontWeight = FontWeight.SemiBold,
             letterSpacing = 1.sp,
@@ -302,7 +314,7 @@ fun SettingsScreen(
         ).forEach { (label, value) ->
             Text(
                 label,
-                color = if (selawik == value) accent.color else Metro.Foreground,
+                color = if (selawik == value) accentText else Metro.Foreground,
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Light,
                 modifier = Modifier
@@ -315,7 +327,7 @@ fun SettingsScreen(
         Spacer(Modifier.height(30.dp))
         Text(
             stringResource(R.string.settings_language_title),
-            color = accent.color,
+            color = accentText,
             fontSize = 14.sp,
             fontWeight = FontWeight.SemiBold,
             letterSpacing = 1.sp,
@@ -335,7 +347,7 @@ fun SettingsScreen(
         Spacer(Modifier.height(30.dp))
         Text(
             stringResource(R.string.settings_default_apps_title),
-            color = accent.color,
+            color = accentText,
             fontSize = 14.sp,
             fontWeight = FontWeight.SemiBold,
             letterSpacing = 1.sp,
@@ -388,7 +400,7 @@ fun SettingsScreen(
             Spacer(Modifier.height(30.dp))
             Text(
                 stringResource(R.string.settings_google_disabled_title),
-                color = accent.color,
+                color = accentText,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.SemiBold,
                 letterSpacing = 1.sp,
@@ -418,7 +430,7 @@ fun SettingsScreen(
             Spacer(Modifier.height(30.dp))
             Text(
                 stringResource(R.string.settings_dup_notif_title),
-                color = accent.color,
+                color = accentText,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.SemiBold,
                 letterSpacing = 1.sp,
@@ -469,39 +481,18 @@ fun SettingsScreen(
 
         Spacer(Modifier.height(30.dp))
         val light by AppPrefs.light.collectAsState()
-        Text(
-            stringResource(R.string.settings_light_theme_title),
-            color = accent.color,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.SemiBold,
-            letterSpacing = 1.sp,
-        )
-        WpToggleRow(light, accent.color) {
+        WpToggleRow(stringResource(R.string.settings_light_theme_title), light, accent.color) {
             AppPrefs.setLight(context, it)
             Metro.light = it
         }
 
         Spacer(Modifier.height(30.dp))
         val tilt by AppPrefs.tilt.collectAsState()
-        Text(
-            stringResource(R.string.settings_tilt_title),
-            color = accent.color,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.SemiBold,
-            letterSpacing = 1.sp,
-        )
-        WpToggleRow(tilt, accent.color) { AppPrefs.setTilt(context, it) }
+        WpToggleRow(stringResource(R.string.settings_tilt_title), tilt, accent.color) { AppPrefs.setTilt(context, it) }
 
         Spacer(Modifier.height(30.dp))
         val relativeTimes by AppPrefs.relativeTimes.collectAsState()
-        Text(
-            stringResource(R.string.settings_relative_times_title),
-            color = accent.color,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.SemiBold,
-            letterSpacing = 1.sp,
-        )
-        WpToggleRow(relativeTimes, accent.color) { AppPrefs.setRelativeTimes(context, it) }
+        WpToggleRow(stringResource(R.string.settings_relative_times_title), relativeTimes, accent.color) { AppPrefs.setRelativeTimes(context, it) }
         Text(
             stringResource(R.string.settings_relative_times_hint),
             color = Metro.Subtle,
@@ -512,14 +503,7 @@ fun SettingsScreen(
 
         Spacer(Modifier.height(30.dp))
         val oneHandedLists by AppPrefs.oneHandedLists.collectAsState()
-        Text(
-            stringResource(R.string.settings_one_handed_lists_title),
-            color = accent.color,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.SemiBold,
-            letterSpacing = 1.sp,
-        )
-        WpToggleRow(oneHandedLists, accent.color) { AppPrefs.setOneHandedLists(context, it) }
+        WpToggleRow(stringResource(R.string.settings_one_handed_lists_title), oneHandedLists, accent.color) { AppPrefs.setOneHandedLists(context, it) }
         Text(
             stringResource(R.string.settings_one_handed_lists_hint),
             color = Metro.Subtle,
@@ -530,14 +514,7 @@ fun SettingsScreen(
 
         Spacer(Modifier.height(30.dp))
         val reachGesture by AppPrefs.reachGesture.collectAsState()
-        Text(
-            stringResource(R.string.settings_reach_title),
-            color = accent.color,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.SemiBold,
-            letterSpacing = 1.sp,
-        )
-        WpToggleRow(reachGesture, accent.color) { AppPrefs.setReachGesture(context, it) }
+        WpToggleRow(stringResource(R.string.settings_reach_title), reachGesture, accent.color) { AppPrefs.setReachGesture(context, it) }
         Text(
             stringResource(R.string.settings_reach_hint),
             color = Metro.Subtle,
@@ -549,7 +526,7 @@ fun SettingsScreen(
         Spacer(Modifier.height(30.dp))
         Text(
             stringResource(R.string.settings_text_replies_title),
-            color = accent.color,
+            color = accentText,
             fontSize = 14.sp,
             fontWeight = FontWeight.SemiBold,
             letterSpacing = 1.sp,
@@ -571,7 +548,7 @@ fun SettingsScreen(
             val globalSim by AppPrefs.globalSim.collectAsState()
             Text(
                 stringResource(R.string.settings_default_sim_title),
-                color = accent.color,
+                color = accentText,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.SemiBold,
                 letterSpacing = 1.sp,
@@ -584,7 +561,7 @@ fun SettingsScreen(
                 ).forEach { (label, flat) ->
                 Text(
                     label,
-                    color = if (globalSim == flat) accent.color else Metro.Foreground,
+                    color = if (globalSim == flat) accentText else Metro.Foreground,
                     fontSize = 22.sp,
                     fontWeight = FontWeight.Light,
                     modifier = Modifier
@@ -596,18 +573,17 @@ fun SettingsScreen(
         }
 
         Spacer(Modifier.height(30.dp))
-        var blockedTick by androidx.compose.runtime.remember {
-            androidx.compose.runtime.mutableIntStateOf(0)
-        }
+        // Keyed on the role too: the provider only answers the default
+        // dialer, so becoming default must re-query instead of staying empty.
         val blocked by androidx.compose.runtime.produceState(
-            emptyList<Pair<Long, String>>(), blockedTick,
+            emptyList<Pair<Long, String>>(), blockedTick, isDefaultDialer,
         ) {
             value = Repo.listBlocked(context)
         }
         val settingsScope = androidx.compose.runtime.rememberCoroutineScope()
         Text(
             stringResource(R.string.settings_blocked_title),
-            color = accent.color,
+            color = accentText,
             fontSize = 14.sp,
             fontWeight = FontWeight.SemiBold,
             letterSpacing = 1.sp,
@@ -633,7 +609,7 @@ fun SettingsScreen(
         blocked.forEach { (rowId, number) ->
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp),
+                modifier = Modifier.fillMaxWidth(),
             ) {
                 Text(
                     Repo.pretty(context, number),
@@ -644,14 +620,11 @@ fun SettingsScreen(
                 )
                 Text(
                     stringResource(R.string.settings_unblock),
-                    color = accent.color,
+                    color = accentText,
                     fontSize = 16.sp,
-                    modifier = Modifier.clickable {
-                        settingsScope.launch {
-                            Repo.unblockNumber(context, rowId)
-                            blockedTick++
-                        }
-                    },
+                    modifier = Modifier
+                        .clickable(role = Role.Button) { confirmUnblock = rowId to number }
+                        .padding(vertical = 12.dp, horizontal = 4.dp),
                 )
             }
         }
@@ -659,14 +632,14 @@ fun SettingsScreen(
         Spacer(Modifier.height(30.dp))
         Text(
             stringResource(R.string.settings_backup_title),
-            color = accent.color,
+            color = accentText,
             fontSize = 14.sp,
             fontWeight = FontWeight.SemiBold,
         )
         val backupScope = androidx.compose.runtime.rememberCoroutineScope()
         fun backupToast(resId: Int) {
             android.widget.Toast
-                .makeText(context, context.getString(resId), android.widget.Toast.LENGTH_SHORT)
+                .makeText(context, resources.getString(resId), android.widget.Toast.LENGTH_SHORT)
                 .show()
         }
         val exportLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
@@ -725,7 +698,7 @@ fun SettingsScreen(
         Spacer(Modifier.height(30.dp))
         Text(
             stringResource(R.string.settings_setup_title),
-            color = accent.color,
+            color = accentText,
             fontSize = 14.sp,
             fontWeight = FontWeight.SemiBold,
         )
@@ -736,14 +709,16 @@ fun SettingsScreen(
             fontWeight = FontWeight.Light,
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable { AppPrefs.setSetupDone(context, false) }
+                .clickable {
+                    onRerunSetup?.invoke() ?: AppPrefs.setSetupDone(context, false)
+                }
                 .padding(vertical = 8.dp),
         )
 
         Spacer(Modifier.height(30.dp))
         Text(
             stringResource(R.string.settings_about_title),
-            color = accent.color,
+            color = accentText,
             fontSize = 14.sp,
             fontWeight = FontWeight.SemiBold,
         )
@@ -762,214 +737,167 @@ fun SettingsScreen(
     }
 
     pendingRestore?.let { payload ->
-        androidx.activity.compose.BackHandler { pendingRestore = null }
         val restoreScope = androidx.compose.runtime.rememberCoroutineScope()
-        Box(
-            Modifier
-                .fillMaxSize()
-                .background(Metro.Background.copy(alpha = 0.97f))
-                .clickable(
-                    interactionSource = androidx.compose.runtime.remember {
-                        androidx.compose.foundation.interaction.MutableInteractionSource()
-                    },
-                    indication = null,
-                ) {},
-            contentAlignment = Alignment.Center,
-        ) {
-            Column(Modifier.padding(horizontal = 24.dp)) {
-                Text(
-                    stringResource(R.string.settings_restore_confirm),
-                    color = Metro.Foreground,
-                    fontSize = 24.sp,
-                    fontWeight = FontWeight.Light,
-                )
-                Text(
-                    stringResource(R.string.settings_restore_hint),
-                    color = Metro.Subtle,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Light,
-                    modifier = Modifier.padding(top = 8.dp, bottom = 20.dp),
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    MetroButton(
-                        stringResource(R.string.settings_restore_button),
-                        fill = accent.color,
-                        modifier = Modifier.weight(1f),
-                    ) {
-                        restoreScope.launch {
-                            val ok = runCatching {
-                                com.fancyshark.wpdialer.data.SettingsBackup.apply(context, payload)
-                            }.getOrDefault(false)
-                            if (ok) {
-                                // Every pref-backed store re-reads the restored file.
-                                AppPrefs.init(context)
-                                com.fancyshark.wpdialer.ui.AccentStore.init(context)
-                                com.fancyshark.wpdialer.ui.FontStore.init(context)
-                                com.fancyshark.wpdialer.ui.Haptics.init(context)
-                                Metro.light = AppPrefs.light.value
-                                // The home-screen tile wears the restored accent.
-                                com.fancyshark.wpdialer.widget.TileWidget.updateAll(context)
-                            }
-                            pendingRestore = null
-                            android.widget.Toast.makeText(
-                                context,
-                                context.getString(
-                                    if (ok) R.string.settings_restore_done
-                                    else R.string.settings_backup_failed,
-                                ),
-                                android.widget.Toast.LENGTH_SHORT,
-                            ).show()
-                        }
+        // Applying replaces settings wholesale — confirm only, a stray tap on
+        // the backdrop must not decide it either way.
+        MetroConfirm(
+            title = stringResource(R.string.settings_restore_confirm),
+            message = stringResource(R.string.settings_restore_hint),
+            confirmLabel = stringResource(R.string.settings_restore_button),
+            cancelLabel = stringResource(R.string.main_button_cancel),
+            confirmFill = accent.color,
+            dismissOnBackdrop = false,
+            onConfirm = {
+                restoreScope.launch {
+                    val ok = runCatching {
+                        com.fancyshark.wpdialer.data.SettingsBackup.apply(context, payload)
+                    }.getOrDefault(false)
+                    if (ok) {
+                        // Every pref-backed store re-reads the restored file.
+                        AppPrefs.init(context)
+                        com.fancyshark.wpdialer.ui.AccentStore.init(context)
+                        com.fancyshark.wpdialer.ui.FontStore.init(context)
+                        com.fancyshark.wpdialer.ui.Haptics.init(context)
+                        Metro.light = AppPrefs.light.value
+                        // The home-screen tile wears the restored accent.
+                        com.fancyshark.wpdialer.widget.TileWidget.updateAll(context)
                     }
-                    MetroButton(
-                        stringResource(R.string.main_button_cancel),
-                        modifier = Modifier.weight(1f),
-                    ) { pendingRestore = null }
+                    pendingRestore = null
+                    android.widget.Toast.makeText(
+                        context,
+                        resources.getString(
+                            if (ok) R.string.settings_restore_done
+                            else R.string.settings_backup_failed,
+                        ),
+                        android.widget.Toast.LENGTH_SHORT,
+                    ).show()
                 }
-            }
-        }
+            },
+            onCancel = { pendingRestore = null },
+        )
     }
 
     if (showLanguagePicker) {
-        androidx.activity.compose.BackHandler { showLanguagePicker = false }
-        Box(
-            Modifier
-                .fillMaxSize()
-                .background(Metro.Background.copy(alpha = 0.97f))
-                .clickable(
-                    interactionSource = androidx.compose.runtime.remember {
-                        androidx.compose.foundation.interaction.MutableInteractionSource()
-                    },
-                    indication = null,
-                ) { showLanguagePicker = false },
-        ) {
-            Column(
-                Modifier
-                    .align(Alignment.Center)
-                    .fillMaxWidth()
-                    .padding(horizontal = 32.dp)
-                    .clickable(
-                        interactionSource = androidx.compose.runtime.remember {
-                            androidx.compose.foundation.interaction.MutableInteractionSource()
-                        },
-                        indication = null,
-                    ) { /* consume so taps inside don't dismiss */ },
-            ) {
+        MetroDialog(onDismiss = { showLanguagePicker = false }, backdropAlpha = 0.97f) {
+            Text(
+                stringResource(R.string.settings_language_title),
+                color = Metro.Foreground,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold,
+                letterSpacing = 1.sp,
+                modifier = Modifier.padding(bottom = 14.dp),
+            )
+            languageOptions.forEach { (tag, label) ->
                 Text(
-                    stringResource(R.string.settings_language_title),
-                    color = Metro.Foreground,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    letterSpacing = 1.sp,
-                    modifier = Modifier.padding(bottom = 14.dp),
-                )
-                languageOptions.forEach { (tag, label) ->
-                    Text(
-                        label,
-                        color = if (langSelected(tag)) accent.color else Metro.Foreground,
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.Light,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                currentLangTag = tag
-                                localeManager?.applicationLocales = if (tag.isEmpty()) {
-                                    android.os.LocaleList.getEmptyLocaleList()
-                                } else {
-                                    android.os.LocaleList.forLanguageTags(tag)
-                                }
-                                showLanguagePicker = false
+                    label,
+                    color = if (langSelected(tag)) accentText else Metro.Foreground,
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Light,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            currentLangTag = tag
+                            localeManager?.applicationLocales = if (tag.isEmpty()) {
+                                android.os.LocaleList.getEmptyLocaleList()
+                            } else {
+                                android.os.LocaleList.forLanguageTags(tag)
                             }
-                            .padding(vertical = 10.dp),
-                    )
-                }
+                            showLanguagePicker = false
+                        }
+                        .padding(vertical = 10.dp),
+                )
             }
         }
     }
 
     if (showRepliesEditor) {
-        androidx.activity.compose.BackHandler { showRepliesEditor = false }
-        var newReply by androidx.compose.runtime.remember {
+        var newReply by androidx.compose.runtime.saveable.rememberSaveable {
             androidx.compose.runtime.mutableStateOf("")
         }
-        Box(
-            Modifier
-                .fillMaxSize()
-                .background(Metro.Background.copy(alpha = 0.97f))
-                .clickable(
-                    interactionSource = androidx.compose.runtime.remember {
-                        androidx.compose.foundation.interaction.MutableInteractionSource()
-                    },
-                    indication = null,
-                ) { showRepliesEditor = false },
-        ) {
+        MetroDialog(onDismiss = { showRepliesEditor = false }, backdropAlpha = 0.97f) {
+            Text(
+                stringResource(R.string.settings_text_replies_title),
+                color = Metro.Foreground,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold,
+                letterSpacing = 1.sp,
+                modifier = Modifier.padding(bottom = 12.dp),
+            )
             Column(
                 Modifier
-                    .align(Alignment.Center)
-                    .fillMaxWidth()
-                    .padding(horizontal = 32.dp)
-                    .clickable(
-                        interactionSource = androidx.compose.runtime.remember {
-                            androidx.compose.foundation.interaction.MutableInteractionSource()
-                        },
-                        indication = null,
-                    ) { /* consume so taps inside don't dismiss */ },
+                    .heightIn(max = 340.dp)
+                    .verticalScroll(rememberScrollState()),
             ) {
-                Text(
-                    stringResource(R.string.settings_text_replies_title),
-                    color = Metro.Foreground,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    letterSpacing = 1.sp,
-                    modifier = Modifier.padding(bottom = 12.dp),
-                )
-                Column(
-                    Modifier
-                        .heightIn(max = 340.dp)
-                        .verticalScroll(rememberScrollState()),
-                ) {
-                    replies.forEach { message ->
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 5.dp),
-                        ) {
-                            Text(
-                                message,
-                                color = Metro.Foreground,
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Light,
-                                modifier = Modifier.weight(1f),
-                            )
-                            Text(
-                                "✕",
-                                color = Metro.Subtle,
-                                fontSize = 18.sp,
-                                modifier = Modifier
-                                    .clickable {
-                                        AppPrefs.setRejectMessages(context, replies - message)
-                                    }
-                                    .padding(start = 10.dp),
-                            )
-                        }
+                replies.forEachIndexed { index, message ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(
+                            message,
+                            color = Metro.Foreground,
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Light,
+                            modifier = Modifier.weight(1f),
+                        )
+                        MetroCloseMark(
+                            stringResource(R.string.ui_remove),
+                            fontSize = 18.sp,
+                        ) { confirmDeleteReply = index }
                     }
                 }
-                Spacer(Modifier.height(10.dp))
-                MetroTextBox(
-                    newReply,
-                    { newReply = it },
-                    accent.color,
-                    placeholder = stringResource(R.string.settings_new_reply_placeholder),
-                )
-                Spacer(Modifier.height(8.dp))
-                MetroButton(
-                    stringResource(R.string.settings_add_reply_button),
-                    enabled = newReply.isNotBlank(),
-                ) {
-                    AppPrefs.setRejectMessages(context, replies + newReply.trim())
-                    newReply = ""
-                }
+            }
+            Spacer(Modifier.height(10.dp))
+            MetroTextBox(
+                newReply,
+                { newReply = it },
+                accent.color,
+                placeholder = stringResource(R.string.settings_new_reply_placeholder),
+            )
+            Spacer(Modifier.height(8.dp))
+            MetroButton(
+                stringResource(R.string.settings_add_reply_button),
+                enabled = newReply.isNotBlank(),
+            ) {
+                AppPrefs.setRejectMessages(context, replies + newReply.trim())
+                newReply = ""
             }
         }
+    }
+
+    // After the replies editor so it stacks (and takes back) above it.
+    confirmDeleteReply?.let { index ->
+        MetroConfirm(
+            title = stringResource(R.string.settings_confirm_delete_reply),
+            message = replies.getOrNull(index),
+            confirmLabel = stringResource(R.string.main_button_delete),
+            cancelLabel = stringResource(R.string.main_button_cancel),
+            onConfirm = {
+                confirmDeleteReply = null
+                // By position: identical templates must not all vanish.
+                AppPrefs.setRejectMessages(context, replies.filterIndexed { i, _ -> i != index })
+            },
+            onCancel = { confirmDeleteReply = null },
+        )
+    }
+
+    confirmUnblock?.let { (rowId, number) ->
+        val unblockScope = androidx.compose.runtime.rememberCoroutineScope()
+        MetroConfirm(
+            title = stringResource(R.string.settings_confirm_unblock),
+            message = Repo.pretty(context, number),
+            confirmLabel = stringResource(R.string.settings_unblock),
+            cancelLabel = stringResource(R.string.main_button_cancel),
+            confirmFill = accent.color,
+            onConfirm = {
+                unblockScope.launch {
+                    Repo.unblockNumber(context, rowId)
+                    blockedTick++
+                    confirmUnblock = null
+                }
+            },
+            onCancel = { confirmUnblock = null },
+        )
     }
     }
 }

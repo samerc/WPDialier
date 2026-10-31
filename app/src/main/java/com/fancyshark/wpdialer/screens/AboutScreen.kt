@@ -30,6 +30,7 @@ private const val PRIVACY_URL = "https://github.com/samerc/WPDialier/blob/main/P
 
 @Composable
 fun AboutScreen(accent: Accent) {
+    val accentText = Metro.textAccent(accent.color)
     val context = LocalContext.current
     val version = remember {
         runCatching {
@@ -60,7 +61,7 @@ fun AboutScreen(accent: Accent) {
 
         Text(
             stringResource(R.string.about_app_name),
-            color = accent.color,
+            color = accentText,
             fontSize = 40.sp,
             fontWeight = FontWeight.Light,
         )
@@ -79,7 +80,7 @@ fun AboutScreen(accent: Accent) {
             fontSize = 25.sp,
             fontWeight = FontWeight.Light,
         )
-        Text(version, color = accent.color, fontSize = 15.sp)
+        Text(version, color = accentText, fontSize = 15.sp)
 
         // Tip jar — appears only when Play returns configured products
         // (hidden on devices without Play or until Console setup is done).
@@ -96,7 +97,7 @@ fun AboutScreen(accent: Accent) {
             )
             Text(
                 stringResource(R.string.about_tip_hint),
-                color = accent.color,
+                color = accentText,
                 fontSize = 15.sp,
             )
             tipProducts.forEach { product ->
@@ -124,7 +125,7 @@ fun AboutScreen(accent: Accent) {
             if (thanked) {
                 Text(
                     stringResource(R.string.about_tip_thanks),
-                    color = accent.color,
+                    color = accentText,
                     fontSize = 16.sp,
                     modifier = Modifier.padding(top = 4.dp),
                 )
@@ -159,7 +160,7 @@ fun AboutScreen(accent: Accent) {
                 fontSize = 25.sp,
                 fontWeight = FontWeight.Light,
             )
-            Text(CONTACT_EMAIL, color = accent.color, fontSize = 15.sp)
+            Text(CONTACT_EMAIL, color = accentText, fontSize = 15.sp)
         }
 
         Spacer(Modifier.height(22.dp))
@@ -205,7 +206,7 @@ fun AboutScreen(accent: Accent) {
             )
             Text(
                 stringResource(R.string.about_report_hint),
-                color = accent.color,
+                color = accentText,
                 fontSize = 15.sp,
             )
         }
@@ -234,7 +235,7 @@ fun AboutScreen(accent: Accent) {
             )
             Text(
                 stringResource(R.string.about_privacy_hint),
-                color = accent.color,
+                color = accentText,
                 fontSize = 15.sp,
             )
         }

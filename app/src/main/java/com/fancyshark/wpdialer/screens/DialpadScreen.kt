@@ -18,6 +18,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -99,12 +102,17 @@ object DialpadBus {
     val events = kotlinx.coroutines.flow.MutableSharedFlow<String>(extraBufferCapacity = 16)
 }
 
+/**
+ * [onCall] gets the number plus an `onPlaced` callback the host runs once the
+ * call really went out — the typed number is only consumed then, so a
+ * cancelled SIM chooser or a denied permission keeps it on the pad.
+ */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun DialpadScreen(
     initial: String,
     accent: Color,
-    onCall: (String) -> Unit,
+    onCall: (number: String, onPlaced: () -> Unit) -> Unit,
     onSave: (String) -> Unit,
     onVoicemail: (() -> Unit)? = null,
 ) {
@@ -138,8 +146,7 @@ fun DialpadScreen(
                     // Consume the number once dialed — coming back to the
                     // dialpad after the call should start fresh.
                     val n = number
-                    number = ""
-                    onCall(n)
+                    onCall(n) { if (number == n) number = "" }
                 }
                 else -> {
                     beep(event)
@@ -150,6 +157,12 @@ fun DialpadScreen(
         }
     }
 
+    androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize()) {
+    // Short windows (split screen, landscape tablets) shrink the keys so the
+    // call tile always stays on screen: fixed chrome is ~136dp + 5 key rows.
+    val compact = maxHeight < 560.dp
+    val chrome = if (compact) 100.dp else 136.dp
+    val keyHeight = ((maxHeight - chrome - 24.dp) / 5).coerceIn(36.dp, 64.dp)
     Column(
         Modifier
             .fillMaxSize()
@@ -162,7 +175,9 @@ fun DialpadScreen(
                 androidx.compose.ui.unit.LayoutDirection.Ltr,
         ) {
         Row(
-            Modifier.padding(top = 26.dp, bottom = 14.dp).height(64.dp),
+            Modifier
+                .padding(top = if (compact) 8.dp else 26.dp, bottom = if (compact) 4.dp else 14.dp)
+                .height(64.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
@@ -238,8 +253,8 @@ fun DialpadScreen(
                     Modifier
                         .fillMaxWidth()
                         .clickable {
-                            number = ""
-                            onCall(entry.number)
+                            val typed = number
+                            onCall(entry.number) { if (number == typed) number = "" }
                         }
                         .padding(horizontal = 10.dp, vertical = 6.dp),
                 ) {
@@ -252,7 +267,7 @@ fun DialpadScreen(
                     )
                     Text(
                         com.fancyshark.wpdialer.data.Repo.pretty(context, entry.number),
-                        color = accent,
+                        color = Metro.textAccent(accent),
                         fontSize = 14.sp,
                     )
                 }
@@ -272,6 +287,7 @@ fun DialpadScreen(
                             digit = digit,
                             letters = letters,
                             accent = accent,
+                            height = keyHeight,
                             modifier = Modifier.weight(1f),
                             onTap = {
                                 beep(digit)
@@ -307,25 +323,31 @@ fun DialpadScreen(
 
         Spacer(Modifier.height(5.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-            CallTile(accent, modifier = Modifier.weight(2f)) {
+            CallTile(accent, height = keyHeight, modifier = Modifier.weight(2f)) {
                 if (number.isNotBlank()) {
                     val n = number
-                    number = ""
-                    onCall(n)
+                    // Cleared only if the pad still shows what was dialed.
+                    onCall(n) { if (number == n) number = "" }
                 }
             }
-            SaveTile(accent, modifier = Modifier.weight(1f)) {
+            SaveTile(accent, height = keyHeight, modifier = Modifier.weight(1f)) {
                 if (number.isNotBlank()) onSave(number)
             }
         }
         }
         Spacer(Modifier.height(12.dp))
     }
+    }
 }
 
 /** WP 8.1 keypad call button: accent-filled tile spanning two key columns. */
 @Composable
-private fun CallTile(accent: Color, modifier: Modifier = Modifier, onClick: () -> Unit) {
+private fun CallTile(
+    accent: Color,
+    height: androidx.compose.ui.unit.Dp,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val focused by interaction.collectIsFocusedAsState()
@@ -333,7 +355,7 @@ private fun CallTile(accent: Color, modifier: Modifier = Modifier, onClick: () -
     Box(
         modifier
             .metroTilt(tiltOn)
-            .height(64.dp)
+            .heightIn(min = height)
             .background(if (pressed) Metro.Foreground else accent)
             .then(if (focused) Modifier.border(3.dp, Metro.Foreground) else Modifier)
             .clickable(
@@ -344,15 +366,21 @@ private fun CallTile(accent: Color, modifier: Modifier = Modifier, onClick: () -
     ) {
         Text(
             stringResource(com.fancyshark.wpdialer.R.string.dialpad_call),
-            color = if (pressed) Metro.Background else Color.White,
+            color = if (pressed) Metro.Background else Metro.onAccent(accent),
             fontSize = 16.sp,
+            maxLines = 1,
         )
     }
 }
 
 /** WP 8.1 keypad save button: gray key tile with icon and small label. */
 @Composable
-private fun SaveTile(accent: Color, modifier: Modifier = Modifier, onClick: () -> Unit) {
+private fun SaveTile(
+    accent: Color,
+    height: androidx.compose.ui.unit.Dp,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val focused by interaction.collectIsFocusedAsState()
@@ -360,7 +388,7 @@ private fun SaveTile(accent: Color, modifier: Modifier = Modifier, onClick: () -
     Box(
         modifier
             .metroTilt(tiltOn)
-            .height(64.dp)
+            .heightIn(min = height)
             .background(if (pressed) accent else Metro.Key)
             .then(if (focused) Modifier.border(3.dp, accent) else Modifier)
             .clickable(
@@ -376,12 +404,18 @@ private fun SaveTile(accent: Color, modifier: Modifier = Modifier, onClick: () -
                 tint = Metro.Foreground,
                 modifier = Modifier.size(20.dp),
             )
-            Text(
-                stringResource(com.fancyshark.wpdialer.R.string.dialpad_save),
-                color = Metro.Foreground,
-                fontSize = 11.sp,
-                modifier = Modifier.padding(top = 2.dp),
-            )
+            // Hidden on the shortest keys — the icon alone still fits.
+            if (height >= 48.dp) {
+                Text(
+                    stringResource(com.fancyshark.wpdialer.R.string.dialpad_save),
+                    color = Metro.Foreground,
+                    fontSize = 11.sp,
+                    maxLines = 1,
+                    modifier = Modifier
+                        .padding(top = 2.dp)
+                        .clearAndSetSemantics {},
+                )
+            }
         }
     }
 }
@@ -392,6 +426,7 @@ private fun DialKey(
     digit: String,
     letters: String,
     accent: Color,
+    height: androidx.compose.ui.unit.Dp,
     modifier: Modifier = Modifier,
     onTap: () -> Unit,
     onLongPress: (() -> Unit)? = null,
@@ -403,7 +438,8 @@ private fun DialKey(
     Box(
         modifier
             .metroTilt(tiltOn)
-            .height(64.dp)
+            // min, not fixed: at 200% font the digit + letters need more.
+            .heightIn(min = height)
             .background(if (pressed) accent else Metro.Key)
             .then(if (focused) Modifier.border(3.dp, accent) else Modifier)
             .combinedClickable(
@@ -417,16 +453,20 @@ private fun DialKey(
         Row(verticalAlignment = Alignment.CenterVertically) {
             // Fixed-width digit and letter slots so digits line up in a
             // column across all keys, letters trailing at a shared offset.
-            Box(Modifier.width(34.dp), contentAlignment = Alignment.CenterEnd) {
+            // Min widths: large font scales widen the slots instead of
+            // wrapping "WXYZ" or clipping the digit.
+            Box(Modifier.widthIn(min = 34.dp), contentAlignment = Alignment.CenterEnd) {
                 Text(
                     digit,
                     color = Metro.Foreground,
                     fontSize = 30.sp,
                     fontWeight = FontWeight.Light,
+                    maxLines = 1,
+                    softWrap = false,
                 )
             }
             Box(
-                Modifier.width(52.dp).padding(start = 5.dp),
+                Modifier.widthIn(min = 52.dp).padding(start = 5.dp),
                 contentAlignment = Alignment.CenterStart,
             ) {
                 if (letters.isNotEmpty()) {
@@ -435,6 +475,8 @@ private fun DialKey(
                         color = if (pressed) Metro.Foreground else Metro.Subtle,
                         fontSize = 10.sp,
                         letterSpacing = 1.sp,
+                        maxLines = 1,
+                        softWrap = false,
                         modifier = Modifier.padding(top = 8.dp),
                     )
                 }

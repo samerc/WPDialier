@@ -1,6 +1,5 @@
 package com.fancyshark.wpdialer.screens
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -21,6 +20,7 @@ import androidx.compose.ui.unit.sp
 import com.fancyshark.wpdialer.R
 import com.fancyshark.wpdialer.ui.Metro
 import com.fancyshark.wpdialer.ui.MetroButton
+import com.fancyshark.wpdialer.ui.MetroOverlay
 
 /**
  * One-shot page shown on the first open after an app update (never on a
@@ -29,11 +29,11 @@ import com.fancyshark.wpdialer.ui.MetroButton
  */
 @Composable
 fun WhatsNewScreen(accent: Color, versionName: String, onDone: () -> Unit) {
-    androidx.activity.compose.BackHandler { onDone() }
+    // Full-screen and touch-blocking: nothing beneath may react to taps.
+    MetroOverlay(onBack = onDone) {
     Column(
         Modifier
             .fillMaxSize()
-            .background(Metro.Background)
             .padding(horizontal = 24.dp, vertical = 28.dp),
     ) {
         Text(
@@ -68,7 +68,7 @@ fun WhatsNewScreen(accent: Color, versionName: String, onDone: () -> Unit) {
                 Row(Modifier.padding(vertical = 7.dp)) {
                     Text(
                         "■",
-                        color = accent,
+                        color = Metro.textAccent(accent),
                         fontSize = 11.sp,
                         modifier = Modifier.padding(top = 7.dp, end = 12.dp),
                     )
@@ -88,5 +88,6 @@ fun WhatsNewScreen(accent: Color, versionName: String, onDone: () -> Unit) {
             fill = accent,
             modifier = Modifier.fillMaxWidth(),
         ) { onDone() }
+    }
     }
 }

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Shared UI: accessibility labels, discard + confirm overlays -->
+    <string name="ui_close">إغلاق</string>
+    <string name="ui_remove">إزالة</string>
+    <string name="ui_more_options">مزيد من الخيارات</string>
+    <string name="ui_add_photo">إضافة صورة</string>
+    <string name="editor_discard_title">تجاهل التغييرات؟</string>
+    <string name="editor_discard_message">لم يتم حفظ تعديلاتك</string>
+    <string name="editor_discard_button">تجاهل</string>
+    <string name="editor_keep_editing">متابعة التعديل</string>
+    <string name="editcontact_load_failed">تعذّر فتح جهة الاتصال هذه</string>
+    <string name="home_confirm_remove_speed_dial">إزالة من الاتصال السريع؟</string>
+    <string name="settings_confirm_delete_reply">حذف هذا الرد؟</string>
+    <string name="settings_confirm_unblock">إلغاء حظر هذا الرقم؟</string>
+</resources>

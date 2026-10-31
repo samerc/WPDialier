@@ -1,6 +1,5 @@
 package com.fancyshark.wpdialer.screens
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -9,7 +8,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.background
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -27,6 +25,7 @@ import androidx.compose.ui.unit.sp
 import com.fancyshark.wpdialer.R
 import com.fancyshark.wpdialer.ui.Metro
 import com.fancyshark.wpdialer.ui.MetroButton
+import com.fancyshark.wpdialer.ui.MetroOverlay
 
 /**
  * First-run setup, WP8 out-of-box style: role first (its grant carries most
@@ -44,6 +43,7 @@ fun SetupWizardScreen(
     onRequestPermissions: () -> Unit,
     onOpenBannerSetting: () -> Unit,
     onFinish: () -> Unit,
+    onExit: () -> Unit,
 ) {
     var step by rememberSaveable { mutableIntStateOf(0) }
     val wizardContext = androidx.compose.ui.platform.LocalContext.current
@@ -76,12 +76,14 @@ fun SetupWizardScreen(
         if (step == 3 && canUseFullScreen) step = 4
     }
 
-    BackHandler(enabled = step > 0) { stepBack() }
-
+    // Covers the whole app: swallows touches meant for the screens beneath
+    // and owns back on every page — the welcome page hands back to the
+    // host ([onExit]: close a Settings re-run, or leave the app), so back
+    // never pops screens hidden under the wizard.
+    MetroOverlay(onBack = { if (step > 0) stepBack() else onExit() }) {
     Column(
         Modifier
             .fillMaxSize()
-            .background(Metro.Background)
             .padding(horizontal = 24.dp, vertical = 28.dp),
     ) {
         Text(
@@ -192,5 +194,6 @@ fun SetupWizardScreen(
                 modifier = Modifier.fillMaxWidth(),
             ) { onFinish() }
         }
+    }
     }
 }

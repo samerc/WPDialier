@@ -1,17 +1,12 @@
 package com.fancyshark.wpdialer.screens
 
-import android.app.DatePickerDialog
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -29,14 +24,13 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Place
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -45,7 +39,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -60,41 +53,47 @@ import com.fancyshark.wpdialer.data.Countries
 import com.fancyshark.wpdialer.data.Region
 import com.fancyshark.wpdialer.ui.Metro
 import com.fancyshark.wpdialer.ui.MetroButton
+import com.fancyshark.wpdialer.ui.MetroCloseMark
+import com.fancyshark.wpdialer.ui.MetroConfirm
+import com.fancyshark.wpdialer.ui.MetroOverlay
 import com.fancyshark.wpdialer.ui.MetroTextBox
-import java.io.ByteArrayOutputStream
-import java.util.Calendar
+import com.fancyshark.wpdialer.ui.hiddenFromAccessibility
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-private data class TypedEntry(
-    val value: String,
-    val typeIdx: Int,
-    val customLabel: String = "",
-)
-
+/**
+ * [onDirtyChange] reports whether the form holds unsaved input, so the host
+ * can keep the editor alive when a dial intent arrives.
+ */
 @Composable
 fun NewContactScreen(
     accent: Color,
     initialNumber: String = "",
     onDone: () -> Unit,
+    onDirtyChange: (Boolean) -> Unit = {},
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    val accentText = Metro.textAccent(accent)
     val accounts by produceState(listOf(ContactAccount(null, null))) {
         value = ContactEditor.listAccounts(context)
     }
-    var selectedAccount by remember { mutableStateOf<ContactAccount?>(null) }
+    // Form state is saveable: the photo/map/location round trips can cost
+    // the process, and the typed input must survive that.
+    var selectedAccount by rememberSaveable(stateSaver = ContactAccountSaver) {
+        mutableStateOf<ContactAccount?>(null)
+    }
     val chosen = selectedAccount ?: accounts.first()
 
     val regions = remember { Countries.all() }
-    var regionCode by remember { mutableStateOf(Countries.defaultRegionCode(context)) }
+    var regionCode by rememberSaveable { mutableStateOf(Countries.defaultRegionCode(context)) }
     val region = regions.firstOrNull { it.code == regionCode }
 
-    var name by remember { mutableStateOf("") }
-    var note by remember { mutableStateOf("") }
-    var address by remember { mutableStateOf("") }
-    var photoUri by remember { mutableStateOf<Uri?>(null) }
+    var name by rememberSaveable { mutableStateOf("") }
+    var note by rememberSaveable { mutableStateOf("") }
+    var address by rememberSaveable { mutableStateOf("") }
+    var photoUri by rememberSaveable { mutableStateOf<Uri?>(null) }
     val photoPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.GetContent(),
     ) { uri -> if (uri != null) photoUri = uri }
@@ -105,17 +104,37 @@ fun NewContactScreen(
         }
     }
 
-    val phones = remember {
+    val phones = rememberSaveable(saver = TypedEntryListSaver) {
         mutableListOf(TypedEntry(initialNumber, 0)).toMutableStateList()
     }
-    val emails = remember { mutableListOf<TypedEntry>().toMutableStateList() }
-    val events = remember { mutableListOf<TypedEntry>().toMutableStateList() }
+    val emails = rememberSaveable(saver = TypedEntryListSaver) {
+        mutableListOf<TypedEntry>().toMutableStateList()
+    }
+    val events = rememberSaveable(saver = TypedEntryListSaver) {
+        mutableListOf<TypedEntry>().toMutableStateList()
+    }
     var saving by remember { mutableStateOf(false) }
     var saveFailed by remember { mutableStateOf(false) }
-    var showAccountPicker by remember { mutableStateOf(false) }
-    var showCountryPicker by remember { mutableStateOf(false) }
-    var showMapPicker by remember { mutableStateOf(false) }
+    var showAccountPicker by rememberSaveable { mutableStateOf(false) }
+    var showCountryPicker by rememberSaveable { mutableStateOf(false) }
+    var showMapPicker by rememberSaveable { mutableStateOf(false) }
+    var confirmDiscard by rememberSaveable { mutableStateOf(false) }
     var locating by remember { mutableStateOf(false) }
+
+    // Anything typed beyond the prefilled number counts as unsaved input.
+    val dirty = name.isNotBlank() || note.isNotBlank() || address.isNotBlank() ||
+        photoUri != null ||
+        phones.withIndex().any { (i, p) ->
+            p.value.isNotBlank() && !(i == 0 && p.value == initialNumber)
+        } ||
+        emails.any { it.value.isNotBlank() } ||
+        events.any { it.value.isNotEmpty() }
+    LaunchedEffect(dirty) { onDirtyChange(dirty) }
+    fun requestClose() {
+        if (dirty) confirmDiscard = true else onDone()
+    }
+    // Registered before the pickers' handlers, so an open picker closes first.
+    BackHandler(enabled = dirty) { confirmDiscard = true }
     val locationPermission = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions(),
     ) { grants ->
@@ -133,7 +152,14 @@ fun NewContactScreen(
     }
 
     Box(Modifier.fillMaxSize()) {
-        Column(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .hiddenFromAccessibility(
+                    showAccountPicker || showCountryPicker || showMapPicker || confirmDiscard,
+                )
+                .padding(horizontal = 20.dp),
+        ) {
             Text(
                 stringResource(
                     com.fancyshark.wpdialer.R.string.newcontact_title,
@@ -167,32 +193,11 @@ fun NewContactScreen(
                         modifier = Modifier.weight(1f),
                     )
                     Spacer(Modifier.width(10.dp))
-                    Box(
-                        Modifier
-                            .size(76.dp)
-                            .background(accent)
-                            .clickable { photoPicker.launch("image/*") },
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        val preview = photoPreview
-                        if (preview != null) {
-                            Image(
-                                preview,
-                                contentDescription = stringResource(
-                                    com.fancyshark.wpdialer.R.string.newcontact_change_photo,
-                                ),
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.size(76.dp),
-                            )
-                        } else {
-                            Text(
-                                "+",
-                                color = Color.White,
-                                fontSize = 34.sp,
-                                fontWeight = FontWeight.Light,
-                            )
-                        }
-                    }
+                    PhotoTile(
+                        photoPreview,
+                        accent,
+                        stringResource(com.fancyshark.wpdialer.R.string.newcontact_change_photo),
+                    ) { photoPicker.launch("image/*") }
                 }
 
                 FieldLabel(stringResource(com.fancyshark.wpdialer.R.string.newcontact_save_to))
@@ -233,36 +238,13 @@ fun NewContactScreen(
                 events.forEachIndexed { i, entry ->
                     FieldLabel(stringResource(com.fancyshark.wpdialer.R.string.newcontact_date))
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            Modifier
-                                .weight(1f)
-                                .border(2.dp, Metro.Foreground)
-                                .clickable {
-                                    val cal = Calendar.getInstance()
-                                    DatePickerDialog(
-                                        context,
-                                        { _, y, m, day ->
-                                            events[i] = entry.copy(
-                                                value = "%04d-%02d-%02d".format(y, m + 1, day),
-                                            )
-                                        },
-                                        cal.get(Calendar.YEAR),
-                                        cal.get(Calendar.MONTH),
-                                        cal.get(Calendar.DAY_OF_MONTH),
-                                    ).show()
-                                }
-                                .padding(horizontal = 10.dp, vertical = 12.dp),
-                        ) {
-                            Text(
-                                entry.value.ifEmpty {
-                                    stringResource(
-                                        com.fancyshark.wpdialer.R.string.newcontact_pick_a_date,
-                                    )
-                                },
-                                color = if (entry.value.isEmpty()) Metro.Subtle else Metro.Foreground,
-                                fontSize = 18.sp,
-                            )
-                        }
+                        DateField(
+                            value = entry.value,
+                            placeholder = stringResource(
+                                com.fancyshark.wpdialer.R.string.newcontact_pick_a_date,
+                            ),
+                            modifier = Modifier.weight(1f),
+                        ) { picked -> events[i] = entry.copy(value = picked) }
                         Spacer(Modifier.width(8.dp))
                         WpDropdown(
                             current = typeKeyLabel(ContactEditor.EVENT_TYPES[entry.typeIdx].first),
@@ -429,12 +411,11 @@ fun NewContactScreen(
                 MetroButton(
                     stringResource(com.fancyshark.wpdialer.R.string.newcontact_cancel),
                     modifier = Modifier.weight(1f),
-                ) { onDone() }
+                ) { requestClose() }
             }
         }
 
         if (showAccountPicker) {
-            BackHandler { showAccountPicker = false }
             FullScreenPicker(
                 title = stringResource(com.fancyshark.wpdialer.R.string.newcontact_save_to_caps),
                 onDismiss = { showAccountPicker = false },
@@ -452,7 +433,7 @@ fun NewContactScreen(
                     ) {
                         Text(
                             accountKindLabel(account.kindLabel),
-                            color = if (selected) accent else Metro.Foreground,
+                            color = if (selected) accentText else Metro.Foreground,
                             fontSize = 26.sp,
                             fontWeight = FontWeight.Light,
                         )
@@ -470,7 +451,6 @@ fun NewContactScreen(
         }
 
         if (showMapPicker) {
-            BackHandler { showMapPicker = false }
             MapPinPicker(
                 accent = accent,
                 onCancel = { showMapPicker = false },
@@ -482,8 +462,7 @@ fun NewContactScreen(
         }
 
         if (showCountryPicker) {
-            BackHandler { showCountryPicker = false }
-            var query by remember { mutableStateOf("") }
+            var query by rememberSaveable { mutableStateOf("") }
             FullScreenPicker(
                 title = stringResource(com.fancyshark.wpdialer.R.string.newcontact_country_caps),
                 onDismiss = { showCountryPicker = false },
@@ -507,7 +486,7 @@ fun NewContactScreen(
                         val r = filtered[i]
                         Text(
                             r.label,
-                            color = if (r.code == regionCode) accent else Metro.Foreground,
+                            color = if (r.code == regionCode) accentText else Metro.Foreground,
                             fontSize = 21.sp,
                             fontWeight = FontWeight.Light,
                             modifier = Modifier
@@ -521,6 +500,22 @@ fun NewContactScreen(
                     }
                 }
             }
+        }
+
+        if (confirmDiscard) {
+            MetroConfirm(
+                title = stringResource(com.fancyshark.wpdialer.R.string.editor_discard_title),
+                message = stringResource(com.fancyshark.wpdialer.R.string.editor_discard_message),
+                confirmLabel = stringResource(
+                    com.fancyshark.wpdialer.R.string.editor_discard_button,
+                ),
+                cancelLabel = stringResource(com.fancyshark.wpdialer.R.string.editor_keep_editing),
+                onConfirm = {
+                    confirmDiscard = false
+                    onDone()
+                },
+                onCancel = { confirmDiscard = false },
+            )
         }
     }
 }
@@ -561,10 +556,11 @@ private fun MapPinPicker(
         onDispose { mapView.onDetach() }
     }
 
-    Column(Modifier.fillMaxSize().background(Metro.Background)) {
+    MetroOverlay(onBack = onCancel) {
+    Column(Modifier.fillMaxSize()) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp),
+            modifier = Modifier.padding(start = 20.dp, end = 8.dp, top = 2.dp, bottom = 2.dp),
         ) {
             Text(
                 stringResource(com.fancyshark.wpdialer.R.string.newcontact_pick_a_location),
@@ -574,17 +570,9 @@ private fun MapPinPicker(
                 letterSpacing = 1.sp,
                 modifier = Modifier.weight(1f),
             )
-            Text(
-                "✕",
-                color = Metro.Subtle,
-                fontSize = 20.sp,
-                modifier = Modifier
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                    ) { onCancel() }
-                    .padding(6.dp),
-            )
+            MetroCloseMark(stringResource(com.fancyshark.wpdialer.R.string.ui_close)) {
+                onCancel()
+            }
         }
         Box(Modifier.weight(1f).fillMaxWidth()) {
             androidx.compose.ui.viewinterop.AndroidView(
@@ -622,7 +610,10 @@ private fun MapPinPicker(
                     val center = mapView.mapCenter
                     val addr = com.fancyshark.wpdialer.data.Geo.reverseGeocode(
                         context, center.latitude, center.longitude,
-                    ) ?: "%.5f, %.5f".format(center.latitude, center.longitude)
+                    ) ?: String.format(
+                        // Stored text: ASCII digits and "." decimals in any locale.
+                        java.util.Locale.ROOT, "%.5f, %.5f", center.latitude, center.longitude,
+                    )
                     onPicked(addr)
                 }
             }
@@ -632,9 +623,10 @@ private fun MapPinPicker(
             ) { onCancel() }
         }
     }
+    }
 }
 
-/** Full-screen Metro picker overlay. */
+/** Full-screen Metro picker overlay; back and the close mark dismiss it. */
 @Composable
 private fun FullScreenPicker(
     title: String,
@@ -642,38 +634,29 @@ private fun FullScreenPicker(
     header: @Composable () -> Unit = {},
     content: @Composable () -> Unit,
 ) {
-    Column(
-        Modifier
-            .fillMaxSize()
-            .background(Metro.Background)
-            .padding(horizontal = 20.dp),
-    ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(top = 18.dp, bottom = 14.dp),
-        ) {
-            Text(
-                title,
-                color = Metro.Foreground,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.SemiBold,
-                letterSpacing = 1.sp,
-                modifier = Modifier.weight(1f),
-            )
-            Text(
-                "✕",
-                color = Metro.Subtle,
-                fontSize = 20.sp,
-                modifier = Modifier
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                    ) { onDismiss() }
-                    .padding(6.dp),
-            )
+    MetroOverlay(onBack = onDismiss) {
+        Column(Modifier.fillMaxSize().padding(start = 20.dp, end = 8.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(top = 6.dp, bottom = 2.dp),
+            ) {
+                Text(
+                    title,
+                    color = Metro.Foreground,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    letterSpacing = 1.sp,
+                    modifier = Modifier.weight(1f),
+                )
+                MetroCloseMark(stringResource(com.fancyshark.wpdialer.R.string.ui_close)) {
+                    onDismiss()
+                }
+            }
+            Column(Modifier.padding(end = 12.dp)) {
+                header()
+                content()
+            }
         }
-        header()
-        content()
     }
 }
 
@@ -713,46 +696,8 @@ private fun MetroSelector(
                 )
             }
         }
-        Text("▾", color = accent, fontSize = 18.sp)
+        Text("▾", color = Metro.textAccent(accent), fontSize = 18.sp)
     }
-}
-
-@Composable
-private fun FieldLabel(text: String) {
-    Spacer(Modifier.height(14.dp))
-    Text(text, color = Metro.Subtle, fontSize = 14.sp)
-    Spacer(Modifier.height(4.dp))
-}
-
-@Composable
-private fun AddLink(text: String, accent: Color, onClick: () -> Unit) {
-    Spacer(Modifier.height(10.dp))
-    Text(
-        "+ $text",
-        color = accent,
-        fontSize = 17.sp,
-        modifier = Modifier
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-            ) { onClick() }
-            .padding(vertical = 4.dp),
-    )
-}
-
-@Composable
-private fun RemoveMark(onClick: () -> Unit) {
-    Text(
-        "✕",
-        color = Metro.Subtle,
-        fontSize = 20.sp,
-        modifier = Modifier
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-            ) { onClick() }
-            .padding(start = 10.dp, end = 2.dp),
-    )
 }
 
 @Composable
@@ -801,83 +746,3 @@ private fun TypedSection(
         accent,
     ) { entries.add(TypedEntry("", 0)) }
 }
-
-/** WP-style dropdown: white select box that opens a menu of options. */
-@Composable
-fun WpDropdown(
-    current: String,
-    options: List<String>,
-    onSelect: (Int) -> Unit,
-    modifier: Modifier = Modifier.fillMaxWidth(),
-) {
-    var expanded by remember { mutableStateOf(false) }
-    Box(modifier) {
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .border(2.dp, Metro.Foreground)
-                .clickable { expanded = true }
-                .padding(horizontal = 10.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                current,
-                color = Metro.Foreground,
-                fontSize = 16.sp,
-                maxLines = 1,
-                modifier = Modifier.weight(1f),
-            )
-            Text("▾", color = Metro.Foreground, fontSize = 14.sp)
-        }
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            options.forEachIndexed { i, option ->
-                DropdownMenuItem(
-                    text = { Text(option, fontSize = 16.sp) },
-                    onClick = {
-                        expanded = false
-                        onSelect(i)
-                    },
-                )
-            }
-        }
-    }
-}
-
-/**
- * Decodes an image bounded to roughly [maxSide] px using inSampleSize, so an
- * arbitrarily large gallery image can't exhaust memory.
- */
-private fun decodeSampled(context: android.content.Context, uri: Uri, maxSide: Int): Bitmap? =
-    runCatching {
-        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        context.contentResolver.openInputStream(uri)?.use {
-            BitmapFactory.decodeStream(it, null, bounds)
-        }
-        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
-        var sample = 1
-        while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= maxSide) sample *= 2
-        val opts = BitmapFactory.Options().apply { inSampleSize = sample }
-        context.contentResolver.openInputStream(uri)?.use {
-            BitmapFactory.decodeStream(it, null, opts)
-        }
-    }.getOrNull()
-
-private suspend fun loadPhotoBytes(context: android.content.Context, uri: Uri): ByteArray? =
-    withContext(Dispatchers.IO) {
-        runCatching {
-            val source = decodeSampled(context, uri, 720) ?: return@withContext null
-            val maxSide = 720
-            val scale = minOf(1f, maxSide.toFloat() / maxOf(source.width, source.height))
-            val bitmap = if (scale < 1f) {
-                Bitmap.createScaledBitmap(
-                    source,
-                    (source.width * scale).toInt().coerceAtLeast(1),
-                    (source.height * scale).toInt().coerceAtLeast(1),
-                    true,
-                )
-            } else source
-            val out = ByteArrayOutputStream()
-            bitmap.compress(Bitmap.CompressFormat.JPEG, 90, out)
-            out.toByteArray()
-        }.getOrNull()
-    }

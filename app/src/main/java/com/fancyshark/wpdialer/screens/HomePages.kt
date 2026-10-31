@@ -48,6 +48,7 @@ import com.fancyshark.wpdialer.data.HistoryItem
 import com.fancyshark.wpdialer.data.Repo
 import com.fancyshark.wpdialer.ui.ContactTile
 import com.fancyshark.wpdialer.ui.Metro
+import com.fancyshark.wpdialer.ui.MetroCloseMark
 import kotlinx.coroutines.launch
 
 @androidx.compose.runtime.Composable
@@ -66,6 +67,7 @@ fun HistoryPage(
     emptyText: String? = null,
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
+    val accentText = Metro.textAccent(accent)
     if (items.isEmpty()) {
         Text(
             // A filtered-empty list must not read like a wiped call log —
@@ -91,8 +93,15 @@ fun HistoryPage(
         val out = mutableListOf<MutableList<HistoryItem>>()
         items.forEach { item ->
             val last = out.lastOrNull()?.lastOrNull()
-            if (last != null && last.type == item.type &&
-                last.number.filter(Char::isDigit) == item.number.filter(Char::isDigit) &&
+            // Same line (national vs E.164 spellings unify); withheld calls
+            // have no number and group with each other.
+            val sameNumber = if (last == null) false
+            else if (last.number.isBlank() || item.number.isBlank()) {
+                last.number.isBlank() && item.number.isBlank()
+            } else {
+                Repo.numbersMatch(last.number, item.number)
+            }
+            if (last != null && last.type == item.type && sameNumber &&
                 sameDay(last.date, item.date)
             ) {
                 out.last() += item
@@ -134,7 +143,7 @@ fun HistoryPage(
                             ?: stringResource(com.fancyshark.wpdialer.R.string.home_unknown)
                         Text(
                             if (group.size > 1) "$label (${group.size})" else label,
-                            color = if (missed) accent else Metro.Foreground,
+                            color = if (missed) accentText else Metro.Foreground,
                             fontSize = 27.sp,
                             fontWeight = FontWeight.Light,
                             maxLines = 1,
@@ -311,9 +320,8 @@ fun CallDetailsScreen(
     onText: (String) -> Unit,
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
-    val digits = number.filter(Char::isDigit)
     val entries = remember(history, number) {
-        history.filter { it.number.filter(Char::isDigit) == digits }
+        history.filter { Repo.numbersMatch(it.number, number) }
     }
     Column(
         Modifier
@@ -342,7 +350,7 @@ fun CallDetailsScreen(
             overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
         )
         if (!name.isNullOrBlank()) {
-            Text(Repo.pretty(context, number), color = accent, fontSize = 15.sp)
+            Text(Repo.pretty(context, number), color = Metro.textAccent(accent), fontSize = 15.sp)
         }
         Spacer(Modifier.height(12.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
@@ -431,17 +439,10 @@ fun SpeedDialPage(
                     fontWeight = FontWeight.Light,
                     modifier = Modifier.weight(1f).padding(start = 12.dp),
                 )
-                Text(
-                    "✕",
-                    color = Metro.Subtle,
+                MetroCloseMark(
+                    stringResource(com.fancyshark.wpdialer.R.string.ui_remove),
                     fontSize = 18.sp,
-                    modifier = Modifier
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                        ) { onRemoveNumber(number) }
-                        .padding(8.dp),
-                )
+                ) { onRemoveNumber(number) }
             }
         }
         items(starred.chunked(2).size) { rowIndex ->
@@ -463,7 +464,7 @@ fun SpeedDialPage(
                             }
                             Text(
                                 contact.name,
-                                color = Color.White,
+                                color = Metro.onAccent(accent),
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.Normal,
                                 maxLines = 1,
@@ -481,11 +482,36 @@ fun SpeedDialPage(
     }
 }
 
-private const val JUMP_LETTERS = "#abcdefghijklmnopqrstuvwxyz"
+/**
+ * Jump-list buckets for the app locale plus Latin (so Arabic/Hindi names
+ * bucket under their own script while English names still land on a-z).
+ * Everything the index can't place goes under "#", which sorts first.
+ */
+private class JumpIndex(locale: java.util.Locale) {
+    private val index = android.icu.text.AlphabeticIndex<Any>(locale)
+        .addLabels(java.util.Locale.ENGLISH)
+        .buildImmutableIndex()
+    private val lower = locale
 
-private fun groupLetterOf(name: String): Char {
-    val c = name.firstOrNull()?.lowercaseChar() ?: '#'
-    return if (c in 'a'..'z') c else '#'
+    /** Grid tiles: "#" then every letter bucket in index order. */
+    val labels: List<String> = listOf("#") + (0 until index.bucketCount)
+        .map { index.getBucket(it) }
+        .filter { it.labelType == android.icu.text.AlphabeticIndex.Bucket.LabelType.NORMAL }
+        .map { it.label.lowercase(lower) }
+        .distinct()
+
+    /** (sort order, label) for [name]; "#" names sort before the letters. */
+    fun bucketOf(name: String): Pair<Int, String> {
+        val i = index.getBucketIndex(name)
+        val bucket = index.getBucket(i)
+        return if (name.isBlank() ||
+            bucket.labelType != android.icu.text.AlphabeticIndex.Bucket.LabelType.NORMAL
+        ) {
+            -1 to "#"
+        } else {
+            i to bucket.label.lowercase(lower)
+        }
+    }
 }
 
 @Composable
@@ -505,14 +531,18 @@ fun PeoplePage(
         return
     }
 
+    val locale = androidx.compose.ui.platform.LocalConfiguration.current.locales[0]
+    val jump = remember(locale) { JumpIndex(locale) }
     // Flatten into list entries and record where each letter group starts.
-    val entries = remember(contacts) {
-        val list = mutableListOf<Any>() // Char = group header, ContactItem = row
-        val positions = mutableMapOf<Char, Int>()
-        var current: Char? = null
-        contacts.sortedBy { groupLetterOf(it.name).let { c -> if (c == '#') ' ' else c } }
-            .forEach { contact ->
-                val letter = groupLetterOf(contact.name)
+    val entries = remember(contacts, jump) {
+        val list = mutableListOf<Any>() // String = group header, ContactItem = row
+        val positions = mutableMapOf<String, Int>()
+        var current: String? = null
+        // Stable sort: names keep the provider's collation within a bucket.
+        contacts.map { it to jump.bucketOf(it.name) }
+            .sortedBy { it.second.first }
+            .forEach { (contact, bucket) ->
+                val letter = bucket.second
                 if (letter != current) {
                     current = letter
                     positions[letter] = list.size
@@ -535,7 +565,7 @@ fun PeoplePage(
         ) {
             items(list.size) { i ->
                 when (val entry = list[i]) {
-                    is Char -> {
+                    is String -> {
                         Box(
                             Modifier
                                 .padding(top = 10.dp, bottom = 6.dp)
@@ -545,8 +575,8 @@ fun PeoplePage(
                             contentAlignment = Alignment.BottomStart,
                         ) {
                             Text(
-                                entry.toString(),
-                                color = Color.White,
+                                entry,
+                                color = Metro.onAccent(accent),
                                 fontSize = 20.sp,
                                 fontWeight = FontWeight.Bold,
                                 modifier = Modifier.padding(start = 5.dp),
@@ -589,7 +619,9 @@ fun PeoplePage(
                     .padding(8.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                JUMP_LETTERS.toList().chunked(4).forEach { row ->
+                // Latin + a second script can top 50 tiles — go 5 wide.
+                val columns = if (jump.labels.size > 30) 5 else 4
+                jump.labels.chunked(columns).forEach { row ->
                     Row(
                         Modifier.weight(1f).fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -608,15 +640,15 @@ fun PeoplePage(
                                 contentAlignment = Alignment.BottomStart,
                             ) {
                                 Text(
-                                    letter.toString(),
-                                    color = if (target != null) Color.White else Metro.Dim,
-                                    fontSize = 28.sp,
+                                    letter,
+                                    color = if (target != null) Metro.onAccent(accent) else Metro.Dim,
+                                    fontSize = if (columns > 4) 22.sp else 28.sp,
                                     fontWeight = FontWeight.Bold,
                                     modifier = Modifier.padding(start = 8.dp, bottom = 2.dp),
                                 )
                             }
                         }
-                        repeat(4 - row.size) { Spacer(Modifier.weight(1f)) }
+                        repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
                     }
                 }
             }

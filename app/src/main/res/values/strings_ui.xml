@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Shared UI: accessibility labels, discard + confirm overlays -->
+    <string name="ui_close">close</string>
+    <string name="ui_remove">remove</string>
+    <string name="ui_more_options">more options</string>
+    <string name="ui_add_photo">add photo</string>
+    <string name="editor_discard_title">discard changes?</string>
+    <string name="editor_discard_message">your edits haven\'t been saved</string>
+    <string name="editor_discard_button">discard</string>
+    <string name="editor_keep_editing">keep editing</string>
+    <string name="editcontact_load_failed">couldn\'t open this contact</string>
+    <string name="home_confirm_remove_speed_dial">remove from speed dial?</string>
+    <string name="settings_confirm_delete_reply">delete this reply?</string>
+    <string name="settings_confirm_unblock">unblock this number?</string>
+</resources>

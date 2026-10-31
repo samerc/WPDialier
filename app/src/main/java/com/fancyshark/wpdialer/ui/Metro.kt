@@ -28,6 +28,13 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
@@ -82,6 +89,85 @@ object Metro {
     val Chrome: Color get() = if (light) Color(0xFFDDDDDD) else Color(0xFF1F1F1F)
     val Key: Color get() = if (light) Color(0xFFE4E4E4) else Color(0xFF3A3A3A)
     val Red = Color(0xFFE51400)
+
+    /**
+     * [accent] as a TEXT color: unchanged on the dark theme (WP-authentic),
+     * blended toward black on the light theme until it reaches 4.5:1 against
+     * the white background — lime/yellow/amber text on white is ~2:1.
+     */
+    fun textAccent(accent: Color): Color {
+        if (!light) return accent
+        val bg = Background
+        var c = accent
+        var step = 0
+        while (contrast(c, bg) < 4.5f && step < 20) {
+            c = lerp(accent, Color.Black, (++step) * 0.05f)
+        }
+        return c
+    }
+
+    /** Text color on an accent-filled tile: white unless that drops below 3:1. */
+    fun onAccent(fill: Color): Color =
+        if (contrast(Color.White, fill) < 3f) Color.Black else Color.White
+
+    /** WCAG contrast ratio of two opaque colors. */
+    fun contrast(a: Color, b: Color): Float {
+        val la = a.luminance() + 0.05f
+        val lb = b.luminance() + 0.05f
+        return if (la > lb) la / lb else lb / la
+    }
+}
+
+/**
+ * System-bar icon appearance for the current theme. targetSdk 36 forces
+ * edge-to-edge (the theme's bar colors are ignored on 35+), so dark icons
+ * must be requested explicitly on the light theme; pre-35 the bars are
+ * still painted, so they also take the theme background.
+ */
+@Composable
+fun MetroSystemBars(window: android.view.Window) {
+    val light = Metro.light
+    val background = Metro.Background
+    val view = androidx.compose.ui.platform.LocalView.current
+    androidx.compose.runtime.SideEffect {
+        androidx.core.view.WindowCompat.getInsetsController(window, view).apply {
+            isAppearanceLightStatusBars = light
+            isAppearanceLightNavigationBars = light
+        }
+        if (android.os.Build.VERSION.SDK_INT < 35) {
+            @Suppress("DEPRECATION")
+            window.statusBarColor = background.toArgb()
+            @Suppress("DEPRECATION")
+            window.navigationBarColor = background.toArgb()
+        }
+    }
+}
+
+/**
+ * The "✕" glyph button (remove a row, close a picker): labeled for TalkBack
+ * and padded to a 48dp touch target without changing how the glyph looks.
+ */
+@Composable
+fun MetroCloseMark(
+    label: String,
+    modifier: Modifier = Modifier,
+    fontSize: TextUnit = 20.sp,
+    onClick: () -> Unit,
+) {
+    Box(
+        modifier
+            .sizeIn(minWidth = 48.dp, minHeight = 48.dp)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                role = Role.Button,
+                onClickLabel = label,
+            ) { onClick() }
+            .semantics { contentDescription = label },
+        contentAlignment = Alignment.Center,
+    ) {
+        Text("✕", color = Metro.Subtle, fontSize = fontSize)
+    }
 }
 
 /**
@@ -244,6 +330,8 @@ fun MetroButton(
     val fg = when {
         pressed -> Metro.Background
         !enabled -> Metro.Dim
+        // Lime/yellow/amber fills can't carry white text.
+        fill != null -> Metro.onAccent(fill)
         else -> Metro.Foreground
     }
     val borderColor = when {
@@ -259,7 +347,12 @@ fun MetroButton(
             .metroTilt(tiltOn)
             .border(3.dp, borderColor)
             .background(bg)
-            .clickable(interactionSource = interaction, indication = null, enabled = enabled) { onClick() }
+            .clickable(
+                interactionSource = interaction,
+                indication = null,
+                enabled = enabled,
+                role = Role.Button,
+            ) { onClick() }
             .padding(horizontal = 18.dp, vertical = 10.dp),
         contentAlignment = Alignment.Center,
     ) {
@@ -406,6 +499,8 @@ fun MetroAppBar(
     val accent by AccentStore.accent.collectAsState()
     val swipeDown by rememberUpdatedState(onSwipeDown)
     val menuExpanded by rememberUpdatedState(expanded)
+    // Back closes the expanded bar before it navigates anywhere.
+    androidx.activity.compose.BackHandler(enabled = expanded) { expanded = false }
     Column(
         modifier
             .fillMaxWidth()
@@ -439,19 +534,31 @@ fun MetroAppBar(
         Box(Modifier.fillMaxWidth()) {
             val dotsInteraction = remember { MutableInteractionSource() }
             val dotsFocused by dotsInteraction.collectIsFocusedAsState()
-            Text(
-                "•••",
-                color = if (dotsFocused) accent.color else Metro.Foreground,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier
+            val moreLabel = androidx.compose.ui.res.stringResource(
+                com.fancyshark.wpdialer.R.string.ui_more_options,
+            )
+            // 48dp target; the dots stay drawn at the strip's top edge.
+            Box(
+                Modifier
                     .align(Alignment.TopEnd)
+                    .size(width = 56.dp, height = 48.dp)
                     .clickable(
                         interactionSource = dotsInteraction,
                         indication = null,
+                        role = Role.Button,
+                        onClickLabel = moreLabel,
                     ) { expanded = !expanded }
-                    .padding(horizontal = 14.dp, vertical = 6.dp),
-            )
+                    .semantics { contentDescription = moreLabel },
+                contentAlignment = Alignment.TopCenter,
+            ) {
+                Text(
+                    "•••",
+                    color = if (dotsFocused) accent.color else Metro.Foreground,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(top = 6.dp),
+                )
+            }
             Row(
                 Modifier
                     .align(Alignment.Center)

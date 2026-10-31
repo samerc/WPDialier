@@ -28,6 +28,8 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Dialpad
@@ -86,6 +88,9 @@ import com.fancyshark.wpdialer.ui.Selawik
 import com.fancyshark.wpdialer.ui.Metro
 import com.fancyshark.wpdialer.ui.MetroAppBar
 import com.fancyshark.wpdialer.ui.MetroButton
+import com.fancyshark.wpdialer.ui.MetroConfirm
+import com.fancyshark.wpdialer.ui.MetroSystemBars
+import com.fancyshark.wpdialer.ui.hiddenFromAccessibility
 import com.fancyshark.wpdialer.ui.Pivot
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
@@ -102,8 +107,11 @@ sealed interface Screen {
     data object About : Screen
 }
 
-/** A call waiting on the user to choose a SIM. */
-data class SimRequest(val number: String, val contactId: Long?)
+/**
+ * A call waiting on the user to choose a SIM. [onPlaced] runs once the call
+ * actually goes out (the dialpad clears its number only then).
+ */
+data class SimRequest(val number: String, val contactId: Long?, val onPlaced: () -> Unit = {})
 
 // Serializes the navigation stack across activity recreation (locale change,
 // process death). Field delimiter is a control char that can't appear in
@@ -169,6 +177,9 @@ class MainActivity : ComponentActivity() {
     // requested number when the navigation key happens to be identical.
     private val dialNonce = MutableStateFlow(0)
     private val refreshTick = MutableStateFlow(0)
+    // An open contact editor holding unsaved input — a dial intent must not
+    // wipe it by clearing the back stack.
+    private val editorDirty = MutableStateFlow(false)
     private val simRequest = MutableStateFlow<SimRequest?>(null)
     // One-shot what's-new page after an app update (never on fresh install).
     private val showWhatsNew = MutableStateFlow(false)
@@ -248,6 +259,9 @@ class MainActivity : ComponentActivity() {
         handleIntent(intent)
     }
 
+    // cancelMissedCallsNotification: default-dialer privilege, gated on
+    // isDefaultDialer and wrapped in runCatching.
+    @android.annotation.SuppressLint("MissingPermission")
     override fun onResume() {
         super.onResume()
         updatePermissionState()
@@ -370,7 +384,11 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun placeCall(number: String) {
+    /** [onPlaced] runs only once the call really went out. */
+    // Emergency calls deliberately skip the CALL_PHONE gate (a failure
+    // falls back to the permission request); everything else checks it.
+    @android.annotation.SuppressLint("MissingPermission")
+    private fun placeCall(number: String, onPlaced: () -> Unit = {}) {
         // Emergency numbers go first — before the permission gate (a revoked
         // phone permission must never turn 112 into a dialog) and bypassing
         // SIM preferences: telecom routes them itself regardless of account.
@@ -383,7 +401,7 @@ class MainActivity : ComponentActivity() {
                 getSystemService(TelecomManager::class.java)!!
                     .placeCall(Uri.fromParts("tel", number, null), Bundle())
             }.isSuccess
-            if (!placed) permissionLauncher.launch(corePermissions())
+            if (placed) onPlaced() else permissionLauncher.launch(corePermissions())
             return
         }
         if (checkSelfPermission(Manifest.permission.CALL_PHONE) != PackageManager.PERMISSION_GRANTED) {
@@ -392,7 +410,7 @@ class MainActivity : ComponentActivity() {
         }
         val sims = Sims.options(this)
         if (sims.size <= 1) {
-            placeCallWith(number, null)
+            if (placeCallWith(number, null)) onPlaced()
             return
         }
         lifecycleScope.launch {
@@ -403,16 +421,19 @@ class MainActivity : ComponentActivity() {
                 ?.let { flat -> sims.firstOrNull { it.flat == flat } }
             val preferred = contactPref ?: globalPref
             if (preferred != null) {
-                placeCallWith(number, preferred.handle)
+                if (placeCallWith(number, preferred.handle)) onPlaced()
             } else {
-                simRequest.value = SimRequest(number, contactId)
+                simRequest.value = SimRequest(number, contactId, onPlaced)
             }
         }
     }
 
-    private fun placeCallWith(number: String, handle: PhoneAccountHandle?) {
+    /** True when the call was handed to Telecom (or the ACTION_CALL fallback). */
+    // Only reached after placeCall's CALL_PHONE check; wrapped anyway.
+    @android.annotation.SuppressLint("MissingPermission")
+    private fun placeCallWith(number: String, handle: PhoneAccountHandle?): Boolean {
         val uri = Uri.fromParts("tel", number, null)
-        runCatching {
+        return runCatching {
             val telecom = getSystemService(TelecomManager::class.java)
                 ?: throw IllegalStateException("no telecom")
             val extras = Bundle()
@@ -420,11 +441,13 @@ class MainActivity : ComponentActivity() {
                 extras.putParcelable(TelecomManager.EXTRA_PHONE_ACCOUNT_HANDLE, handle)
             }
             telecom.placeCall(uri, extras)
-        }.onFailure {
-            runCatching { startActivity(Intent(Intent.ACTION_CALL, uri)) }
-        }
+        }.recoverCatching {
+            startActivity(Intent(Intent.ACTION_CALL, uri))
+        }.isSuccess
     }
 
+    // Failure (no CALL_PHONE) falls back to placeCallWith, wrapped.
+    @android.annotation.SuppressLint("MissingPermission")
     private fun callVoicemail() {
         val number = runCatching {
             getSystemService(android.telephony.TelephonyManager::class.java)?.voiceMailNumber
@@ -469,7 +492,11 @@ class MainActivity : ComponentActivity() {
                 .padding(vertical = 8.dp),
             contentAlignment = Alignment.Center,
         ) {
-            Text(stringResource(R.string.main_return_to_call), color = Color.White, fontSize = 14.sp)
+            Text(
+                stringResource(R.string.main_return_to_call),
+                color = Metro.onAccent(accent),
+                fontSize = 14.sp,
+            )
         }
     }
 
@@ -489,13 +516,39 @@ class MainActivity : ComponentActivity() {
         var confirmClearHistory by remember { mutableStateOf(false) }
         var confirmDeleteGroup by remember { mutableStateOf<List<HistoryItem>?>(null) }
         var confirmBlock by remember { mutableStateOf<String?>(null) }
+        var confirmRemoveSpeedDial by remember { mutableStateOf<String?>(null) }
+        // Set when Settings re-runs the wizard: back from its first page
+        // then closes it instead of leaving the app.
+        var wizardRerun by androidx.compose.runtime.saveable.rememberSaveable {
+            mutableStateOf(false)
+        }
+        MetroSystemBars(window)
+
+        // Keeps each stack entry's rememberSaveable state (typed dialpad
+        // number, search query, scroll positions) alive while another
+        // screen is pushed on top of it.
+        val screenStateHolder =
+            androidx.compose.runtime.saveable.rememberSaveableStateHolder()
+        val nonce by dialNonce.collectAsState()
+        fun stateKeyOf(index: Int, screen: Screen): String =
+            if (screen is Screen.Dialpad) "$index|$screen|$nonce" else "$index|$screen"
+        // Popped entries drop their saved state — reopening Search (same
+        // index + screen = same key) must start fresh, not show the old query.
+        fun popTop() {
+            val index = backStack.lastIndex
+            val popped = backStack.removeAt(index)
+            screenStateHolder.removeState(stateKeyOf(index, popped))
+            if (popped is Screen.EditContact || popped is Screen.NewContact) {
+                editorDirty.value = false
+            }
+        }
         // Dedupe: a double-tap must not push the same screen twice (back
         // would then appear to do nothing).
         fun push(screen: Screen) {
             if (backStack.last() != screen) backStack.add(screen)
         }
         fun popAndRefresh() {
-            if (backStack.size > 1) backStack.removeAt(backStack.lastIndex)
+            if (backStack.size > 1) popTop()
             refreshTick.value += 1
         }
         BackHandler(enabled = backStack.size > 1) {
@@ -511,18 +564,31 @@ class MainActivity : ComponentActivity() {
             if (granted) value = Repo.loadHistory(this@MainActivity)
         }
 
+        val setupDone by com.fancyshark.wpdialer.data.AppPrefs.setupDone.collectAsState()
+        val whatsNewVisible by showWhatsNew.collectAsState()
+        // The wizard / what's-new page cover the whole app.
+        val fullPageOverlay = !setupDone || whatsNewVisible
         val pendingDial by dialRequest.collectAsState()
-        LaunchedEffect(pendingDial) {
-            pendingDial?.let { number ->
-                while (backStack.size > 1) backStack.removeAt(backStack.lastIndex)
-                // Fresh state-holder key: otherwise a Dialpad entry equal to
-                // the previous one restores the old typed number instead of
-                // this request's.
-                dialNonce.value += 1
-                push(Screen.Dialpad(number))
-                dialRequest.value = null
-            }
+        LaunchedEffect(pendingDial, fullPageOverlay) {
+            val number = pendingDial ?: return@LaunchedEffect
+            // Held until the full-page overlay is gone — a dialpad opened
+            // hidden beneath it would just be a surprise later.
+            if (fullPageOverlay) return@LaunchedEffect
+            // An editor with unsaved input stays on the stack; the dialpad
+            // opens on top and back returns to the edits.
+            val keepEditor = editorDirty.value &&
+                backStack.any { it is Screen.EditContact || it is Screen.NewContact }
+            if (!keepEditor) while (backStack.size > 1) popTop()
+            // Fresh state-holder key: otherwise a Dialpad entry equal to
+            // the previous one restores the old typed number instead of
+            // this request's.
+            dialNonce.value += 1
+            push(Screen.Dialpad(number))
+            dialRequest.value = null
         }
+        val simReq by simRequest.collectAsState()
+        val overlayOpen = fullPageOverlay || simReq != null || confirmClearHistory ||
+            confirmDeleteGroup != null || confirmBlock != null || confirmRemoveSpeedDial != null
 
         val selawik by FontStore.selawik.collectAsState()
         MaterialTheme(colorScheme = darkColorScheme(primary = accent.color)) {
@@ -567,26 +633,25 @@ class MainActivity : ComponentActivity() {
                     .imePadding(),
             ) {
                 val top = backStack.last()
-                LaunchedEffect(top) {
-                    hardwareDialSafe.value = top is Screen.Home || top is Screen.Dialpad
+                // Not under an overlay either: digits typed at the wizard or
+                // a confirm must not land in (or open) a hidden dialpad.
+                LaunchedEffect(top, overlayOpen) {
+                    hardwareDialSafe.value =
+                        (top is Screen.Home || top is Screen.Dialpad) && !overlayOpen
                 }
                 var contentHeightPx by remember { mutableStateOf(0) }
                 Box(
                     Modifier
+                        .align(Alignment.TopCenter)
+                        // sw600dp+ ignores the portrait lock under targetSdk
+                        // 36 — keep the phone layout from stretching.
+                        .widthIn(max = com.fancyshark.wpdialer.ui.MetroMaxContentWidth)
                         .fillMaxSize()
+                        .hiddenFromAccessibility(overlayOpen)
                         .onSizeChanged { contentHeightPx = it.height }
                         .graphicsLayer { translationY = reach.value },
                 ) {
-                // Keeps each stack entry's rememberSaveable state (typed
-                // dialpad number, search query, scroll positions) alive while
-                // another screen is pushed on top of it.
-                val screenStateHolder =
-                    androidx.compose.runtime.saveable.rememberSaveableStateHolder()
-                val nonce by dialNonce.collectAsState()
-                val stateKey =
-                    if (top is Screen.Dialpad) "${backStack.lastIndex}|$top|$nonce"
-                    else "${backStack.lastIndex}|$top"
-                screenStateHolder.SaveableStateProvider(stateKey) {
+                screenStateHolder.SaveableStateProvider(stateKeyOf(backStack.lastIndex, top)) {
                     when (top) {
                         Screen.Home -> Column(Modifier.fillMaxSize()) {
                             ReturnToCallBanner(accent.color)
@@ -602,7 +667,7 @@ class MainActivity : ComponentActivity() {
                                 ) {
                                     Text(
                                         stringResource(R.string.main_make_default_banner),
-                                        color = Color.White,
+                                        color = Metro.onAccent(accent.color),
                                         fontSize = 14.sp,
                                     )
                                 }
@@ -658,10 +723,7 @@ class MainActivity : ComponentActivity() {
                                             accent = accent.color,
                                             onOpen = { push(Screen.Contact(it.id)) },
                                             onCallNumber = { placeCall(it) },
-                                            onRemoveNumber = {
-                                                com.fancyshark.wpdialer.data.AppPrefs
-                                                    .removeSpeedDial(this@MainActivity, it)
-                                            },
+                                            onRemoveNumber = { confirmRemoveSpeedDial = it },
                                         )
                                     },
                                     stringResource(R.string.main_page_people) to {
@@ -705,7 +767,7 @@ class MainActivity : ComponentActivity() {
                         is Screen.Dialpad -> DialpadScreen(
                             initial = top.initial,
                             accent = accent.color,
-                            onCall = { placeCall(it) },
+                            onCall = { number, onPlaced -> placeCall(number, onPlaced) },
                             onSave = { push(Screen.NewContact(it)) },
                             onVoicemail = { callVoicemail() },
                         )
@@ -730,12 +792,14 @@ class MainActivity : ComponentActivity() {
                             contactId = top.id,
                             accent = accent.color,
                             onDone = { popAndRefresh() },
+                            onDirtyChange = { editorDirty.value = it },
                         )
 
                         is Screen.NewContact -> NewContactScreen(
                             accent = accent.color,
                             initialNumber = top.initialNumber,
                             onDone = { popAndRefresh() },
+                            onDirtyChange = { editorDirty.value = it },
                         )
 
                         is Screen.CallDetails -> com.fancyshark.wpdialer.screens.CallDetailsScreen(
@@ -756,6 +820,11 @@ class MainActivity : ComponentActivity() {
                             isDefaultDialer = default,
                             onRequestDefault = { requestDefaultDialer() },
                             onAbout = { push(Screen.About) },
+                            onRerunSetup = {
+                                wizardRerun = true
+                                com.fancyshark.wpdialer.data.AppPrefs
+                                    .setSetupDone(this@MainActivity, false)
+                            },
                         )
 
                         Screen.About -> com.fancyshark.wpdialer.screens.AboutScreen(accent)
@@ -779,181 +848,75 @@ class MainActivity : ComponentActivity() {
 
                 confirmDeleteGroup?.let { group ->
                     val item = group.first()
-                    BackHandler { confirmDeleteGroup = null }
-                    Box(
-                        Modifier
-                            .fillMaxSize()
-                            .background(Metro.Background.copy(alpha = 0.96f))
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null,
-                            ) { confirmDeleteGroup = null },
-                    ) {
-                        Column(
-                            Modifier
-                                .align(Alignment.Center)
-                                .padding(horizontal = 32.dp)
-                                .clickable(
-                                    interactionSource = remember { MutableInteractionSource() },
-                                    indication = null,
-                                ) { /* consume so taps inside don't dismiss */ },
-                        ) {
-                            Text(
-                                if (group.size > 1) {
-                                    stringResource(R.string.main_confirm_delete_calls, group.size)
-                                } else {
-                                    stringResource(R.string.main_confirm_delete_call)
-                                },
-                                color = Metro.Foreground,
-                                fontSize = 26.sp,
-                                fontWeight = FontWeight.Light,
-                            )
-                            Text(
-                                item.name?.takeIf { it.isNotBlank() }
-                                    ?: Repo.pretty(this@MainActivity, item.number),
-                                color = Metro.Subtle,
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Light,
-                                modifier = Modifier.padding(bottom = 16.dp),
-                            )
-                            Row(
-                                horizontalArrangement = androidx.compose.foundation.layout
-                                    .Arrangement.spacedBy(10.dp),
-                            ) {
-                                MetroButton(
-                                    stringResource(R.string.main_button_delete),
-                                    fill = Metro.Red,
-                                    modifier = Modifier.weight(1f),
-                                ) {
-                                    confirmDeleteGroup = null
-                                    lifecycleScope.launch {
-                                        Repo.deleteHistoryItems(this@MainActivity, group.map { it.id })
-                                        refreshTick.value += 1
-                                    }
-                                }
-                                MetroButton(stringResource(R.string.main_button_cancel), modifier = Modifier.weight(1f)) {
-                                    confirmDeleteGroup = null
-                                }
+                    MetroConfirm(
+                        title = if (group.size > 1) {
+                            stringResource(R.string.main_confirm_delete_calls, group.size)
+                        } else {
+                            stringResource(R.string.main_confirm_delete_call)
+                        },
+                        message = item.name?.takeIf { it.isNotBlank() }
+                            ?: Repo.pretty(this@MainActivity, item.number),
+                        confirmLabel = stringResource(R.string.main_button_delete),
+                        cancelLabel = stringResource(R.string.main_button_cancel),
+                        onConfirm = {
+                            confirmDeleteGroup = null
+                            lifecycleScope.launch {
+                                Repo.deleteHistoryItems(this@MainActivity, group.map { it.id })
+                                refreshTick.value += 1
                             }
-                        }
-                    }
+                        },
+                        onCancel = { confirmDeleteGroup = null },
+                    )
                 }
 
                 if (confirmClearHistory) {
-                    BackHandler { confirmClearHistory = false }
-                    Box(
-                        Modifier
-                            .fillMaxSize()
-                            .background(Metro.Background.copy(alpha = 0.96f))
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null,
-                            ) { confirmClearHistory = false },
-                    ) {
-                        Column(
-                            Modifier
-                                .align(Alignment.Center)
-                                .padding(horizontal = 32.dp)
-                                .clickable(
-                                    interactionSource = remember { MutableInteractionSource() },
-                                    indication = null,
-                                ) { /* consume so taps inside don't dismiss */ },
-                        ) {
-                            Text(
-                                stringResource(R.string.main_confirm_delete_all_history),
-                                color = Metro.Foreground,
-                                fontSize = 26.sp,
-                                fontWeight = FontWeight.Light,
-                            )
-                            Text(
-                                stringResource(R.string.main_confirm_cant_undo),
-                                color = Metro.Subtle,
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Light,
-                                modifier = Modifier.padding(bottom = 16.dp),
-                            )
-                            Row(
-                                horizontalArrangement = androidx.compose.foundation.layout
-                                    .Arrangement.spacedBy(10.dp),
-                            ) {
-                                MetroButton(
-                                    stringResource(R.string.main_button_delete),
-                                    fill = Metro.Red,
-                                    modifier = Modifier.weight(1f),
-                                ) {
-                                    confirmClearHistory = false
-                                    lifecycleScope.launch {
-                                        Repo.clearHistory(this@MainActivity)
-                                        refreshTick.value += 1
-                                    }
-                                }
-                                MetroButton(stringResource(R.string.main_button_cancel), modifier = Modifier.weight(1f)) {
-                                    confirmClearHistory = false
-                                }
+                    MetroConfirm(
+                        title = stringResource(R.string.main_confirm_delete_all_history),
+                        message = stringResource(R.string.main_confirm_cant_undo),
+                        confirmLabel = stringResource(R.string.main_button_delete),
+                        cancelLabel = stringResource(R.string.main_button_cancel),
+                        onConfirm = {
+                            confirmClearHistory = false
+                            lifecycleScope.launch {
+                                Repo.clearHistory(this@MainActivity)
+                                refreshTick.value += 1
                             }
-                        }
-                    }
+                        },
+                        onCancel = { confirmClearHistory = false },
+                    )
                 }
 
                 confirmBlock?.let { number ->
-                    BackHandler { confirmBlock = null }
-                    Box(
-                        Modifier
-                            .fillMaxSize()
-                            .background(Metro.Background.copy(alpha = 0.96f))
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null,
-                            ) { confirmBlock = null },
-                    ) {
-                        Column(
-                            Modifier
-                                .align(Alignment.Center)
-                                .padding(horizontal = 32.dp)
-                                .clickable(
-                                    interactionSource = remember { MutableInteractionSource() },
-                                    indication = null,
-                                ) { /* consume so taps inside don't dismiss */ },
-                        ) {
-                            Text(
-                                stringResource(R.string.main_confirm_block),
-                                color = Metro.Foreground,
-                                fontSize = 26.sp,
-                                fontWeight = FontWeight.Light,
-                            )
-                            Text(
-                                Repo.pretty(this@MainActivity, number),
-                                color = Metro.Subtle,
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Light,
-                                modifier = Modifier.padding(bottom = 16.dp),
-                            )
-                            Row(
-                                horizontalArrangement = androidx.compose.foundation.layout
-                                    .Arrangement.spacedBy(10.dp),
-                            ) {
-                                MetroButton(
-                                    stringResource(R.string.main_button_block),
-                                    fill = Metro.Red,
-                                    modifier = Modifier.weight(1f),
-                                ) {
-                                    confirmBlock = null
-                                    lifecycleScope.launch {
-                                        Repo.blockNumber(this@MainActivity, number)
-                                    }
-                                }
-                                MetroButton(
-                                    stringResource(R.string.main_button_cancel),
-                                    modifier = Modifier.weight(1f),
-                                ) {
-                                    confirmBlock = null
-                                }
+                    MetroConfirm(
+                        title = stringResource(R.string.main_confirm_block),
+                        message = Repo.pretty(this@MainActivity, number),
+                        confirmLabel = stringResource(R.string.main_button_block),
+                        cancelLabel = stringResource(R.string.main_button_cancel),
+                        onConfirm = {
+                            confirmBlock = null
+                            lifecycleScope.launch {
+                                Repo.blockNumber(this@MainActivity, number)
                             }
-                        }
-                    }
+                        },
+                        onCancel = { confirmBlock = null },
+                    )
                 }
 
-                val simReq by simRequest.collectAsState()
+                confirmRemoveSpeedDial?.let { number ->
+                    MetroConfirm(
+                        title = stringResource(R.string.home_confirm_remove_speed_dial),
+                        message = Repo.pretty(this@MainActivity, number),
+                        confirmLabel = stringResource(R.string.ui_remove),
+                        cancelLabel = stringResource(R.string.main_button_cancel),
+                        onConfirm = {
+                            confirmRemoveSpeedDial = null
+                            com.fancyshark.wpdialer.data.AppPrefs
+                                .removeSpeedDial(this@MainActivity, number)
+                        },
+                        onCancel = { confirmRemoveSpeedDial = null },
+                    )
+                }
+
                 simReq?.let { req ->
                     SimPickerOverlay(
                         request = req,
@@ -963,14 +926,14 @@ class MainActivity : ComponentActivity() {
                                 SimPrefs.set(this@MainActivity, req.number, option.flat)
                             }
                             simRequest.value = null
-                            placeCallWith(req.number, option.handle)
+                            if (placeCallWith(req.number, option.handle)) req.onPlaced()
                         },
+                        // Cancelling never consumes the dialpad's number.
                         onCancel = { simRequest.value = null },
                     )
                 }
 
                 // First-run setup covers the whole app until finished.
-                val setupDone by com.fancyshark.wpdialer.data.AppPrefs.setupDone.collectAsState()
                 if (!setupDone) {
                     val fsi by canUseFullScreen.collectAsState()
                     val allGranted by allCorePermissionsGranted.collectAsState()
@@ -995,9 +958,22 @@ class MainActivity : ComponentActivity() {
                             }
                         },
                         onFinish = {
+                            wizardRerun = false
                             com.fancyshark.wpdialer.data.AppPrefs
                                 .setSetupDone(this@MainActivity, true)
                             refreshTick.value += 1
+                        },
+                        onExit = {
+                            if (wizardRerun) {
+                                // Re-run from Settings: back closes it again.
+                                wizardRerun = false
+                                com.fancyshark.wpdialer.data.AppPrefs
+                                    .setSetupDone(this@MainActivity, true)
+                            } else {
+                                // First run: leave the app, as back would
+                                // from any root screen. It resumes next time.
+                                finish()
+                            }
                         },
                     )
                 }
@@ -1006,7 +982,6 @@ class MainActivity : ComponentActivity() {
                 // Fresh installs never see it (onCreate marks it seen when
                 // the wizard is still pending), and the wizard renders on
                 // top if both would somehow show.
-                val whatsNewVisible by showWhatsNew.collectAsState()
                 if (setupDone && whatsNewVisible) {
                     com.fancyshark.wpdialer.screens.WhatsNewScreen(
                         accent = accent.color,
@@ -1031,71 +1006,55 @@ class MainActivity : ComponentActivity() {
     ) {
         val options = remember { Sims.options(this) }
         var rememberChoice by remember { mutableStateOf(false) }
-        BackHandler { onCancel() }
-        Box(
-            Modifier
-                .fillMaxSize()
-                .background(Metro.Background.copy(alpha = 0.96f))
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                ) { onCancel() },
-        ) {
-            Column(
-                Modifier
-                    .align(Alignment.Center)
-                    .padding(horizontal = 32.dp)
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                    ) { /* consume so taps inside don't dismiss */ },
-            ) {
-                Text(
-                    stringResource(R.string.main_choose_sim_title),
-                    color = Metro.Foreground,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    letterSpacing = 1.sp,
-                )
-                Text(
-                    request.number,
-                    color = Metro.Subtle,
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.Light,
-                    modifier = Modifier.padding(bottom = 16.dp),
-                )
-                options.forEach { option ->
-                    MetroButton(
-                        option.label,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 5.dp),
-                    ) { onPick(option, rememberChoice) }
-                }
-                if (request.contactId != null) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .padding(top = 12.dp)
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null,
-                            ) { rememberChoice = !rememberChoice },
-                    ) {
-                        Box(
-                            Modifier
-                                .size(24.dp)
-                                .border(3.dp, Metro.Foreground)
-                                .background(if (rememberChoice) accent else Color.Transparent),
-                        )
-                        Text(
-                            stringResource(R.string.main_choose_sim_remember),
-                            color = Metro.Foreground,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Light,
-                            modifier = Modifier.padding(start = 10.dp),
-                        )
-                    }
+        com.fancyshark.wpdialer.ui.MetroDialog(onDismiss = onCancel) {
+            Text(
+                stringResource(R.string.main_choose_sim_title),
+                color = Metro.Foreground,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold,
+                letterSpacing = 1.sp,
+            )
+            Text(
+                // pretty() wraps the number in LRI/PDI for RTL locales.
+                Repo.pretty(this@MainActivity, request.number),
+                color = Metro.Subtle,
+                fontSize = 17.sp,
+                fontWeight = FontWeight.Light,
+                modifier = Modifier.padding(bottom = 16.dp),
+            )
+            options.forEach { option ->
+                MetroButton(
+                    option.label,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 5.dp),
+                ) { onPick(option, rememberChoice) }
+            }
+            if (request.contactId != null) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .padding(top = 12.dp)
+                        .toggleable(
+                            value = rememberChoice,
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            role = androidx.compose.ui.semantics.Role.Checkbox,
+                        ) { rememberChoice = it },
+                ) {
+                    Box(
+                        Modifier
+                            .size(24.dp)
+                            .border(3.dp, Metro.Foreground)
+                            .background(if (rememberChoice) accent else Color.Transparent),
+                    )
+                    Text(
+                        stringResource(R.string.main_choose_sim_remember),
+                        color = Metro.Foreground,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Light,
+                        modifier = Modifier.padding(start = 10.dp),
+                    )
                 }
             }
         }

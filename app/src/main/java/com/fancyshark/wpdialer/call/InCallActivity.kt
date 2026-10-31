@@ -91,6 +91,8 @@ class InCallActivity : ComponentActivity() {
         com.fancyshark.wpdialer.data.AppPrefs.init(this)
         Metro.light = com.fancyshark.wpdialer.data.AppPrefs.light.value
         setContent {
+            // Light theme needs dark status/nav icons (edge-to-edge on 35+).
+            com.fancyshark.wpdialer.ui.MetroSystemBars(window)
             val selawik by FontStore.selawik.collectAsState()
             androidx.compose.runtime.CompositionLocalProvider(
                 androidx.compose.material3.LocalTextStyle provides

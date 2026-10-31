@@ -52,6 +52,9 @@ import com.fancyshark.wpdialer.ui.AppBarAction
 import com.fancyshark.wpdialer.ui.ContactTile
 import com.fancyshark.wpdialer.ui.Metro
 import com.fancyshark.wpdialer.ui.MetroAppBar
+import com.fancyshark.wpdialer.ui.MetroConfirm
+import com.fancyshark.wpdialer.ui.MetroDialog
+import com.fancyshark.wpdialer.ui.hiddenFromAccessibility
 
 @Composable
 fun ContactDetailScreen(
@@ -79,7 +82,7 @@ fun ContactDetailScreen(
     // bar while one is open so edit/delete aren't tappable "through" it.
     var bodyOverlayOpen by remember { mutableStateOf(false) }
     Box(Modifier.fillMaxSize()) {
-        Column(Modifier.fillMaxSize()) {
+        Column(Modifier.fillMaxSize().hiddenFromAccessibility(confirmDelete)) {
             ContactDetailBody(
                 d, accent, history, onCall, onText, Modifier.weight(1f),
                 onOverlayVisible = { bodyOverlayOpen = it },
@@ -132,60 +135,25 @@ fun ContactDetailScreen(
         }
 
         if (confirmDelete) {
-            androidx.activity.compose.BackHandler { confirmDelete = false }
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .background(Metro.Background.copy(alpha = 0.96f))
-                    .clickable { confirmDelete = false },
-            ) {
-                Column(
-                    Modifier
-                        .align(Alignment.Center)
-                        .padding(horizontal = 32.dp)
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                        ) { /* consume so taps inside don't dismiss */ },
-                ) {
-                    Text(
-                        stringResource(
-                            com.fancyshark.wpdialer.R.string.contact_delete_confirm,
-                            d.name,
-                        ),
-                        color = Metro.Foreground,
-                        fontSize = 26.sp,
-                        fontWeight = FontWeight.Light,
-                        modifier = Modifier.padding(bottom = 16.dp),
-                    )
-                    Row(
-                        horizontalArrangement = androidx.compose.foundation.layout.Arrangement
-                            .spacedBy(10.dp),
-                    ) {
-                        MetroButton(
-                            stringResource(com.fancyshark.wpdialer.R.string.contact_delete),
-                            fill = Metro.Red,
-                            modifier = Modifier.weight(1f),
-                        ) {
-                            // Guard: a double-tap must not run delete +
-                            // onDeleted (an extra back-pop) twice.
-                            if (confirmDelete) {
-                                confirmDelete = false
-                                scope.launch {
-                                    Repo.deleteContact(context, d.id)
-                                    onDeleted()
-                                }
-                            }
-                        }
-                        MetroButton(
-                            stringResource(com.fancyshark.wpdialer.R.string.contact_cancel),
-                            modifier = Modifier.weight(1f),
-                        ) {
-                            confirmDelete = false
-                        }
+            MetroConfirm(
+                title = stringResource(
+                    com.fancyshark.wpdialer.R.string.contact_delete_confirm,
+                    d.name,
+                ),
+                message = null,
+                confirmLabel = stringResource(com.fancyshark.wpdialer.R.string.contact_delete),
+                cancelLabel = stringResource(com.fancyshark.wpdialer.R.string.contact_cancel),
+                // MetroConfirm fires once: a double-tap can't run delete +
+                // onDeleted (an extra back-pop) twice.
+                onConfirm = {
+                    confirmDelete = false
+                    scope.launch {
+                        Repo.deleteContact(context, d.id)
+                        onDeleted()
                     }
-                }
-            }
+                },
+                onCancel = { confirmDelete = false },
+            )
         }
     }
 }
@@ -199,18 +167,21 @@ private fun normalized(number: String): String =
 @Composable
 private fun AppActionIcon(accountType: String?, app: String, onClick: () -> Unit) {
     val context = LocalContext.current
-    val icon = remember(accountType) {
-        accountType?.let { pkg ->
-            runCatching {
-                val drawable = context.packageManager.getApplicationIcon(pkg)
-                val bmp = android.graphics.Bitmap.createBitmap(
-                    96, 96, android.graphics.Bitmap.Config.ARGB_8888,
-                )
-                val canvas = android.graphics.Canvas(bmp)
-                drawable.setBounds(0, 0, 96, 96)
-                drawable.draw(canvas)
-                bmp.asImageBitmap()
-            }.getOrNull()
+    // PackageManager IPC + rasterizing: off the main thread.
+    val icon by produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, accountType) {
+        value = accountType?.let { pkg ->
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                runCatching {
+                    val drawable = context.packageManager.getApplicationIcon(pkg)
+                    val bmp = android.graphics.Bitmap.createBitmap(
+                        96, 96, android.graphics.Bitmap.Config.ARGB_8888,
+                    )
+                    val canvas = android.graphics.Canvas(bmp)
+                    drawable.setBounds(0, 0, 96, 96)
+                    drawable.draw(canvas)
+                    bmp.asImageBitmap()
+                }.getOrNull()
+            }
         }
     }
     Box(
@@ -223,8 +194,9 @@ private fun AppActionIcon(accountType: String?, app: String, onClick: () -> Unit
             .padding(7.dp),
         contentAlignment = Alignment.Center,
     ) {
-        if (icon != null) {
-            Image(icon, contentDescription = app, modifier = Modifier.fillMaxSize())
+        val bitmap = icon
+        if (bitmap != null) {
+            Image(bitmap, contentDescription = app, modifier = Modifier.fillMaxSize())
         } else {
             Text(app.take(1).uppercase(), color = Metro.Foreground, fontSize = 16.sp)
         }
@@ -324,18 +296,28 @@ private fun ContactDetailBody(
     fun AppIcons(actions: List<ContactAppAction>) {
         // Group by package: apps like Telegram use a different summary name
         // per row ("Telegram Voice Call", ...), which is one app, not three.
-        actions.groupBy { it.accountType ?: it.app }.forEach { (_, list) ->
-            val name = appDisplayName(context, list.first())
-            AppActionIcon(list.first().accountType, name) {
-                if (list.size == 1) launchAction(list[0]) else appChooser = name to list
+        actions.groupBy { it.accountType ?: it.app }.forEach { (group, list) ->
+            androidx.compose.runtime.key(group) {
+                // Launcher label lookup is a PackageManager IPC — resolve it
+                // once per package off the main thread, DATA2 until then.
+                val name by produceState(list.first().app, list.first().accountType) {
+                    value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                        appDisplayName(context, list.first())
+                    }
+                }
+                AppActionIcon(list.first().accountType, name) {
+                    if (list.size == 1) launchAction(list[0]) else appChooser = name to list
+                }
             }
         }
     }
 
+    val accentText = Metro.textAccent(accent)
     Box(modifier.fillMaxWidth()) {
         Column(
             Modifier
                 .fillMaxSize()
+                .hiddenFromAccessibility(appChooser != null || showSimChooser)
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp),
         ) {
@@ -387,7 +369,7 @@ private fun ContactDetailBody(
                             fontSize = 25.sp,
                             fontWeight = FontWeight.Light,
                         )
-                        Text(Repo.pretty(context, phone.number), color = accent, fontSize = 15.sp)
+                        Text(Repo.pretty(context, phone.number), color = accentText, fontSize = 15.sp)
                     }
                     Icon(
                         Icons.AutoMirrored.Filled.Message,
@@ -437,7 +419,7 @@ private fun ContactDetailBody(
                             fontSize = 25.sp,
                             fontWeight = FontWeight.Light,
                         )
-                        Text(email.address, color = accent, fontSize = 15.sp)
+                        Text(email.address, color = accentText, fontSize = 15.sp)
                     }
                     AppIcons(emailActions[email.address.lowercase()].orEmpty())
                 }
@@ -451,7 +433,7 @@ private fun ContactDetailBody(
                         fontSize = 25.sp,
                         fontWeight = FontWeight.Light,
                     )
-                    Text(event.date, color = accent, fontSize = 15.sp)
+                    Text(event.date, color = accentText, fontSize = 15.sp)
                 }
             }
 
@@ -484,7 +466,7 @@ private fun ContactDetailBody(
                         fontSize = 25.sp,
                         fontWeight = FontWeight.Light,
                     )
-                    Text(site, color = accent, fontSize = 15.sp)
+                    Text(site, color = accentText, fontSize = 15.sp)
                 }
             }
 
@@ -496,7 +478,7 @@ private fun ContactDetailBody(
                         fontSize = 25.sp,
                         fontWeight = FontWeight.Light,
                     )
-                    Text(d.organization, color = accent, fontSize = 15.sp)
+                    Text(d.organization, color = accentText, fontSize = 15.sp)
                 }
             }
 
@@ -508,7 +490,7 @@ private fun ContactDetailBody(
                         fontSize = 25.sp,
                         fontWeight = FontWeight.Light,
                     )
-                    Text(d.nickname, color = accent, fontSize = 15.sp)
+                    Text(d.nickname, color = accentText, fontSize = 15.sp)
                 }
             }
 
@@ -527,7 +509,7 @@ private fun ContactDetailBody(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
-                    Text(action.app, color = accent, fontSize = 15.sp)
+                    Text(action.app, color = accentText, fontSize = 15.sp)
                 }
             }
 
@@ -555,7 +537,7 @@ private fun ContactDetailBody(
                         fontSize = 25.sp,
                         fontWeight = FontWeight.Light,
                     )
-                    Text(d.address, color = accent, fontSize = 15.sp)
+                    Text(d.address, color = accentText, fontSize = 15.sp)
                 }
             }
 
@@ -575,7 +557,7 @@ private fun ContactDetailBody(
                     Text(
                         simOptions.firstOrNull { it.flat == simPref }?.label
                             ?: stringResource(com.fancyshark.wpdialer.R.string.contact_not_set),
-                        color = accent,
+                        color = accentText,
                         fontSize = 15.sp,
                     )
                 }
@@ -587,13 +569,16 @@ private fun ContactDetailBody(
             }
             val ringtoneDefaultTitle =
                 stringResource(com.fancyshark.wpdialer.R.string.contact_ringtone_default)
-            val ringtoneTitle = remember(ringtoneUri, ringtoneDefaultTitle) {
-                ringtoneUri?.let { uri ->
-                    runCatching {
-                        android.media.RingtoneManager
-                            .getRingtone(context, android.net.Uri.parse(uri))
-                            ?.getTitle(context)
-                    }.getOrNull()
+            // getRingtone/getTitle query the media provider — off the main thread.
+            val ringtoneTitle by produceState(ringtoneDefaultTitle, ringtoneUri, ringtoneDefaultTitle) {
+                value = ringtoneUri?.let { uri ->
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                        runCatching {
+                            android.media.RingtoneManager
+                                .getRingtone(context, android.net.Uri.parse(uri))
+                                ?.getTitle(context)
+                        }.getOrNull()
+                    }
                 } ?: ringtoneDefaultTitle
             }
             val ringtoneScope = androidx.compose.runtime.rememberCoroutineScope()
@@ -659,7 +644,7 @@ private fun ContactDetailBody(
                     fontSize = 25.sp,
                     fontWeight = FontWeight.Light,
                 )
-                Text(ringtoneTitle, color = accent, fontSize = 15.sp)
+                Text(ringtoneTitle, color = accentText, fontSize = 15.sp)
             }
 
             if (!d.note.isNullOrBlank()) {
@@ -708,86 +693,70 @@ private fun ContactDetailBody(
         }
 
         appChooser?.let { (app, actions) ->
-            androidx.activity.compose.BackHandler { appChooser = null }
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .background(Metro.Background.copy(alpha = 0.96f))
-                    .clickable { appChooser = null },
-            ) {
-                Column(Modifier.align(Alignment.Center).padding(horizontal = 32.dp)) {
+            MetroDialog(onDismiss = { appChooser = null }) {
+                Text(
+                    app.uppercase(),
+                    color = Metro.Foreground,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    letterSpacing = 1.sp,
+                    modifier = Modifier.padding(bottom = 14.dp),
+                )
+                actions.forEach { action ->
                     Text(
-                        app.uppercase(),
+                        shortActionLabel(action),
                         color = Metro.Foreground,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        letterSpacing = 1.sp,
-                        modifier = Modifier.padding(bottom = 14.dp),
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Light,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                launchAction(action)
+                                appChooser = null
+                            }
+                            .padding(vertical = 10.dp),
                     )
-                    actions.forEach { action ->
-                        Text(
-                            shortActionLabel(action),
-                            color = Metro.Foreground,
-                            fontSize = 24.sp,
-                            fontWeight = FontWeight.Light,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    launchAction(action)
-                                    appChooser = null
-                                }
-                                .padding(vertical = 10.dp),
-                        )
-                    }
                 }
             }
         }
 
         if (showSimChooser) {
-            androidx.activity.compose.BackHandler { showSimChooser = false }
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .background(Metro.Background.copy(alpha = 0.96f))
-                    .clickable { showSimChooser = false },
-            ) {
-                Column(Modifier.align(Alignment.Center).padding(horizontal = 32.dp)) {
+            MetroDialog(onDismiss = { showSimChooser = false }) {
+                Text(
+                    stringResource(com.fancyshark.wpdialer.R.string.contact_preferred_sim_caps),
+                    color = Metro.Foreground,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    letterSpacing = 1.sp,
+                    modifier = Modifier.padding(bottom = 14.dp),
+                )
+                (
+                    listOf<Pair<String, String?>>(
+                        stringResource(
+                            com.fancyshark.wpdialer.R.string.contact_no_preference,
+                        ) to null,
+                    ) +
+                    simOptions.map { it.label to it.flat }
+                    ).forEach { (label, flat) ->
+                    val selected = simPref == flat
                     Text(
-                        stringResource(com.fancyshark.wpdialer.R.string.contact_preferred_sim_caps),
-                        color = Metro.Foreground,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        letterSpacing = 1.sp,
-                        modifier = Modifier.padding(bottom = 14.dp),
-                    )
-                    (
-                        listOf<Pair<String, String?>>(
-                            stringResource(
-                                com.fancyshark.wpdialer.R.string.contact_no_preference,
-                            ) to null,
-                        ) +
-                        simOptions.map { it.label to it.flat }
-                        ).forEach { (label, flat) ->
-                        val selected = simPref == flat
-                        Text(
-                            label,
-                            color = if (selected) accent else Metro.Foreground,
-                            fontSize = 24.sp,
-                            fontWeight = FontWeight.Light,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    // The preference applies to the person:
-                                    // store it for every number they have.
-                                    d.phones.forEach {
-                                        SimPrefs.set(context, it.number, flat)
-                                    }
-                                    simPref = flat
-                                    showSimChooser = false
+                        label,
+                        color = if (selected) accentText else Metro.Foreground,
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Light,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                // The preference applies to the person:
+                                // store it for every number they have.
+                                d.phones.forEach {
+                                    SimPrefs.set(context, it.number, flat)
                                 }
-                                .padding(vertical = 10.dp),
-                        )
-                    }
+                                simPref = flat
+                                showSimChooser = false
+                            }
+                            .padding(vertical = 10.dp),
+                    )
                 }
             }
         }

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Shared UI: accessibility labels, discard + confirm overlays -->
+    <string name="ui_close">fermer</string>
+    <string name="ui_remove">supprimer</string>
+    <string name="ui_more_options">plus d\'options</string>
+    <string name="ui_add_photo">ajouter une photo</string>
+    <string name="editor_discard_title">abandonner les modifications ?</string>
+    <string name="editor_discard_message">vos modifications n\'ont pas été enregistrées</string>
+    <string name="editor_discard_button">abandonner</string>
+    <string name="editor_keep_editing">continuer</string>
+    <string name="editcontact_load_failed">impossible d\'ouvrir ce contact</string>
+    <string name="home_confirm_remove_speed_dial">retirer de la numérotation rapide ?</string>
+    <string name="settings_confirm_delete_reply">supprimer cette réponse ?</string>
+    <string name="settings_confirm_unblock">débloquer ce numéro ?</string>
+</resources>

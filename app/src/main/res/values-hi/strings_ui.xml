@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Shared UI: accessibility labels, discard + confirm overlays -->
+    <string name="ui_close">बंद करें</string>
+    <string name="ui_remove">हटाएँ</string>
+    <string name="ui_more_options">और विकल्प</string>
+    <string name="ui_add_photo">फ़ोटो जोड़ें</string>
+    <string name="editor_discard_title">बदलाव छोड़ दें?</string>
+    <string name="editor_discard_message">आपके बदलाव सहेजे नहीं गए हैं</string>
+    <string name="editor_discard_button">छोड़ दें</string>
+    <string name="editor_keep_editing">संपादन जारी रखें</string>
+    <string name="editcontact_load_failed">यह संपर्क नहीं खुल सका</string>
+    <string name="home_confirm_remove_speed_dial">स्पीड डायल से हटाएँ?</string>
+    <string name="settings_confirm_delete_reply">यह जवाब हटाएँ?</string>
+    <string name="settings_confirm_unblock">इस नंबर को अनब्लॉक करें?</string>
+</resources>

@@ -45,7 +45,7 @@ fun ContactTile(name: String, photoUri: String?, accent: Color, size: Dp) {
             val initials = initialsOf(name)
             Text(
                 initials,
-                color = Color.White,
+                color = Metro.onAccent(accent),
                 fontSize = (size.value * if (initials.length > 1) 0.30f else 0.40f).sp,
                 fontWeight = FontWeight.Light,
                 letterSpacing = 1.sp,
