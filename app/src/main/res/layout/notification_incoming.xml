@@ -42,6 +42,18 @@
             android:textColor="@color/wp_notif_secondary"
             android:textDirection="ltr"
             android:singleLine="true" />
+
+        <!-- STIR/SHAKEN result; shown only for verified / failed calls -->
+        <TextView
+            android:id="@+id/caller_verification"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:fontFamily="@font/selawk"
+            android:textSize="12sp"
+            android:textColor="@color/wp_notif_secondary"
+            android:singleLine="true"
+            android:ellipsize="end"
+            android:visibility="gone" />
     </LinearLayout>
 
     <ImageView

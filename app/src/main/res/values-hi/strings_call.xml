@@ -37,4 +37,20 @@
     <string name="notif_incoming_call">इनकमिंग कॉल</string>
     <string name="notif_answer">जवाब दें</string>
     <string name="notif_decline">अस्वीकार करें</string>
+
+    <!-- Dialer codes, speed-dial keys, post-dial, caller verification, RTT, voicemail -->
+    <string name="call_send_tones_title">टोन भेजें?</string>
+    <string name="call_send">भेजें</string>
+    <string name="call_verified">सत्यापित कॉलर</string>
+    <string name="call_spoof_warning">कॉलर आईडी नकली हो सकती है</string>
+    <string name="call_rtt">RTT</string>
+    <string name="call_rtt_title">रीयल-टाइम टेक्स्ट</string>
+    <string name="call_rtt_hint">भेजने के लिए टाइप करें</string>
+    <string name="call_rtt_request_title">रीयल-टाइम टेक्स्ट पर जाएँ?</string>
+    <string name="call_rtt_request_message">दूसरा व्यक्ति इस कॉल के दौरान मैसेज टाइप करना चाहता है।</string>
+    <string name="call_rtt_accept">स्वीकार करें</string>
+    <string name="notif_channel_voicemail">वॉइसमेल</string>
+    <string name="notif_voicemail">नया वॉइसमेल</string>
+    <string name="notif_voicemail_many">%1$d नए वॉइसमेल</string>
+    <string name="notif_voicemail_text">वॉइसमेल पर कॉल करने के लिए टैप करें</string>
 </resources>

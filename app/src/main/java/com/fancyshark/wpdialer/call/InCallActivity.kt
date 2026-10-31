@@ -22,6 +22,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -30,6 +32,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Bluetooth
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Keyboard
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.filled.CallMerge
 import androidx.compose.material.icons.filled.Dialpad
 import androidx.compose.material.icons.filled.MicOff
@@ -63,6 +68,7 @@ import com.fancyshark.wpdialer.ui.FontStore
 import com.fancyshark.wpdialer.ui.Selawik
 import com.fancyshark.wpdialer.ui.Metro
 import com.fancyshark.wpdialer.ui.MetroButton
+import com.fancyshark.wpdialer.ui.MetroConfirm
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 
@@ -151,7 +157,7 @@ class InCallActivity : ComponentActivity() {
                 return true
             }
         }
-        val dtmf = dtmfChar(keyCode)
+        val dtmf = com.fancyshark.wpdialer.ui.DialKeys.charFor(keyCode, event)
         if (dtmf != null && CallManager.state.value == Call.STATE_ACTIVE) {
             CallManager.startDtmf(dtmf)
             dtmfTyped.value += dtmf
@@ -163,19 +169,14 @@ class InCallActivity : ComponentActivity() {
     override fun onKeyUp(keyCode: Int, event: android.view.KeyEvent?): Boolean {
         // Unconditional: if the call left ACTIVE between key down and up, the
         // tone would otherwise stay latched on the connection.
-        if (dtmfChar(keyCode) != null) {
+        // Shift-agnostic: shift may be released before the digit key.
+        if (com.fancyshark.wpdialer.ui.DialKeys.charFor(keyCode, false) != null ||
+            com.fancyshark.wpdialer.ui.DialKeys.charFor(keyCode, true) != null
+        ) {
             CallManager.stopDtmf()
             return true
         }
         return super.onKeyUp(keyCode, event)
-    }
-
-    private fun dtmfChar(keyCode: Int): Char? = when (keyCode) {
-        in android.view.KeyEvent.KEYCODE_0..android.view.KeyEvent.KEYCODE_9 ->
-            '0' + (keyCode - android.view.KeyEvent.KEYCODE_0)
-        android.view.KeyEvent.KEYCODE_STAR -> '*'
-        android.view.KeyEvent.KEYCODE_POUND -> '#'
-        else -> null
     }
 }
 
@@ -236,6 +237,8 @@ private fun InCallRoot(onFinished: () -> Unit) {
                     number = number,
                     photoUri = caller.second,
                     accent = accent.color,
+                    // Keyed to detailsTick like the name: details can update.
+                    verified = remember(call, detailsTick) { CallManager.callerVerified(call) },
                 )
             }
             else -> {
@@ -327,6 +330,7 @@ private fun IncomingScreen(
     number: String,
     photoUri: String?,
     accent: Color,
+    verified: Boolean? = null,
 ) {
     val context = LocalContext.current
     val country by produceState<String?>(null, number, isSavedContact) {
@@ -386,6 +390,32 @@ private fun IncomingScreen(
                     fontWeight = FontWeight.Light,
                     textAlign = TextAlign.Center,
                 )
+            }
+            // STIR/SHAKEN: the network vouches for (or rejects) the number.
+            // Nothing is shown for unverified calls, which are most of them.
+            if (verified != null) {
+                Spacer(Modifier.height(10.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        if (verified) Icons.Filled.CheckCircle else Icons.Filled.Warning,
+                        contentDescription = null,
+                        tint = if (verified) Metro.textAccent(accent) else Metro.Red,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Text(
+                        stringResource(
+                            if (verified) {
+                                com.fancyshark.wpdialer.R.string.call_verified
+                            } else {
+                                com.fancyshark.wpdialer.R.string.call_spoof_warning
+                            },
+                        ),
+                        color = if (verified) Metro.Subtle else Metro.Red,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Light,
+                        modifier = Modifier.padding(start = 6.dp),
+                    )
+                }
             }
         }
         Spacer(Modifier.weight(1f))
@@ -503,8 +533,16 @@ private fun ActiveScreen(
         value = Repo.lookupCaller(context2, secondNumber)
     }
 
+    // RTT: offered when the call's account supports it and the call is live.
+    val rttActive by CallManager.rttActive.collectAsState()
+    val rttSupported = remember(call, state, capsTick) {
+        state == Call.STATE_ACTIVE && CallManager.supportsRtt(context2, call)
+    }
+    val postDialWait by CallManager.postDialWait.collectAsState()
+    val rttRequest by CallManager.rttRequest.collectAsState()
+
     var showBtPicker by remember { mutableStateOf(false) }
-    Box(Modifier.fillMaxSize()) {
+    Box(Modifier.fillMaxSize().imePadding()) {
     Column(Modifier.fillMaxSize()) {
         // WP 8.1 places the caller info on a chrome-gray panel.
         Column(Modifier.fillMaxWidth().background(Metro.Key).padding(24.dp)) {
@@ -606,7 +644,11 @@ private fun ActiveScreen(
             }
         }
         }
-        Spacer(Modifier.weight(1f))
+        if (rttActive && !showKeypad) {
+            RttPanel(accent, Modifier.weight(1f))
+        } else {
+            Spacer(Modifier.weight(1f))
+        }
         Column(Modifier.padding(horizontal = 24.dp)) {
 
         if (showKeypad) {
@@ -709,7 +751,17 @@ private fun ActiveScreen(
                                 .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
                         )
                     }
-                    Spacer(Modifier.weight(1f))
+                    // Third slot: RTT upgrade when the network offers it.
+                    if (rttSupported && !rttActive) {
+                        IconTile(
+                            Icons.Filled.Keyboard,
+                            stringResource(com.fancyshark.wpdialer.R.string.call_rtt),
+                            false, accent,
+                            modifier = Modifier.weight(1f),
+                        ) { CallManager.requestRtt() }
+                    } else {
+                        Spacer(Modifier.weight(1f))
+                    }
                 }
             }
         }
@@ -790,6 +842,77 @@ private fun ActiveScreen(
             }
         }
     }
+
+    // A wait (';') in the dialed number: Telecom holds the remaining tones
+    // until the user confirms (e.g. once an IVR has answered).
+    postDialWait?.let { wait ->
+        MetroConfirm(
+            title = stringResource(com.fancyshark.wpdialer.R.string.call_send_tones_title),
+            message = wait.remaining,
+            confirmLabel = stringResource(com.fancyshark.wpdialer.R.string.call_send),
+            cancelLabel = stringResource(com.fancyshark.wpdialer.R.string.main_button_cancel),
+            confirmFill = accent,
+            dismissOnBackdrop = false,
+            onConfirm = { CallManager.postDialContinue(true) },
+            onCancel = { CallManager.postDialContinue(false) },
+        )
+    }
+
+    if (rttRequest != null && postDialWait == null) {
+        MetroConfirm(
+            title = stringResource(com.fancyshark.wpdialer.R.string.call_rtt_request_title),
+            message = stringResource(com.fancyshark.wpdialer.R.string.call_rtt_request_message),
+            confirmLabel = stringResource(com.fancyshark.wpdialer.R.string.call_rtt_accept),
+            cancelLabel = stringResource(com.fancyshark.wpdialer.R.string.notif_decline),
+            confirmFill = accent,
+            dismissOnBackdrop = false,
+            onConfirm = { CallManager.respondToRttRequest(true) },
+            onCancel = { CallManager.respondToRttRequest(false) },
+        )
+    }
+    }
+}
+
+/**
+ * Live RTT conversation: the other side's text as it arrives, and a field
+ * whose every edit goes out immediately (new characters, or backspaces for
+ * deletions; RTT has no "send" step).
+ */
+@Composable
+private fun RttPanel(accent: Color, modifier: Modifier = Modifier) {
+    val transcript by CallManager.rttTranscript.collectAsState()
+    val call by CallManager.call.collectAsState()
+    // Per call: a swap to another RTT call starts a fresh field.
+    var typed by remember(call) { mutableStateOf("") }
+    val scroll = androidx.compose.foundation.rememberScrollState()
+    LaunchedEffect(transcript) { scroll.animateScrollTo(scroll.maxValue) }
+    Column(modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 12.dp)) {
+        Text(
+            stringResource(com.fancyshark.wpdialer.R.string.call_rtt_title),
+            color = Metro.Foreground,
+            fontSize = 15.sp,
+            letterSpacing = 2.sp,
+        )
+        Text(
+            transcript,
+            color = Metro.Foreground,
+            fontSize = 20.sp,
+            fontWeight = FontWeight.Light,
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .padding(vertical = 8.dp)
+                .verticalScroll(scroll),
+        )
+        com.fancyshark.wpdialer.ui.MetroTextBox(
+            value = typed,
+            onValueChange = { next ->
+                CallManager.rttWrite(RttText.delta(typed, next))
+                typed = next
+            },
+            accent = accent,
+            placeholder = stringResource(com.fancyshark.wpdialer.R.string.call_rtt_hint),
+        )
     }
 }
 

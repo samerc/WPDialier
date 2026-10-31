@@ -115,8 +115,11 @@ fun DialpadScreen(
     onCall: (number: String, onPlaced: () -> Unit) -> Unit,
     onSave: (String) -> Unit,
     onVoicemail: (() -> Unit)? = null,
+    onSpecialCode: ((SpecialCode) -> Unit)? = null,
 ) {
     var number by rememberSaveable { mutableStateOf(initial) }
+    val speedDial by com.fancyshark.wpdialer.data.AppPrefs.speedDialNumbers.collectAsState()
+    val resources = androidx.compose.ui.platform.LocalResources.current
     val context = androidx.compose.ui.platform.LocalContext.current
     val tones = remember {
         runCatching { ToneGenerator(AudioManager.STREAM_DTMF, 70) }.getOrNull()
@@ -136,6 +139,43 @@ fun DialpadScreen(
             else -> key.toIntOrNull() ?: return
         }
         runCatching { tones?.startTone(tone, 120) }
+    }
+
+    // Secret / MMI codes act as they're typed (AOSP SpecialCharSequenceMgr):
+    // no call press, and the pad clears so the code can't be re-sent.
+    androidx.compose.runtime.LaunchedEffect(number) {
+        val code = SpecialCodes.detect(number) ?: return@LaunchedEffect
+        if (onSpecialCode != null) {
+            number = ""
+            onSpecialCode(code)
+        }
+    }
+
+    // Hold 2-9 on an empty pad: speed-dial entry N-1 (key 2 = first entry).
+    fun speedDialKey(key: Int) {
+        val target = speedDial.getOrNull(key - 2)
+        Haptics.tick(context)
+        if (target != null) {
+            onCall(target) {}
+        } else {
+            android.widget.Toast.makeText(
+                context,
+                resources.getString(com.fancyshark.wpdialer.R.string.dialpad_speed_dial_empty, key),
+                android.widget.Toast.LENGTH_SHORT,
+            ).show()
+        }
+    }
+
+    // Hold * = pause (','), hold # = wait (';') — AOSP convention. Where one
+    // isn't allowed (first character, wait after wait) the key types itself.
+    fun postDialKey(key: String, ch: Char) {
+        if (SpecialCodes.canAppendPostDial(number, ch)) {
+            Haptics.tick(context)
+            number += ch
+        } else {
+            beep(key)
+            number += key
+        }
     }
 
     androidx.compose.runtime.LaunchedEffect(Unit) {
@@ -180,9 +220,12 @@ fun DialpadScreen(
                 .height(64.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            // Pause/wait tones stay verbatim after the formatted number —
+            // the formatter would mangle (or drop) them.
+            val (dialable, postDial) = SpecialCodes.splitPostDial(number)
             Text(
-                if (number.length > 3) {
-                    com.fancyshark.wpdialer.data.Repo.pretty(context, number)
+                if (dialable.length > 3) {
+                    com.fancyshark.wpdialer.data.Repo.pretty(context, dialable) + postDial
                 } else number,
                 color = Metro.Foreground,
                 fontSize = when {
@@ -229,7 +272,9 @@ fun DialpadScreen(
         }
         val input = number.filter { it.isDigit() }
         val suggestions = remember(number, entries) {
-            if (input.length < 2 || number.any { it == '*' || it == '#' }) {
+            if (input.length < 2 || number.any { it == '*' || it == '#' } ||
+                SpecialCodes.hasPostDial(number)
+            ) {
                 emptyList()
             } else {
                 entries.mapNotNull { p -> dialRank(p, input)?.let { it to p.entry } }
@@ -312,6 +357,23 @@ fun DialpadScreen(
                                     }
                                 } else {
                                     null
+                                }
+                                "*" -> {
+                                    { postDialKey("*", SpecialCodes.PAUSE) }
+                                }
+                                "#" -> {
+                                    { postDialKey("#", SpecialCodes.WAIT) }
+                                }
+                                // Same empty-pad rule as hold-1: mid-number a
+                                // long press just types the digit.
+                                in "2".."9" -> {
+                                    {
+                                        if (number.isEmpty()) {
+                                            speedDialKey(digit.toInt())
+                                        } else {
+                                            number += digit
+                                        }
+                                    }
                                 }
                                 else -> null
                             },

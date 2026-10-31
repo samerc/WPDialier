@@ -11,6 +11,8 @@ import android.telecom.VideoProfile
 import androidx.annotation.RequiresApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 
 /**
  * Platform-neutral audio route. Fed by the [CallEndpoint] callbacks on
@@ -80,6 +82,124 @@ object CallManager {
         }
         override fun onDetailsChanged(call: Call, details: Call.Details) {
             _detailsTick.value += 1
+            syncRtt()
+        }
+
+        // A ';' in the dialed number: Telecom stops and waits for the user
+        // to confirm the rest of the tones (AOSP "send tones?" prompt).
+        override fun onPostDialWait(call: Call, remainingPostDialSequence: String?) {
+            _postDialWait.value = PostDialWait(call, remainingPostDialSequence.orEmpty())
+        }
+
+        override fun onRttRequest(call: Call, id: Int) {
+            _rttRequest.value = RttRequest(call, id)
+        }
+
+        override fun onRttStatusChanged(call: Call, enabled: Boolean, rttCall: Call.RttCall?) {
+            syncRtt()
+        }
+
+        override fun onRttModeChanged(call: Call, mode: Int) {
+            syncRtt()
+        }
+
+        override fun onRttInitiationFailure(call: Call, reason: Int) {
+            syncRtt()
+        }
+    }
+
+    /** A call paused on a wait (';') with the tones still to send. */
+    class PostDialWait(val call: Call, val remaining: String)
+
+    private val _postDialWait = MutableStateFlow<PostDialWait?>(null)
+    val postDialWait: StateFlow<PostDialWait?> = _postDialWait
+
+    /** Answers the wait prompt: send the remaining tones, or drop them. */
+    fun postDialContinue(proceed: Boolean) {
+        val wait = _postDialWait.value ?: return
+        _postDialWait.value = null
+        runCatching { wait.call.postDialContinue(proceed) }
+    }
+
+    // ---- RTT (real-time text). Carrier support varies wildly, so every
+    // platform call is wrapped; failures just leave RTT unavailable. ----
+
+    /** The remote side asked to upgrade this call to RTT. */
+    class RttRequest(val call: Call, val id: Int)
+
+    private val _rttRequest = MutableStateFlow<RttRequest?>(null)
+    val rttRequest: StateFlow<RttRequest?> = _rttRequest
+
+    private val _rttActive = MutableStateFlow(false)
+    val rttActive: StateFlow<Boolean> = _rttActive
+
+    // What the other side typed (backspaces already applied).
+    private val _rttTranscript = MutableStateFlow("")
+    val rttTranscript: StateFlow<String> = _rttTranscript
+
+    private val rttScope = kotlinx.coroutines.CoroutineScope(
+        kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO,
+    )
+    private var rttReader: kotlinx.coroutines.Job? = null
+    private var rttReaderCall: Call? = null
+
+    /** Whether the primary call's account can carry RTT at all. */
+    fun supportsRtt(context: android.content.Context, call: Call?): Boolean {
+        val handle = call?.details?.accountHandle ?: return false
+        return runCatching {
+            context.getSystemService(android.telecom.TelecomManager::class.java)
+                ?.getPhoneAccount(handle)
+                ?.hasCapabilities(android.telecom.PhoneAccount.CAPABILITY_RTT) == true
+        }.getOrDefault(false)
+    }
+
+    fun requestRtt() {
+        runCatching { _call.value?.sendRttRequest() }
+    }
+
+    fun respondToRttRequest(accept: Boolean) {
+        val req = _rttRequest.value ?: return
+        _rttRequest.value = null
+        runCatching { req.call.respondToRttRequest(req.id, accept) }
+    }
+
+    /** Sends typed text (already a delta, see [RttText.delta]) off-main. */
+    fun rttWrite(text: String) {
+        if (text.isEmpty()) return
+        val rtt = runCatching { _call.value?.rttCall }.getOrNull() ?: return
+        rttScope.launch { runCatching { rtt.write(text) } }
+    }
+
+    /**
+     * Mirrors the primary call's RTT state and runs the transcript reader
+     * only while RTT is live on it. readImmediately never blocks — polled on
+     * IO every 100ms rather than parking a thread in the blocking read().
+     */
+    private fun syncRtt() {
+        val primary = _call.value
+        val active = runCatching { primary?.isRttActive == true }.getOrDefault(false)
+        _rttActive.value = active
+        if (active && primary != null && rttReaderCall === primary) return
+        rttReader?.cancel()
+        rttReader = null
+        rttReaderCall = null
+        if (!active || primary == null) {
+            if (primary == null) _rttTranscript.value = ""
+            return
+        }
+        _rttTranscript.value = ""
+        rttReaderCall = primary
+        rttReader = rttScope.launch {
+            while (isActive) {
+                val rtt = runCatching { primary.rttCall }.getOrNull()
+                val text = rtt?.let { runCatching { it.readImmediately() }.getOrNull() }
+                if (!text.isNullOrEmpty()) {
+                    // Bounded: a long RTT session must not grow without limit.
+                    _rttTranscript.value =
+                        RttText.applyRemote(_rttTranscript.value, text).takeLast(4000)
+                }
+                kotlinx.coroutines.delay(100)
+            }
         }
     }
 
@@ -153,6 +273,18 @@ object CallManager {
         }
     }
 
+    /**
+     * STIR/SHAKEN result for an incoming call: true = the network verified
+     * the number, false = verification failed (likely spoofed), null = not
+     * verified either way (show nothing).
+     */
+    fun callerVerified(call: Call?): Boolean? =
+        when (runCatching { call?.details?.callerNumberVerificationStatus }.getOrNull()) {
+            android.telecom.Connection.VERIFICATION_STATUS_PASSED -> true
+            android.telecom.Connection.VERIFICATION_STATUS_FAILED -> false
+            else -> null
+        }
+
     /** Ranks calls so the most "active" one is primary. */
     private fun rank(call: Call): Int = when (stateOf(call)) {
         Call.STATE_ACTIVE -> 0
@@ -178,6 +310,10 @@ object CallManager {
         _state.value = live.firstOrNull()?.let { stateOf(it) } ?: Call.STATE_DISCONNECTED
         _secondCall.value = live.getOrNull(1)
         _secondState.value = live.getOrNull(1)?.let { stateOf(it) } ?: Call.STATE_DISCONNECTED
+        // Prompts belong to a live call — drop them once it ends.
+        _postDialWait.value?.let { if (it.call !in live) _postDialWait.value = null }
+        _rttRequest.value?.let { if (it.call !in live) _rttRequest.value = null }
+        syncRtt()
         if (live.isEmpty()) {
             // Per-call audio state must not leak into the next call. The
             // available endpoints stay: they describe device hardware, and

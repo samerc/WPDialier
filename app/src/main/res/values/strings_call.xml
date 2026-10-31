@@ -37,4 +37,20 @@
     <string name="notif_incoming_call">incoming call</string>
     <string name="notif_answer">answer</string>
     <string name="notif_decline">decline</string>
+
+    <!-- Dialer codes, speed-dial keys, post-dial, caller verification, RTT, voicemail -->
+    <string name="call_send_tones_title">send tones?</string>
+    <string name="call_send">send</string>
+    <string name="call_verified">verified caller</string>
+    <string name="call_spoof_warning">caller ID may be spoofed</string>
+    <string name="call_rtt">RTT</string>
+    <string name="call_rtt_title">REAL-TIME TEXT</string>
+    <string name="call_rtt_hint">type to send</string>
+    <string name="call_rtt_request_title">switch to real-time text?</string>
+    <string name="call_rtt_request_message">The other side wants to type messages during this call.</string>
+    <string name="call_rtt_accept">accept</string>
+    <string name="notif_channel_voicemail">Voicemail</string>
+    <string name="notif_voicemail">New voicemail</string>
+    <string name="notif_voicemail_many">%1$d new voicemails</string>
+    <string name="notif_voicemail_text">tap to call voicemail</string>
 </resources>

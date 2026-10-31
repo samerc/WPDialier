@@ -349,7 +349,7 @@ class WpInCallService : InCallService() {
             ?: number.ifBlank { getString(com.fancyshark.wpdialer.R.string.call_unknown) }
         val s = scope
         if (s == null || number.isBlank()) {
-            postIncomingNotificationNow(number, fallback, null)
+            postIncomingNotificationNow(number, fallback, null, CallManager.callerVerified(call))
             return
         }
         s.launch {
@@ -385,7 +385,9 @@ class WpInCallService : InCallService() {
             // after our own in-call UI came to the foreground (fast
             // pause/resume) — don't stack a banner on top of it.
             if (CallManager.stateOf(call) == Call.STATE_RINGING && !inCallUiVisible) {
-                postIncomingNotificationNow(number, name ?: fallback, photo)
+                postIncomingNotificationNow(
+                    number, name ?: fallback, photo, CallManager.callerVerified(call),
+                )
             }
         }
     }
@@ -394,6 +396,7 @@ class WpInCallService : InCallService() {
         number: String,
         display: String,
         photo: android.graphics.Bitmap?,
+        verified: Boolean? = null,
     ) {
         val nm = getSystemService(NotificationManager::class.java)
         nm.createNotificationChannel(
@@ -438,6 +441,30 @@ class WpInCallService : InCallService() {
             views.setImageViewBitmap(com.fancyshark.wpdialer.R.id.caller_photo, photo)
             views.setViewVisibility(
                 com.fancyshark.wpdialer.R.id.caller_photo, android.view.View.VISIBLE,
+            )
+        }
+        // STIR/SHAKEN: accent check for a verified number, red warning for a
+        // failed one (likely spoofed). Spans survive the RemoteViews parcel.
+        if (verified != null) {
+            val mark = if (verified) Char(0x2713) else Char(0x26A0)
+            val label = getString(
+                if (verified) {
+                    com.fancyshark.wpdialer.R.string.call_verified
+                } else {
+                    com.fancyshark.wpdialer.R.string.call_spoof_warning
+                },
+            )
+            val text = android.text.SpannableString("$mark $label")
+            text.setSpan(
+                android.text.style.ForegroundColorSpan(
+                    if (verified) accent else com.fancyshark.wpdialer.ui.Metro.Red.toArgb(),
+                ),
+                0, if (verified) 1 else text.length,
+                android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE,
+            )
+            views.setTextViewText(com.fancyshark.wpdialer.R.id.caller_verification, text)
+            views.setViewVisibility(
+                com.fancyshark.wpdialer.R.id.caller_verification, android.view.View.VISIBLE,
             )
         }
         views.setOnClickPendingIntent(com.fancyshark.wpdialer.R.id.btn_answer, answer)

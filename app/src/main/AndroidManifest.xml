@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!-- A phone app: Play should only offer it to telephony devices. -->
     <uses-feature android:name="android.hardware.telephony" android:required="true" />
@@ -90,6 +91,7 @@
             android:screenOrientation="portrait"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|uiMode"
             android:excludeFromRecents="true"
+            android:windowSoftInputMode="adjustResize"
             android:taskAffinity="com.fancyshark.wpdialer.incall" />
 
         <receiver
@@ -102,6 +104,29 @@
                 <action android:name="android.telecom.action.SHOW_MISSED_CALLS_NOTIFICATION" />
             </intent-filter>
         </receiver>
+
+        <!-- Telephony's voicemail (MWI) broadcast to the default dialer. Its
+             presence makes the phone process skip its own notification.
+             Exported because the sender is another process (com.android.phone,
+             sending with receiver permission READ_PHONE_STATE, which we hold);
+             there's no sender permission we can rely on across OEMs, so the
+             receiver treats extras as untrusted (see VoicemailReceiver). -->
+        <receiver
+            android:name=".call.VoicemailReceiver"
+            android:exported="true"
+            tools:ignore="ExportedReceiver">
+            <intent-filter>
+                <action android:name="android.telephony.action.SHOW_VOICEMAIL_NOTIFICATION" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Non-exported entry point for the voicemail notification's tap:
+             MainActivity only dials voicemail when launched through this
+             alias, so other apps can't trigger a call via the action. -->
+        <activity-alias
+            android:name=".VoicemailLauncher"
+            android:targetActivity=".MainActivity"
+            android:exported="false" />
 
         <receiver
             android:name=".widget.TileWidget"

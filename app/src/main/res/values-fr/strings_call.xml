@@ -37,4 +37,20 @@
     <string name="notif_incoming_call">appel entrant</string>
     <string name="notif_answer">répondre</string>
     <string name="notif_decline">refuser</string>
+
+    <!-- Dialer codes, speed-dial keys, post-dial, caller verification, RTT, voicemail -->
+    <string name="call_send_tones_title">envoyer les tonalités ?</string>
+    <string name="call_send">envoyer</string>
+    <string name="call_verified">appelant vérifié</string>
+    <string name="call_spoof_warning">le numéro de l\'appelant est peut-être usurpé</string>
+    <string name="call_rtt">RTT</string>
+    <string name="call_rtt_title">TEXTE EN TEMPS RÉEL</string>
+    <string name="call_rtt_hint">tapez pour envoyer</string>
+    <string name="call_rtt_request_title">passer au texte en temps réel ?</string>
+    <string name="call_rtt_request_message">Votre correspondant souhaite écrire des messages pendant cet appel.</string>
+    <string name="call_rtt_accept">accepter</string>
+    <string name="notif_channel_voicemail">Messagerie vocale</string>
+    <string name="notif_voicemail">Nouveau message vocal</string>
+    <string name="notif_voicemail_many">%1$d nouveaux messages vocaux</string>
+    <string name="notif_voicemail_text">appuyez pour appeler la messagerie</string>
 </resources>

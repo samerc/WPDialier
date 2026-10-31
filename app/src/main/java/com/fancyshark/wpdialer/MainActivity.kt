@@ -165,6 +165,16 @@ private val ScreenStackSaver = androidx.compose.runtime.saveable.listSaver<
 
 class MainActivity : ComponentActivity() {
 
+    companion object {
+        /** Voicemail notification tap (via the VoicemailLauncher alias). */
+        const val ACTION_CALL_VOICEMAIL = "com.fancyshark.wpdialer.CALL_VOICEMAIL"
+
+        // Class names follow the code namespace, not the applicationId (the
+        // .r8test variant has a suffixed package but the same classes).
+        val VOICEMAIL_LAUNCHER: String =
+            MainActivity::class.java.name.substringBeforeLast('.') + ".VoicemailLauncher"
+    }
+
     private val dialRequest = MutableStateFlow<String?>(null)
     private val permissionsGranted = MutableStateFlow(false)
     private val allCorePermissionsGranted = MutableStateFlow(false)
@@ -309,13 +319,7 @@ class MainActivity : ComponentActivity() {
         // (e.g. mid-edit in the contact editor) a stray CALL key would
         // destroy the back stack and any unsaved input.
         if (!hardwareDialSafe.value) return super.onKeyDown(keyCode, event)
-        val digit = when (keyCode) {
-            in android.view.KeyEvent.KEYCODE_0..android.view.KeyEvent.KEYCODE_9 ->
-                ('0' + (keyCode - android.view.KeyEvent.KEYCODE_0)).toString()
-            android.view.KeyEvent.KEYCODE_STAR -> "*"
-            android.view.KeyEvent.KEYCODE_POUND -> "#"
-            else -> null
-        }
+        val digit = com.fancyshark.wpdialer.ui.DialKeys.charFor(keyCode, event)?.toString()
         if (digit != null) {
             if (DialpadBus.open) DialpadBus.events.tryEmit(digit) else dialRequest.value = digit
             return true
@@ -332,6 +336,14 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun handleIntent(intent: Intent?) {
+        // The voicemail notification's tap. Arrives through a non-exported
+        // alias, so other apps can't make us dial out with this action.
+        if (intent?.action == ACTION_CALL_VOICEMAIL &&
+            intent.component?.className == VOICEMAIL_LAUNCHER
+        ) {
+            callVoicemail()
+            return
+        }
         when (intent?.action) {
             Intent.ACTION_DIAL, Intent.ACTION_VIEW ->
                 dialRequest.value = intent.data?.schemeSpecificPart ?: ""
@@ -413,9 +425,13 @@ class MainActivity : ComponentActivity() {
             if (placeCallWith(number, null)) onPlaced()
             return
         }
+        // Contact / SIM preference lookups use the dialable part only — the
+        // digits of pause/wait tones would skew the number key.
+        val lookupNumber =
+            com.fancyshark.wpdialer.screens.SpecialCodes.splitPostDial(number).first
         lifecycleScope.launch {
-            val contactId = Repo.contactIdFor(this@MainActivity, number)
-            val contactPref = SimPrefs.get(this@MainActivity, number)
+            val contactId = Repo.contactIdFor(this@MainActivity, lookupNumber)
+            val contactPref = SimPrefs.get(this@MainActivity, lookupNumber)
                 ?.let { flat -> sims.firstOrNull { it.flat == flat } }
             val globalPref = com.fancyshark.wpdialer.data.AppPrefs.globalSim.value
                 ?.let { flat -> sims.firstOrNull { it.flat == flat } }
@@ -463,6 +479,23 @@ class MainActivity : ComponentActivity() {
         } else {
             android.widget.Toast.makeText(
                 this, getString(R.string.main_toast_no_voicemail), android.widget.Toast.LENGTH_SHORT,
+            ).show()
+        }
+    }
+
+    /**
+     * `*#*#code#*#*` from the dialpad: the platform broadcasts it to the
+     * apps that registered the code (testing menus etc.). Only the default
+     * dialer may send it.
+     */
+    private fun sendSecretCode(code: String) {
+        val sent = isDefaultDialer.value && runCatching {
+            getSystemService(android.telephony.TelephonyManager::class.java)!!
+                .sendDialerSpecialCode(code)
+        }.isSuccess
+        if (!sent) {
+            android.widget.Toast.makeText(
+                this, getString(R.string.dialpad_code_needs_default), android.widget.Toast.LENGTH_SHORT,
             ).show()
         }
     }
@@ -517,6 +550,8 @@ class MainActivity : ComponentActivity() {
         var confirmDeleteGroup by remember { mutableStateOf<List<HistoryItem>?>(null) }
         var confirmBlock by remember { mutableStateOf<String?>(null) }
         var confirmRemoveSpeedDial by remember { mutableStateOf<String?>(null) }
+        // *#06# typed on the dialpad: explain where the IMEI lives instead.
+        var showDeviceIds by remember { mutableStateOf(false) }
         // Set when Settings re-runs the wizard: back from its first page
         // then closes it instead of leaving the app.
         var wizardRerun by androidx.compose.runtime.saveable.rememberSaveable {
@@ -588,7 +623,8 @@ class MainActivity : ComponentActivity() {
         }
         val simReq by simRequest.collectAsState()
         val overlayOpen = fullPageOverlay || simReq != null || confirmClearHistory ||
-            confirmDeleteGroup != null || confirmBlock != null || confirmRemoveSpeedDial != null
+            confirmDeleteGroup != null || confirmBlock != null || confirmRemoveSpeedDial != null ||
+            showDeviceIds
 
         val selawik by FontStore.selawik.collectAsState()
         MaterialTheme(colorScheme = darkColorScheme(primary = accent.color)) {
@@ -770,6 +806,14 @@ class MainActivity : ComponentActivity() {
                             onCall = { number, onPlaced -> placeCall(number, onPlaced) },
                             onSave = { push(Screen.NewContact(it)) },
                             onVoicemail = { callVoicemail() },
+                            onSpecialCode = { code ->
+                                when (code) {
+                                    is com.fancyshark.wpdialer.screens.SpecialCode.Secret ->
+                                        sendSecretCode(code.code)
+                                    com.fancyshark.wpdialer.screens.SpecialCode.DeviceId ->
+                                        showDeviceIds = true
+                                }
+                            },
                         )
 
                         is Screen.Contact -> ContactDetailScreen(
@@ -917,13 +961,39 @@ class MainActivity : ComponentActivity() {
                     )
                 }
 
+                if (showDeviceIds) {
+                    // Third-party dialers can't read the IMEI (privileged
+                    // permission) — point at the system page that shows it.
+                    MetroConfirm(
+                        title = stringResource(R.string.dialpad_device_id_title),
+                        message = stringResource(R.string.dialpad_device_id_message),
+                        confirmLabel = stringResource(R.string.dialpad_device_id_open),
+                        cancelLabel = stringResource(R.string.dialpad_close),
+                        confirmFill = accent.color,
+                        onConfirm = {
+                            showDeviceIds = false
+                            runCatching {
+                                startActivity(
+                                    Intent(android.provider.Settings.ACTION_DEVICE_INFO_SETTINGS),
+                                )
+                            }
+                        },
+                        onCancel = { showDeviceIds = false },
+                    )
+                }
+
                 simReq?.let { req ->
                     SimPickerOverlay(
                         request = req,
                         accent = accent.color,
                         onPick = { option, remember ->
                             if (remember && req.contactId != null) {
-                                SimPrefs.set(this@MainActivity, req.number, option.flat)
+                                SimPrefs.set(
+                                    this@MainActivity,
+                                    com.fancyshark.wpdialer.screens.SpecialCodes
+                                        .splitPostDial(req.number).first,
+                                    option.flat,
+                                )
                             }
                             simRequest.value = null
                             if (placeCallWith(req.number, option.handle)) req.onPlaced()

@@ -26,4 +26,13 @@
     <string name="dialpad_delete">delete</string>
     <string name="dialpad_call">call</string>
     <string name="dialpad_save">save</string>
+
+    <!-- Dialer codes and speed-dial keys -->
+    <string name="dialpad_device_id_title">device identifiers</string>
+    <string name="dialpad_device_id_message">Phone apps can\'t read the IMEI. Your phone lists it, with its other identifiers, under About phone.</string>
+    <string name="dialpad_device_id_open">about phone</string>
+    <string name="dialpad_close">close</string>
+    <string name="dialpad_speed_dial_empty">no speed dial number on key %1$d</string>
+    <string name="dialpad_code_needs_default">codes work only while this is the default phone app</string>
+    <string name="home_speed_dial_key">hold %1$d on the keypad</string>
 </resources>

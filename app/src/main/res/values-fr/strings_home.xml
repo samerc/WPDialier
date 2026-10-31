@@ -26,4 +26,13 @@
     <string name="dialpad_delete">supprimer</string>
     <string name="dialpad_call">appeler</string>
     <string name="dialpad_save">enregistrer</string>
+
+    <!-- Dialer codes and speed-dial keys -->
+    <string name="dialpad_device_id_title">identifiants de l\'appareil</string>
+    <string name="dialpad_device_id_message">Les applications téléphone ne peuvent pas lire l\'IMEI. Votre téléphone l\'affiche, avec ses autres identifiants, dans À propos du téléphone.</string>
+    <string name="dialpad_device_id_open">à propos du téléphone</string>
+    <string name="dialpad_close">fermer</string>
+    <string name="dialpad_speed_dial_empty">aucun numéro abrégé sur la touche %1$d</string>
+    <string name="dialpad_code_needs_default">les codes ne fonctionnent que si cette app est l\'app téléphone par défaut</string>
+    <string name="home_speed_dial_key">maintenez %1$d sur le clavier</string>
 </resources>

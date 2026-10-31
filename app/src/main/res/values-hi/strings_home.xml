@@ -26,4 +26,13 @@
     <string name="dialpad_delete">मिटाएँ</string>
     <string name="dialpad_call">कॉल करें</string>
     <string name="dialpad_save">सेव करें</string>
+
+    <!-- Dialer codes and speed-dial keys -->
+    <string name="dialpad_device_id_title">डिवाइस पहचानकर्ता</string>
+    <string name="dialpad_device_id_message">फ़ोन ऐप IMEI नहीं पढ़ सकते। आपका फ़ोन इसे अन्य पहचानकर्ताओं के साथ \"फ़ोन के बारे में\" में दिखाता है।</string>
+    <string name="dialpad_device_id_open">फ़ोन के बारे में</string>
+    <string name="dialpad_close">बंद करें</string>
+    <string name="dialpad_speed_dial_empty">कुंजी %1$d पर कोई स्पीड डायल नंबर नहीं है</string>
+    <string name="dialpad_code_needs_default">कोड तभी काम करते हैं जब यह डिफ़ॉल्ट फ़ोन ऐप हो</string>
+    <string name="home_speed_dial_key">कीपैड पर %1$d दबाकर रखें</string>
 </resources>

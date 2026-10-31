@@ -26,4 +26,13 @@
     <string name="dialpad_delete">حذف</string>
     <string name="dialpad_call">اتصال</string>
     <string name="dialpad_save">حفظ</string>
+
+    <!-- Dialer codes and speed-dial keys -->
+    <string name="dialpad_device_id_title">معرّفات الجهاز</string>
+    <string name="dialpad_device_id_message">لا يمكن لتطبيقات الهاتف قراءة رقم IMEI. يعرضه هاتفك مع معرّفاته الأخرى في «حول الهاتف».</string>
+    <string name="dialpad_device_id_open">حول الهاتف</string>
+    <string name="dialpad_close">إغلاق</string>
+    <string name="dialpad_speed_dial_empty">لا يوجد رقم اتصال سريع على المفتاح %1$d</string>
+    <string name="dialpad_code_needs_default">تعمل الرموز فقط عندما يكون هذا تطبيق الهاتف الافتراضي</string>
+    <string name="home_speed_dial_key">اضغط مطولاً على %1$d في لوحة المفاتيح</string>
 </resources>

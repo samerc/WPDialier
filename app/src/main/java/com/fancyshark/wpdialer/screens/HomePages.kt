@@ -38,6 +38,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -431,7 +433,26 @@ fun SpeedDialPage(
                     .fillMaxWidth()
                     .clickable { onCallNumber(number) },
             ) {
-                Box(Modifier.size(40.dp).background(accent))
+                // Hold 2-9 on the dialpad dials the first eight entries —
+                // the tile shows its key so the gesture is discoverable.
+                val key = i + 2
+                Box(
+                    Modifier.size(40.dp).background(accent),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (key <= 9) {
+                        val keyDesc = stringResource(
+                            com.fancyshark.wpdialer.R.string.home_speed_dial_key, key,
+                        )
+                        Text(
+                            key.toString(),
+                            color = Metro.onAccent(accent),
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Light,
+                            modifier = Modifier.semantics { contentDescription = keyDesc },
+                        )
+                    }
+                }
                 Text(
                     Repo.pretty(context, number),
                     color = Metro.Foreground,
