@@ -12,13 +12,18 @@ purge it).
 
 ## Build & install
 
-- Gradle is NOT on PATH: `C:\gradle\gradle-9.7.1\bin\gradle.bat`, with `JAVA_HOME=C:\jdk-21`
-  (8.13 still at C:\gradle\gradle-8.13 but the project needs 9.x since AGP 9)
-- Android SDK at `C:\android-sdk` (see `local.properties`, untracked); adb: `C:\android-sdk\platform-tools\adb.exe`
-- Build: `$env:JAVA_HOME='C:\jdk-21'; & C:\gradle\gradle-9.7.1\bin\gradle.bat -p "<repo>" assembleDebug`
-- Toolchain (refreshed 2026-08-26 for the Play Billing 8+ mandate):
-  Gradle 9.7.1 / AGP 9.3.2 / Kotlin 2.4.10 / billing-ktx 9.1.0 /
-  compose-bom 2026.08.00 (needs compileSdk 37; targetSdk stays 36).
+- Gradle wrapper committed (2026-10-31): `.\gradlew.bat <task>` from the repo
+  root — downloads the pinned Gradle itself. Needs JAVA_HOME (any JDK 17+).
+- TWO dev machines exist. Current one (since 2026-10-31, user "Samer"):
+  JDK = Android Studio's JBR (`C:\Program Files\Android\Android Studio\jbr`,
+  JDK 25), SDK at `%LOCALAPPDATA%\Android\Sdk` (adb in platform-tools there),
+  standalone Gradle 9.7.1 also at `C:\gradle`. Old machine: `C:\jdk-21`,
+  `C:\android-sdk`. `local.properties` (untracked) holds the machine's sdk.dir.
+- Build: `$env:JAVA_HOME='C:\Program Files\Android\Android Studio\jbr'; .\gradlew.bat assembleDebug`
+- Toolchain (refreshed 2026-10-31): Gradle 9.8.2 (wrapper) / AGP 9.5.0
+  (needs Gradle 9.5+) / Kotlin 2.4.21 / billing-ktx 9.1.0 /
+  compose-bom 2026.09.00 (needs compileSdk 37; targetSdk stays 36).
+  osmdroid 6.1.20 and material-icons-extended 1.7.8 are final releases.
   AGP 9 wants built-in Kotlin — we keep external KGP via
   `android.builtInKotlin=false` + `android.newDsl=false` in
   gradle.properties (migration to built-in Kotlin is the eventual path).
@@ -36,7 +41,16 @@ purge it).
 - Test device: user's OnePlus 10 Pro (NE2213, Android 16) over USB. Screenshots via
   `adb shell screencap` + `adb pull` (PowerShell `>` redirection corrupts binary).
   Downscale screenshots before Reading them (System.Drawing) to save context.
-- Emulator (set up 2026-08-25): AVD `wp33` = Android 13 / API 33
+- Current machine's emulator: AVD `Medium_Phone_API_37.0` (API 37
+  google_apis_playstore — NO adb root, but `pm grant`, `appops set` and
+  `cmd role add-role-holder android.app.role.DIALER <pkg> 0` all work).
+  Boot with `-no-window -gpu swiftshader_indirect -no-snapshot -memory 2048
+  -no-audio`. Free RAM drops to ~0.3 GB with it up — `emu kill` before any
+  Gradle build. Its modem auto-answers outgoing calls and can desync from
+  Telecom (`gsm cancel` may not end a call — use the app's end button).
+  The only USB phone on this machine is a Galaxy A02 (Android 11) — below
+  minSdk, can't run the app.
+- Old machine's emulator (set up 2026-08-25): AVD `wp33` = Android 13 / API 33
   google_apis x86_64, AEHD hypervisor driver installed (dev machine is a
   physical Lenovo laptop, VT-x on). Boot:
   `C:\android-sdk\emulator\emulator.exe -avd wp33 -no-window -gpu

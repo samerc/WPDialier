@@ -95,8 +95,8 @@ kotlin {
 }
 
 dependencies {
-    implementation(platform("androidx.compose:compose-bom:2026.08.00"))
-    implementation("androidx.core:core-ktx:1.19.0")
+    implementation(platform("androidx.compose:compose-bom:2026.09.00"))
+    implementation("androidx.core:core-ktx:1.19.1")
     implementation("androidx.activity:activity-compose:1.13.0")
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.foundation:foundation")
@@ -108,7 +108,7 @@ dependencies {
     // ART pre-compiles the hot paths — faster cold start and first scroll.
     implementation("androidx.profileinstaller:profileinstaller:1.4.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
-    implementation("com.googlecode.libphonenumber:libphonenumber:9.0.37")
+    implementation("com.googlecode.libphonenumber:libphonenumber:9.0.42")
     // Tip jar. Products must exist in Play Console; until then (or on
     // devices without Play) the query returns nothing and the UI hides.
     // 8+ is a Play hard requirement for uploads from Aug 31, 2026; 9.x is
@@ -116,6 +116,6 @@ dependencies {
     implementation("com.android.billingclient:billing-ktx:9.1.0")
     // Billing pulls in a pre-1.3 androidx.fragment transitively, which
     // trips the ActivityResult lint check on release builds — pin current.
-    implementation("androidx.fragment:fragment:1.9.0")
+    implementation("androidx.fragment:fragment:1.9.1")
     implementation("org.osmdroid:osmdroid-android:6.1.20")
 }
