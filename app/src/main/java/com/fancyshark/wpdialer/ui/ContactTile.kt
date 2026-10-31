@@ -54,7 +54,8 @@ fun ContactTile(name: String, photoUri: String?, accent: Color, size: Dp) {
     }
 }
 
-private fun initialsOf(name: String): String {
+/** Shared with the contact live tile and shortcut icons (widget/). */
+internal fun initialsOf(name: String): String {
     val parts = name.trim()
         .split(Regex("\\s+"))
         .mapNotNull { word -> word.firstOrNull { it.isLetterOrDigit() } }

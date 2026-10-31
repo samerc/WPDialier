@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Contact live tile (widget/ContactTileWidget.kt) -->
+    <string name="contact_tile_label">Dialer 8 contact</string>
+    <string name="contact_tile_description">Pin a contact to your home screen as a live tile with their missed calls</string>
+    <string name="contact_tile_preview_name">contact</string>
+    <plurals name="contact_tile_a11y_missed">
+        <item quantity="one">%1$s, %2$d missed call</item>
+        <item quantity="other">%1$s, %2$d missed calls</item>
+    </plurals>
+    <!-- Contact tile configure screen (widget/ContactTileConfigActivity.kt) -->
+    <string name="contact_tile_config_title">PIN TO START</string>
+    <string name="contact_tile_config_header">choose a contact</string>
+    <string name="contact_tile_config_tap_label">when tapped</string>
+    <string name="contact_tile_action_profile">open profile</string>
+    <string name="contact_tile_action_call">call</string>
+    <string name="contact_tile_config_permission">Dialer 8 needs access to your contacts to make a contact tile.</string>
+    <string name="contact_tile_config_allow">allow</string>
+    <string name="contact_tile_config_search">search</string>
+    <!-- Contact profile app-bar menu (ContactDetailScreen.kt) -->
+    <string name="contact_pin_to_start">pin to start</string>
+    <string name="contact_add_call_shortcut">add call shortcut</string>
+    <string name="launcher_pin_unsupported">Your home screen app can\'t pin this.</string>
+    <!-- Static launcher shortcuts (xml/shortcuts.xml) -->
+    <string name="shortcut_dialpad_short">dialpad</string>
+    <string name="shortcut_dialpad_long">open the dialpad</string>
+    <string name="shortcut_missed_short">missed</string>
+    <string name="shortcut_missed_long">missed calls</string>
+    <!-- Quick Settings tile (widget/DialpadTileService.kt) -->
+    <string name="qs_dialpad_label">dialpad</string>
+    <!-- Static shortcuts' target package (shortcuts.xml can't use
+         ${applicationId}); the releaseTest source set overrides it. -->
+    <string name="shortcut_target_package" translatable="false">com.fancyshark.wpdialer</string>
+</resources>

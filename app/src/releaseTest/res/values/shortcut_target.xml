@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The R8 smoke-test build installs under a suffixed applicationId;
+         static shortcuts must target it, not the daily app. -->
+    <string name="shortcut_target_package" translatable="false">com.fancyshark.wpdialer.r8test</string>
+</resources>

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Contact live tile. The configure activity runs on placement from the
+     picker (a tile needs a contact — so not configuration_optional) and on
+     "reconfigure" to change the tap action. Pins from a profile arrive
+     pre-bound and the activity finishes at once. updatePeriodMillis 0:
+     event-driven refresh only, like the app tile. -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="110dp"
+    android:minHeight="110dp"
+    android:minResizeWidth="50dp"
+    android:minResizeHeight="50dp"
+    android:targetCellWidth="2"
+    android:targetCellHeight="2"
+    android:resizeMode="horizontal|vertical"
+    android:updatePeriodMillis="0"
+    android:initialLayout="@layout/widget_contact_tile"
+    android:previewLayout="@layout/widget_contact_tile_preview"
+    android:description="@string/contact_tile_description"
+    android:configure="com.fancyshark.wpdialer.widget.ContactTileConfigActivity"
+    android:widgetFeatures="reconfigurable"
+    android:widgetCategory="home_screen" />

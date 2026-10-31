@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="contact_tile_label">Contact Dialer 8</string>
+    <string name="contact_tile_description">Épinglez un contact sur l\'écran d\'accueil : une tuile dynamique avec ses appels manqués</string>
+    <string name="contact_tile_preview_name">contact</string>
+    <plurals name="contact_tile_a11y_missed">
+        <item quantity="one">%1$s, %2$d appel manqué</item>
+        <item quantity="many">%1$s, %2$d appels manqués</item>
+        <item quantity="other">%1$s, %2$d appels manqués</item>
+    </plurals>
+    <string name="contact_tile_config_title">ÉPINGLER À L\'ACCUEIL</string>
+    <string name="contact_tile_config_header">choisir un contact</string>
+    <string name="contact_tile_config_tap_label">au toucher</string>
+    <string name="contact_tile_action_profile">ouvrir la fiche</string>
+    <string name="contact_tile_action_call">appeler</string>
+    <string name="contact_tile_config_permission">Dialer 8 a besoin d\'accéder à vos contacts pour créer une tuile de contact.</string>
+    <string name="contact_tile_config_allow">autoriser</string>
+    <string name="contact_tile_config_search">rechercher</string>
+    <string name="contact_pin_to_start">épingler à l\'accueil</string>
+    <string name="contact_add_call_shortcut">ajouter un raccourci d\'appel</string>
+    <string name="launcher_pin_unsupported">Votre écran d\'accueil ne permet pas d\'épingler ceci.</string>
+    <string name="shortcut_dialpad_short">clavier</string>
+    <string name="shortcut_dialpad_long">ouvrir le clavier</string>
+    <string name="shortcut_missed_short">manqués</string>
+    <string name="shortcut_missed_long">appels manqués</string>
+    <string name="qs_dialpad_label">clavier</string>
+</resources>

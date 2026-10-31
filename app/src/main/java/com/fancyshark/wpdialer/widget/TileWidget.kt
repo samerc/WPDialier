@@ -65,6 +65,10 @@ class TileWidget : AppWidgetProvider() {
                 val ids = mgr.getAppWidgetIds(ComponentName(app, TileWidget::class.java))
                 ids.forEach { push(app, mgr, it) }
             }
+            // Contact tiles share every refresh hook (missed calls, seen,
+            // accent change, app open — which also picks up renamed/
+            // re-photographed contacts). No-op when none are placed.
+            ContactTileWidget.updateAllSync(app)
         }
 
         private fun push(context: Context, mgr: AppWidgetManager, id: Int) {

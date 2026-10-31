@@ -80,6 +80,10 @@
                 <action android:name="android.intent.action.CALL_BUTTON" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
+            <!-- Static launcher shortcuts (dialpad, missed calls). -->
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
         </activity>
 
         <activity
@@ -128,6 +132,15 @@
             android:targetActivity=".MainActivity"
             android:exported="false" />
 
+        <!-- Non-exported entry point for launcher shortcuts, contact tiles and
+             the QS tile. Launchers start shortcuts as our own package, so the
+             alias is reachable for them; MainActivity honors the shortcut
+             actions (incl. placing a call) only via this alias. -->
+        <activity-alias
+            android:name=".ShortcutLauncher"
+            android:targetActivity=".MainActivity"
+            android:exported="false" />
+
         <receiver
             android:name=".widget.TileWidget"
             android:exported="false"
@@ -139,6 +152,46 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_tile_info" />
         </receiver>
+
+        <!-- WP "pin to Start" contact tile. Not exported: the widget host
+             binds providers itself; the pin callback is our own PendingIntent. -->
+        <receiver
+            android:name=".widget.ContactTileWidget"
+            android:exported="false"
+            android:label="@string/contact_tile_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_contact_tile_info" />
+        </receiver>
+
+        <!-- Exported: the launcher starts it. It only (re)binds widget ids
+             owned by ContactTileWidget. -->
+        <activity
+            android:name=".widget.ContactTileConfigActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:screenOrientation="portrait"
+            android:windowSoftInputMode="adjustResize"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|uiMode">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
+
+        <!-- Quick Settings "dialpad" tile. Only SystemUI can bind it. -->
+        <service
+            android:name=".widget.DialpadTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_qs_dialpad"
+            android:label="@string/qs_dialpad_label"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
 
         <service
             android:name=".call.WpInCallService"

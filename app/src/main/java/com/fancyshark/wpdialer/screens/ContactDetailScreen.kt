@@ -77,6 +77,9 @@ fun ContactDetailScreen(
     var starred by remember(d.id, d.starred) { mutableStateOf(d.starred) }
     var confirmDelete by remember { mutableStateOf(false) }
     val shareChooserTitle = stringResource(com.fancyshark.wpdialer.R.string.contact_share_chooser)
+    val pinTileLabel = stringResource(com.fancyshark.wpdialer.R.string.contact_pin_to_start)
+    val pinShortcutLabel = stringResource(com.fancyshark.wpdialer.R.string.contact_add_call_shortcut)
+    val pinUnsupported = stringResource(com.fancyshark.wpdialer.R.string.launcher_pin_unsupported)
 
     // The body's chooser overlays only span the body area — hide the app
     // bar while one is open so edit/delete aren't tappable "through" it.
@@ -131,6 +134,46 @@ fun ContactDetailScreen(
                         stringResource(com.fancyshark.wpdialer.R.string.contact_delete),
                     ) { confirmDelete = true },
                 ),
+                menu = buildList {
+                    // WP "pin to Start": a live contact tile on the home screen.
+                    d.lookupKey?.let { key ->
+                        add(
+                            pinTileLabel to {
+                                val ok = com.fancyshark.wpdialer.widget.ContactTileWidget
+                                    .requestPin(context, key, d.name)
+                                if (!ok) {
+                                    android.widget.Toast.makeText(
+                                        context, pinUnsupported, android.widget.Toast.LENGTH_SHORT,
+                                    ).show()
+                                }
+                            },
+                        )
+                    }
+                    if (d.phones.isNotEmpty()) {
+                        add(
+                            pinShortcutLabel to {
+                                scope.launch {
+                                    // Primary number (the profile's list
+                                    // isn't primary-ordered).
+                                    val number = kotlinx.coroutines.withContext(
+                                        kotlinx.coroutines.Dispatchers.IO,
+                                    ) {
+                                        com.fancyshark.wpdialer.widget.ContactTiles
+                                            .phonesOf(context, d.id).firstOrNull()
+                                    } ?: d.phones.first().number
+                                    val ok = com.fancyshark.wpdialer.widget.Shortcuts
+                                        .requestPinCall(context, d.name, number, d.photoUri)
+                                    if (!ok) {
+                                        android.widget.Toast.makeText(
+                                            context, pinUnsupported,
+                                            android.widget.Toast.LENGTH_SHORT,
+                                        ).show()
+                                    }
+                                }
+                            },
+                        )
+                    }
+                },
             )
         }
 

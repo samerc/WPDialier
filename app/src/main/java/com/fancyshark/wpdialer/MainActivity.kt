@@ -173,7 +173,30 @@ class MainActivity : ComponentActivity() {
         // .r8test variant has a suffixed package but the same classes).
         val VOICEMAIL_LAUNCHER: String =
             MainActivity::class.java.name.substringBeforeLast('.') + ".VoicemailLauncher"
+
+        // Launcher shortcuts, contact tiles and the QS tile. Honored only
+        // when they arrive through the non-exported ShortcutLauncher alias
+        // (launchers start shortcuts as our package; other apps can't reach
+        // it), so no third party can make us place a call.
+        const val ACTION_SHORTCUT_DIALPAD = "com.fancyshark.wpdialer.SHORTCUT_DIALPAD"
+        const val ACTION_SHORTCUT_MISSED = "com.fancyshark.wpdialer.SHORTCUT_MISSED"
+        const val ACTION_SHORTCUT_CALL = "com.fancyshark.wpdialer.SHORTCUT_CALL"
+        const val ACTION_OPEN_CONTACT = "com.fancyshark.wpdialer.OPEN_CONTACT"
+        const val EXTRA_SHORTCUT_ID = "com.fancyshark.wpdialer.SHORTCUT_ID"
+        val SHORTCUT_LAUNCHER: String =
+            MainActivity::class.java.name.substringBeforeLast('.') + ".ShortcutLauncher"
     }
+
+    /** Navigation asked for by a shortcut / tile, applied once the UI is up. */
+    private sealed interface NavRequest {
+        data object Home : NavRequest
+        data object MissedCalls : NavRequest
+        data class Contact(val id: Long) : NavRequest
+    }
+
+    private val navRequest = MutableStateFlow<NavRequest?>(null)
+    // Consumed by the Home page, which owns the (session-scoped) filter.
+    private val missedFilterRequest = MutableStateFlow(false)
 
     private val dialRequest = MutableStateFlow<String?>(null)
     private val permissionsGranted = MutableStateFlow(false)
@@ -344,11 +367,55 @@ class MainActivity : ComponentActivity() {
             callVoicemail()
             return
         }
+        if (intent != null && intent.component?.className == SHORTCUT_LAUNCHER) {
+            handleShortcut(intent)
+            return
+        }
         when (intent?.action) {
             Intent.ACTION_DIAL, Intent.ACTION_VIEW ->
                 dialRequest.value = intent.data?.schemeSpecificPart ?: ""
             // Headset / hardware call button.
             Intent.ACTION_CALL_BUTTON -> dialRequest.value = ""
+        }
+    }
+
+    /** Only reached via the non-exported ShortcutLauncher alias. */
+    private fun handleShortcut(intent: Intent) {
+        when (intent.action) {
+            ACTION_SHORTCUT_DIALPAD -> dialRequest.value = ""
+            ACTION_SHORTCUT_MISSED -> navRequest.value = NavRequest.MissedCalls
+            ACTION_SHORTCUT_CALL -> {
+                // Reopening the task from Recents redelivers the launch
+                // intent — that must never place the call a second time.
+                if (intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0) return
+                val number = intent.data?.takeIf { it.scheme == "tel" }?.schemeSpecificPart
+                if (number.isNullOrBlank()) return
+                intent.getStringExtra(EXTRA_SHORTCUT_ID)?.let { id ->
+                    runCatching {
+                        androidx.core.content.pm.ShortcutManagerCompat.reportShortcutUsed(this, id)
+                    }
+                }
+                // Same SIM-aware path as every in-app call.
+                placeCall(number)
+            }
+            ACTION_OPEN_CONTACT -> {
+                val uri = intent.data
+                    ?.takeIf { it.authority == android.provider.ContactsContract.AUTHORITY }
+                lifecycleScope.launch {
+                    // Lookup URIs survive re-aggregation; a deleted contact
+                    // resolves to null and the tile just opens the app.
+                    val id = uri?.let {
+                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                            runCatching {
+                                android.provider.ContactsContract.Contacts
+                                    .lookupContact(contentResolver, it)
+                                    ?.let(android.content.ContentUris::parseId)
+                            }.getOrNull()
+                        }
+                    }
+                    navRequest.value = if (id != null) NavRequest.Contact(id) else NavRequest.Home
+                }
+            }
         }
     }
 
@@ -621,6 +688,28 @@ class MainActivity : ComponentActivity() {
             push(Screen.Dialpad(number))
             dialRequest.value = null
         }
+        // Shortcut / contact-tile navigation, same rules as a dial request.
+        val pendingNav by navRequest.collectAsState()
+        LaunchedEffect(pendingNav, fullPageOverlay) {
+            val req = pendingNav ?: return@LaunchedEffect
+            if (fullPageOverlay) return@LaunchedEffect
+            val keepEditor = editorDirty.value &&
+                backStack.any { it is Screen.EditContact || it is Screen.NewContact }
+            if (!keepEditor) while (backStack.size > 1) popTop()
+            when (req) {
+                is NavRequest.Contact -> push(Screen.Contact(req.id))
+                NavRequest.MissedCalls -> missedFilterRequest.value = true
+                NavRequest.Home -> Unit
+            }
+            navRequest.value = null
+        }
+        // "call <name>" launcher shortcuts follow the loaded history (and
+        // skip the publish when the top contacts are unchanged).
+        LaunchedEffect(history) {
+            if (history.isNotEmpty()) {
+                com.fancyshark.wpdialer.widget.Shortcuts.refreshDynamic(applicationContext, history)
+            }
+        }
         val simReq by simRequest.collectAsState()
         val overlayOpen = fullPageOverlay || simReq != null || confirmClearHistory ||
             confirmDeleteGroup != null || confirmBlock != null || confirmRemoveSpeedDial != null ||
@@ -712,6 +801,14 @@ class MainActivity : ComponentActivity() {
                             // from the app-bar menu.
                             var missedOnly by androidx.compose.runtime.saveable
                                 .rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
+                            // The "missed calls" launcher shortcut turns it on.
+                            val missedReq by missedFilterRequest.collectAsState()
+                            LaunchedEffect(missedReq) {
+                                if (missedReq) {
+                                    missedOnly = true
+                                    missedFilterRequest.value = false
+                                }
+                            }
                             Pivot(
                                 title = stringResource(R.string.main_pivot_title),
                                 modifier = Modifier.weight(1f),

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="contact_tile_label">جهة اتصال Dialer 8</string>
+    <string name="contact_tile_description">ثبّت جهة اتصال على الشاشة الرئيسية كمربع حي يعرض مكالماتها الفائتة</string>
+    <string name="contact_tile_preview_name">جهة اتصال</string>
+    <plurals name="contact_tile_a11y_missed">
+        <item quantity="zero">%1$s، %2$d مكالمة فائتة</item>
+        <item quantity="one">%1$s، %2$d مكالمة فائتة</item>
+        <item quantity="two">%1$s، %2$d مكالمتان فائتتان</item>
+        <item quantity="few">%1$s، %2$d مكالمات فائتة</item>
+        <item quantity="many">%1$s، %2$d مكالمة فائتة</item>
+        <item quantity="other">%1$s، %2$d مكالمة فائتة</item>
+    </plurals>
+    <string name="contact_tile_config_title">تثبيت على الشاشة الرئيسية</string>
+    <string name="contact_tile_config_header">اختر جهة اتصال</string>
+    <string name="contact_tile_config_tap_label">عند النقر</string>
+    <string name="contact_tile_action_profile">فتح الملف</string>
+    <string name="contact_tile_action_call">اتصال</string>
+    <string name="contact_tile_config_permission">يحتاج Dialer 8 إلى الوصول إلى جهات الاتصال لإنشاء مربع جهة اتصال.</string>
+    <string name="contact_tile_config_allow">سماح</string>
+    <string name="contact_tile_config_search">بحث</string>
+    <string name="contact_pin_to_start">تثبيت على الشاشة الرئيسية</string>
+    <string name="contact_add_call_shortcut">إضافة اختصار اتصال</string>
+    <string name="launcher_pin_unsupported">لا يدعم تطبيق الشاشة الرئيسية التثبيت.</string>
+    <string name="shortcut_dialpad_short">لوحة الاتصال</string>
+    <string name="shortcut_dialpad_long">فتح لوحة الاتصال</string>
+    <string name="shortcut_missed_short">الفائتة</string>
+    <string name="shortcut_missed_long">المكالمات الفائتة</string>
+    <string name="qs_dialpad_label">لوحة الاتصال</string>
+</resources>

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Static shortcut icons can't follow the runtime accent: WP cobalt,
+         the app's default accent (same as the tile widgets' placeholder). -->
+    <color name="shortcut_tile_background">#FF0050EF</color>
+</resources>

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Static launcher shortcuts. Both target the non-exported ShortcutLauncher
+     alias (the launcher starts shortcuts as our package). targetClass is the
+     code namespace; targetPackage the applicationId (overridden for the
+     .r8test variant). Dynamic "call <name>" ones come from widget/Shortcuts. -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="dialpad"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_dialpad"
+        android:shortcutShortLabel="@string/shortcut_dialpad_short"
+        android:shortcutLongLabel="@string/shortcut_dialpad_long">
+        <intent
+            android:action="com.fancyshark.wpdialer.SHORTCUT_DIALPAD"
+            android:targetPackage="@string/shortcut_target_package"
+            android:targetClass="com.fancyshark.wpdialer.ShortcutLauncher" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="missed_calls"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_missed"
+        android:shortcutShortLabel="@string/shortcut_missed_short"
+        android:shortcutLongLabel="@string/shortcut_missed_long">
+        <intent
+            android:action="com.fancyshark.wpdialer.SHORTCUT_MISSED"
+            android:targetPackage="@string/shortcut_target_package"
+            android:targetClass="com.fancyshark.wpdialer.ShortcutLauncher" />
+    </shortcut>
+</shortcuts>

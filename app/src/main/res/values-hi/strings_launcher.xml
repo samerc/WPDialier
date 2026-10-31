@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="contact_tile_label">Dialer 8 संपर्क</string>
+    <string name="contact_tile_description">किसी संपर्क को उसकी छूटी हुई कॉल के साथ लाइव टाइल के रूप में होम स्क्रीन पर पिन करें</string>
+    <string name="contact_tile_preview_name">संपर्क</string>
+    <plurals name="contact_tile_a11y_missed">
+        <item quantity="one">%1$s, %2$d छूटी हुई कॉल</item>
+        <item quantity="other">%1$s, %2$d छूटी हुई कॉल</item>
+    </plurals>
+    <string name="contact_tile_config_title">होम स्क्रीन पर पिन करें</string>
+    <string name="contact_tile_config_header">संपर्क चुनें</string>
+    <string name="contact_tile_config_tap_label">टैप करने पर</string>
+    <string name="contact_tile_action_profile">प्रोफ़ाइल खोलें</string>
+    <string name="contact_tile_action_call">कॉल करें</string>
+    <string name="contact_tile_config_permission">संपर्क टाइल बनाने के लिए Dialer 8 को आपके संपर्कों तक पहुंच चाहिए।</string>
+    <string name="contact_tile_config_allow">अनुमति दें</string>
+    <string name="contact_tile_config_search">खोजें</string>
+    <string name="contact_pin_to_start">होम स्क्रीन पर पिन करें</string>
+    <string name="contact_add_call_shortcut">कॉल शॉर्टकट जोड़ें</string>
+    <string name="launcher_pin_unsupported">आपका होम स्क्रीन ऐप इसे पिन नहीं कर सकता।</string>
+    <string name="shortcut_dialpad_short">डायलपैड</string>
+    <string name="shortcut_dialpad_long">डायलपैड खोलें</string>
+    <string name="shortcut_missed_short">छूटी कॉल</string>
+    <string name="shortcut_missed_long">छूटी हुई कॉल</string>
+    <string name="qs_dialpad_label">डायलपैड</string>
+</resources>
