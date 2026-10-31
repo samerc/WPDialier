@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Contact form (new + edit) — screens/ContactForm*.kt -->
+    <string name="cform_photo_change">बदलें</string>
+    <string name="cform_name_placeholder">नाम जोड़ें</string>
+    <string name="cform_name_hint">पहला, मध्य, अंतिम नाम, उपाधि के लिए टैप करें…</string>
+    <string name="cform_nickname_quoted">“%1$s”</string>
+    <string name="cform_legend_hint">हर फ़ील्ड अपने ही खाते में सेव होती है</string>
+    <string name="cform_saved_to_account">%1$s में सेव</string>
+    <string name="cform_section_work">काम</string>
+    <string name="cform_company">कंपनी</string>
+    <string name="cform_job_title">पद</string>
+    <string name="cform_section_phone">फ़ोन</string>
+    <string name="cform_section_email">ईमेल</string>
+    <string name="cform_section_address">पता</string>
+    <string name="cform_section_dates">तारीखें</string>
+    <string name="cform_section_more">और</string>
+    <string name="cform_add_address">पता जोड़ें</string>
+    <string name="cform_default_number">★ कॉल के लिए डिफ़ॉल्ट नंबर: %1$s — बदलने के लिए किसी नंबर को देर तक दबाएँ</string>
+    <string name="cform_default_none">किसी नंबर को कॉल के लिए डिफ़ॉल्ट बनाने के लिए उसे देर तक दबाएँ</string>
+    <string name="cform_set_default">कॉल के लिए डिफ़ॉल्ट बनाएँ</string>
+    <string name="cform_map">मैप</string>
+    <string name="cform_here">यहाँ</string>
+    <string name="cform_locating">स्थान खोजा जा रहा है…</string>
+    <string name="cform_year_optional">साल वैकल्पिक है</string>
+    <string name="cform_no_year">बिना साल</string>
+    <string name="cform_website">वेबसाइट</string>
+    <string name="cform_relationship">रिश्ता</string>
+    <string name="cform_related_name">नाम</string>
+    <string name="cform_pick_contact">संपर्कों में से चुनें</string>
+    <string name="cform_pick_contact_caps">संपर्क चुनें</string>
+    <string name="cform_internet_call">इंटरनेट कॉल</string>
+    <string name="cform_sip_address">SIP पता</string>
+    <string name="cform_chat">चैट</string>
+    <string name="cform_chat_handle">यूज़र नेम</string>
+    <string name="cform_labels">लेबल</string>
+    <string name="cform_labels_none">कोई नहीं</string>
+    <string name="cform_notes">नोट्स</string>
+    <string name="cform_nickname">उपनाम</string>
+    <string name="cform_add_another">एक और फ़ील्ड जोड़ें</string>
+    <string name="cform_new_fields_to">नई फ़ील्ड यहाँ सेव होती हैं</string>
+    <string name="cform_change">बदलें</string>
+    <string name="cform_read_only">%1$s: केवल पढ़ने के लिए, यहाँ नहीं दिखाया गया</string>
+    <string name="cform_need_name_or_number">पहले कोई नाम या नंबर जोड़ें</string>
+    <string name="cform_done">हो गया</string>
+
+    <!-- Name details page -->
+    <string name="cform_name_caption">नाम</string>
+    <string name="cform_first_name">पहला नाम</string>
+    <string name="cform_middle_name">मध्य नाम</string>
+    <string name="cform_last_name">अंतिम नाम</string>
+    <string name="cform_name_prefix">उपाधि</string>
+    <string name="cform_name_suffix">प्रत्यय</string>
+    <string name="cform_phonetic_first">ध्वन्यात्मक पहला नाम</string>
+    <string name="cform_phonetic_last">ध्वन्यात्मक अंतिम नाम</string>
+    <string name="cform_name_shown_as">“%1$s” के रूप में दिखेगा। ध्वन्यात्मक नाम क्रम लगाने और आवाज़ से डायल करने में मदद करते हैं।</string>
+    <string name="cform_name_phonetic_help">ध्वन्यात्मक नाम क्रम लगाने और आवाज़ से डायल करने में मदद करते हैं।</string>
+
+    <!-- Add another field -->
+    <string name="cform_add_title">जोड़ें</string>
+    <string name="cform_kind_date">तारीख</string>
+    <string name="cform_sub_date">जन्मदिन, सालगिरह, कस्टम</string>
+    <string name="cform_sub_work">कंपनी, पद</string>
+    <string name="cform_sub_relationship">जीवनसाथी, माता-पिता, बहन, सहायक…</string>
+    <string name="cform_sub_chat">Skype, Jabber, कस्टम</string>
+    <string name="cform_already_added">पहले से जोड़ा गया</string>
+    <string name="cform_add_footer">केवल वही फ़ील्ड दिखाई गई हैं जिन्हें लक्ष्य खाता सपोर्ट करता है। उदाहरण के लिए, Exchange रिश्ते सेव नहीं कर सकता।</string>
+
+    <!-- Labels -->
+    <string name="cform_no_labels">इस खाते में अभी कोई लेबल नहीं है</string>
+    <string name="cform_new_label">नया लेबल</string>
+    <string name="cform_new_label_in">%1$s में बनाया जाएगा</string>
+    <string name="cform_label_name">लेबल का नाम</string>
+    <string name="cform_create">बनाएँ</string>
+
+    <!-- Relationship types -->
+    <string name="type_rel_spouse">जीवनसाथी</string>
+    <string name="type_rel_partner">पार्टनर</string>
+    <string name="type_rel_domestic_partner">घरेलू पार्टनर</string>
+    <string name="type_rel_parent">माता-पिता</string>
+    <string name="type_rel_mother">माँ</string>
+    <string name="type_rel_father">पिता</string>
+    <string name="type_rel_child">संतान</string>
+    <string name="type_rel_sister">बहन</string>
+    <string name="type_rel_brother">भाई</string>
+    <string name="type_rel_relative">रिश्तेदार</string>
+    <string name="type_rel_friend">दोस्त</string>
+    <string name="type_rel_manager">मैनेजर</string>
+    <string name="type_rel_assistant">सहायक</string>
+    <string name="type_rel_referred_by">द्वारा रेफ़र किया गया</string>
+</resources>

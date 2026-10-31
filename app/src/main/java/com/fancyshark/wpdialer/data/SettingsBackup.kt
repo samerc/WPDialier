@@ -61,6 +61,7 @@ object SettingsBackup {
         "reach_gesture" to "b",
         "tiles_animate" to "b",
         "tiles_transparent" to "b",
+        "dup_dismissed" to "s",
     )
 
     /**

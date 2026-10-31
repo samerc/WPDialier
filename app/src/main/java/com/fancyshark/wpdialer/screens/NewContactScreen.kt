@@ -1,70 +1,46 @@
 package com.fancyshark.wpdialer.screens
 
-import android.net.Uri
-import androidx.activity.compose.BackHandler
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
+import android.provider.ContactsContract.CommonDataKinds.Phone
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Place
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.toMutableStateList
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardCapitalization
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import com.fancyshark.wpdialer.R
 import com.fancyshark.wpdialer.data.ContactAccount
 import com.fancyshark.wpdialer.data.ContactEditor
 import com.fancyshark.wpdialer.data.Countries
-import com.fancyshark.wpdialer.data.Region
+import com.fancyshark.wpdialer.data.EditPhone
+import com.fancyshark.wpdialer.data.EditableContact
 import com.fancyshark.wpdialer.ui.Metro
-import com.fancyshark.wpdialer.ui.MetroButton
-import com.fancyshark.wpdialer.ui.MetroCloseMark
-import com.fancyshark.wpdialer.ui.MetroConfirm
-import com.fancyshark.wpdialer.ui.MetroOverlay
 import com.fancyshark.wpdialer.ui.MetroTextBox
-import com.fancyshark.wpdialer.ui.hiddenFromAccessibility
-import kotlinx.coroutines.Dispatchers
+import com.fancyshark.wpdialer.ui.MetroToast
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 /**
- * [onDirtyChange] reports whether the form holds unsaved input, so the host
- * can keep the editor alive when a dial intent arrives.
+ * New contact: the same form as edit (one raw contact in the chosen
+ * account), plus the "save to" account and the country used to store
+ * numbers in international form. [onDirtyChange] reports whether the form
+ * holds unsaved input, so the host can keep the editor alive when a dial
+ * intent arrives.
  */
 @Composable
 fun NewContactScreen(
@@ -90,657 +66,171 @@ fun NewContactScreen(
     var regionCode by rememberSaveable { mutableStateOf(Countries.defaultRegionCode(context)) }
     val region = regions.firstOrNull { it.code == regionCode }
 
-    var name by rememberSaveable { mutableStateOf("") }
-    var note by rememberSaveable { mutableStateOf("") }
-    var address by rememberSaveable { mutableStateOf("") }
-    var photoUri by rememberSaveable { mutableStateOf<Uri?>(null) }
-    val photoPicker = rememberLauncherForActivityResult(
-        ActivityResultContracts.GetContent(),
-    ) { uri -> if (uri != null) photoUri = uri }
-    val photoPreview by produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, photoUri) {
-        val uri = photoUri ?: return@produceState
-        value = withContext(Dispatchers.IO) {
-            decodeSampled(context, uri, 256)?.asImageBitmap()
-        }
+    val formSaver = remember { editableContactSaver(context.applicationContext) }
+    var formState by rememberSaveable(stateSaver = formSaver) { mutableStateOf<EditableContact?>(null) }
+    // The untouched form: one empty raw contact holding the prefilled number.
+    val base = EditableContact(
+        -1L,
+        listOf(
+            ContactEditor.blankRaw(chosen).copy(
+                phones = listOf(EditPhone(null, initialNumber, "mobile", Phone.TYPE_MOBILE)),
+            ),
+        ),
+    )
+    // The raw contact always follows the chosen account.
+    val form = (formState ?: base).let { f ->
+        f.copy(raws = f.raws.map { it.copy(account = chosen) })
     }
+    val dirty = !form.sameFormAs(base)
+    LaunchedEffect(dirty) { onDirtyChange(dirty) }
 
-    val phones = rememberSaveable(saver = TypedEntryListSaver) {
-        mutableListOf(TypedEntry(initialNumber, 0)).toMutableStateList()
-    }
-    val emails = rememberSaveable(saver = TypedEntryListSaver) {
-        mutableListOf<TypedEntry>().toMutableStateList()
-    }
-    val events = rememberSaveable(saver = TypedEntryListSaver) {
-        mutableListOf<TypedEntry>().toMutableStateList()
-    }
     var saving by remember { mutableStateOf(false) }
     var saveFailed by remember { mutableStateOf(false) }
     var showAccountPicker by rememberSaveable { mutableStateOf(false) }
     var showCountryPicker by rememberSaveable { mutableStateOf(false) }
-    var showMapPicker by rememberSaveable { mutableStateOf(false) }
-    var confirmDiscard by rememberSaveable { mutableStateOf(false) }
-    var locating by remember { mutableStateOf(false) }
+    val needNameOrNumber = stringResource(R.string.cform_need_name_or_number)
 
-    // Anything typed beyond the prefilled number counts as unsaved input.
-    val dirty = name.isNotBlank() || note.isNotBlank() || address.isNotBlank() ||
-        photoUri != null ||
-        phones.withIndex().any { (i, p) ->
-            p.value.isNotBlank() && !(i == 0 && p.value == initialNumber)
-        } ||
-        emails.any { it.value.isNotBlank() } ||
-        events.any { it.value.isNotEmpty() }
-    LaunchedEffect(dirty) { onDirtyChange(dirty) }
-    fun requestClose() {
-        if (dirty) confirmDiscard = true else onDone()
-    }
-    // Registered before the pickers' handlers, so an open picker closes first.
-    BackHandler(enabled = dirty) { confirmDiscard = true }
-    val locationPermission = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions(),
-    ) { grants ->
-        if (grants.values.any { it }) {
-            locating = true
-            scope.launch {
-                val loc = com.fancyshark.wpdialer.data.Geo.currentLocation(context)
-                val addr = loc?.let {
-                    com.fancyshark.wpdialer.data.Geo.reverseGeocode(context, it.latitude, it.longitude)
-                }
-                if (addr != null) address = addr
-                locating = false
-            }
-        }
+    fun update(transform: (EditableContact) -> EditableContact) {
+        val current = (formState ?: base).let { f -> f.copy(raws = f.raws.map { it.copy(account = chosen) }) }
+        formState = transform(current)
     }
 
-    Box(Modifier.fillMaxSize()) {
-        Column(
-            Modifier
-                .fillMaxSize()
-                .hiddenFromAccessibility(
-                    showAccountPicker || showCountryPicker || showMapPicker || confirmDiscard,
-                )
-                .padding(horizontal = 20.dp),
-        ) {
-            Text(
-                stringResource(
-                    com.fancyshark.wpdialer.R.string.newcontact_title,
-                    accountKindLabel(chosen.kindLabel).uppercase(),
-                ),
-                color = Metro.Foreground,
-                style = Metro.Type.Small,
-                fontWeight = FontWeight.SemiBold,
-                letterSpacing = 1.sp,
-                modifier = Modifier.padding(top = 18.dp, bottom = 6.dp),
-            )
-            Column(
-                Modifier
-                    .weight(1f)
-                    .verticalScroll(rememberScrollState()),
-            ) {
-                Spacer(Modifier.height(12.dp))
-                // Name large at the top, photo tile beside it.
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    MetroTextBox(
-                        name,
-                        { name = it },
-                        accent,
-                        placeholder = stringResource(
-                            com.fancyshark.wpdialer.R.string.newcontact_name,
-                        ),
-                        textSize = 23.sp,
-                        keyboardOptions = KeyboardOptions(
-                            capitalization = KeyboardCapitalization.Words,
-                        ),
-                        modifier = Modifier.weight(1f),
-                    )
-                    Spacer(Modifier.width(10.dp))
-                    PhotoTile(
-                        photoPreview,
-                        accent,
-                        stringResource(com.fancyshark.wpdialer.R.string.newcontact_change_photo),
-                    ) { photoPicker.launch("image/*") }
-                }
-
-                FieldLabel(stringResource(com.fancyshark.wpdialer.R.string.newcontact_save_to))
-                MetroSelector(
-                    primary = accountKindLabel(chosen.kindLabel),
-                    secondary = chosen.name,
-                    accent = accent,
-                ) { showAccountPicker = true }
-
-                FieldLabel(stringResource(com.fancyshark.wpdialer.R.string.newcontact_country))
-                MetroSelector(
-                    primary = region?.label ?: regionCode,
-                    secondary = null,
-                    accent = accent,
-                ) { showCountryPicker = true }
-
-                TypedSection(
-                    title = stringResource(com.fancyshark.wpdialer.R.string.newcontact_phone),
-                    entries = phones,
-                    typeLabels = ContactEditor.PHONE_TYPES.map { it.first },
-                    accent = accent,
-                    keyboardType = KeyboardType.Phone,
-                    placeholder = stringResource(
-                        com.fancyshark.wpdialer.R.string.newcontact_number,
-                    ),
-                )
-                TypedSection(
-                    title = stringResource(com.fancyshark.wpdialer.R.string.newcontact_email),
-                    entries = emails,
-                    typeLabels = ContactEditor.EMAIL_TYPES.map { it.first },
-                    accent = accent,
-                    keyboardType = KeyboardType.Email,
-                    placeholder = stringResource(
-                        com.fancyshark.wpdialer.R.string.newcontact_email_address,
-                    ),
-                )
-
-                events.forEachIndexed { i, entry ->
-                    FieldLabel(stringResource(com.fancyshark.wpdialer.R.string.newcontact_date))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        DateField(
-                            value = entry.value,
-                            placeholder = stringResource(
-                                com.fancyshark.wpdialer.R.string.newcontact_pick_a_date,
-                            ),
-                            modifier = Modifier.weight(1f),
-                        ) { picked -> events[i] = entry.copy(value = picked) }
-                        Spacer(Modifier.width(8.dp))
-                        WpDropdown(
-                            current = typeKeyLabel(ContactEditor.EVENT_TYPES[entry.typeIdx].first),
-                            options = ContactEditor.EVENT_TYPES.map { typeKeyLabel(it.first) },
-                            onSelect = { t -> events[i] = entry.copy(typeIdx = t) },
-                            modifier = Modifier.width(130.dp),
-                        )
-                        RemoveMark { events.removeAt(i) }
-                    }
-                    if (ContactEditor.EVENT_TYPES[entry.typeIdx].first == "custom") {
-                        Spacer(Modifier.height(6.dp))
-                        MetroTextBox(
-                            entry.customLabel,
-                            { events[i] = entry.copy(customLabel = it) },
-                            accent,
-                            placeholder = stringResource(
-                                com.fancyshark.wpdialer.R.string.newcontact_custom_label,
-                            ),
-                        )
-                    }
-                }
-                AddLink(
-                    stringResource(com.fancyshark.wpdialer.R.string.newcontact_add_date),
-                    accent,
-                ) { events.add(TypedEntry("", 0)) }
-
-                FieldLabel(stringResource(com.fancyshark.wpdialer.R.string.newcontact_address))
-                MetroTextBox(
-                    address,
-                    { address = it },
-                    accent,
-                    placeholder = stringResource(
-                        com.fancyshark.wpdialer.R.string.newcontact_street_city_country,
-                    ),
-                    keyboardOptions = KeyboardOptions(
-                        capitalization = KeyboardCapitalization.Sentences,
-                    ),
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-                    AddLink(
-                        stringResource(com.fancyshark.wpdialer.R.string.newcontact_pick_on_map),
-                        accent,
-                    ) { showMapPicker = true }
-                    AddLink(
-                        if (locating) {
-                            stringResource(com.fancyshark.wpdialer.R.string.newcontact_locating)
-                        } else {
-                            stringResource(
-                                com.fancyshark.wpdialer.R.string.newcontact_use_current_location,
-                            )
+    ContactFormScaffold(
+        caption = stringResource(
+            R.string.newcontact_title,
+            accountKindLabel(chosen.kindLabel).uppercase(),
+        ),
+        accent = accent,
+        form = form,
+        update = { update(it) },
+        dirty = dirty,
+        saving = saving,
+        saveFailedText = if (saveFailed) stringResource(R.string.newcontact_save_failed) else null,
+        onSave = {
+            val raw = form.raws.first()
+            if (raw.name.isBlank && raw.phones.none { it.number.isNotBlank() }) {
+                MetroToast.show(needNameOrNumber)
+            } else {
+                saving = true
+                saveFailed = false
+                scope.launch {
+                    val prepared = raw.copy(
+                        account = chosen,
+                        phones = raw.phones.map {
+                            it.copy(number = Countries.toInternational(it.number.trim(), regionCode))
                         },
-                        accent,
-                    ) {
-                        if (!locating) {
-                            val fine = androidx.core.content.ContextCompat.checkSelfPermission(
-                                context, android.Manifest.permission.ACCESS_FINE_LOCATION,
-                            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
-                            if (fine) {
-                                locating = true
-                                scope.launch {
-                                    val loc = com.fancyshark.wpdialer.data.Geo.currentLocation(context)
-                                    val addr = loc?.let {
-                                        com.fancyshark.wpdialer.data.Geo.reverseGeocode(
-                                            context, it.latitude, it.longitude,
-                                        )
-                                    }
-                                    if (addr != null) address = addr
-                                    locating = false
-                                }
-                            } else {
-                                locationPermission.launch(
-                                    arrayOf(
-                                        android.Manifest.permission.ACCESS_FINE_LOCATION,
-                                        android.Manifest.permission.ACCESS_COARSE_LOCATION,
-                                    ),
-                                )
-                            }
-                        }
-                    }
-                }
-
-                FieldLabel(stringResource(com.fancyshark.wpdialer.R.string.newcontact_note))
-                MetroTextBox(
-                    note,
-                    { note = it },
-                    accent,
-                    placeholder = stringResource(
-                        com.fancyshark.wpdialer.R.string.newcontact_note,
-                    ),
-                    singleLine = false,
-                    minLines = 3,
-                    keyboardOptions = KeyboardOptions(
-                        capitalization = KeyboardCapitalization.Sentences,
-                    ),
-                )
-
-                Spacer(Modifier.height(20.dp))
-            }
-            if (saveFailed) {
-                Text(
-                    stringResource(com.fancyshark.wpdialer.R.string.newcontact_save_failed),
-                    color = Metro.Red,
-                    style = Metro.Type.Small,
-                    fontWeight = FontWeight.Light,
-                    modifier = Modifier.padding(top = 6.dp),
-                )
-            }
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                modifier = Modifier.padding(vertical = 14.dp),
-            ) {
-                MetroButton(
-                    if (saving) {
-                        stringResource(com.fancyshark.wpdialer.R.string.newcontact_saving)
-                    } else {
-                        stringResource(com.fancyshark.wpdialer.R.string.newcontact_save)
-                    },
-                    fill = accent,
-                    enabled = !saving &&
-                        (name.isNotBlank() || phones.any { it.value.isNotBlank() }),
-                    modifier = Modifier.weight(1f),
-                ) {
-                    saving = true
-                    saveFailed = false
-                    scope.launch {
-                        val photoBytes = photoUri?.let { loadPhotoBytes(context, it) }
-                        val ok = ContactEditor.create(
-                            context,
-                            chosen,
-                            name.trim(),
-                            phones = phones.map {
-                                ContactEditor.NewPhone(
-                                    Countries.toInternational(it.value.trim(), regionCode),
-                                    ContactEditor.PHONE_TYPES[it.typeIdx].second,
-                                    it.customLabel.ifBlank { null },
-                                )
-                            },
-                            emails = emails.map {
-                                ContactEditor.NewEmail(
-                                    it.value.trim(),
-                                    ContactEditor.EMAIL_TYPES[it.typeIdx].second,
-                                    it.customLabel.ifBlank { null },
-                                )
-                            },
-                            events = events.map {
-                                ContactEditor.NewEvent(
-                                    it.value,
-                                    ContactEditor.EVENT_TYPES[it.typeIdx].second,
-                                    it.customLabel.ifBlank { null },
-                                )
-                            },
-                            photo = photoBytes,
-                            note = note.trim().ifBlank { null },
-                            address = address.trim().ifBlank { null },
-                        )
-                        if (ok) {
-                            onDone()
-                        } else {
-                            saving = false
-                            saveFailed = true
-                        }
-                    }
-                }
-                MetroButton(
-                    stringResource(com.fancyshark.wpdialer.R.string.newcontact_cancel),
-                    modifier = Modifier.weight(1f),
-                ) { requestClose() }
-            }
-        }
-
-        if (showAccountPicker) {
-            FullScreenPicker(
-                title = stringResource(com.fancyshark.wpdialer.R.string.newcontact_save_to_caps),
-                onDismiss = { showAccountPicker = false },
-            ) {
-                accounts.forEach { account ->
-                    val selected = account == chosen
-                    Column(
-                        Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                selectedAccount = account
-                                showAccountPicker = false
-                            }
-                            .padding(vertical = 10.dp),
-                    ) {
-                        Text(
-                            accountKindLabel(account.kindLabel),
-                            color = if (selected) accentText else Metro.Foreground,
-                            style = Metro.Type.SubHeader,
-                        )
-                        if (!account.name.isNullOrBlank()) {
-                            Text(
-                                account.name,
-                                color = Metro.Subtle,
-                                style = Metro.Type.Small,
-                                fontWeight = FontWeight.Light,
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        if (showMapPicker) {
-            MapPinPicker(
-                accent = accent,
-                onCancel = { showMapPicker = false },
-                onPicked = { addr ->
-                    address = addr
-                    showMapPicker = false
-                },
-            )
-        }
-
-        if (showCountryPicker) {
-            var query by rememberSaveable { mutableStateOf("") }
-            FullScreenPicker(
-                title = stringResource(com.fancyshark.wpdialer.R.string.newcontact_country_caps),
-                onDismiss = { showCountryPicker = false },
-                header = {
-                    MetroTextBox(
-                        query,
-                        { query = it },
-                        accent,
-                        placeholder = stringResource(
-                            com.fancyshark.wpdialer.R.string.newcontact_search,
-                        ),
+                        emails = raw.emails.map { it.copy(address = it.address.trim()) },
+                        note = raw.note.trim(),
                     )
-                    Spacer(Modifier.height(10.dp))
-                },
-            ) {
-                val filtered = regions.filter {
-                    query.isBlank() || it.name.contains(query, ignoreCase = true)
+                    val ok = ContactEditor.create(context, prepared)
+                    if (ok) {
+                        onDone()
+                    } else {
+                        saving = false
+                        saveFailed = true
+                    }
                 }
-                LazyColumn {
-                    items(filtered.size, key = { filtered[it].code }) { i ->
-                        val r = filtered[i]
-                        Text(
-                            r.label,
-                            color = if (r.code == regionCode) accentText else Metro.Foreground,
-                            style = Metro.Type.Large,
-                            fontWeight = FontWeight.Light,
-                            modifier = Modifier
+            }
+        },
+        onDone = onDone,
+        header = {
+            FieldLabel(stringResource(R.string.newcontact_save_to), top = 18.dp)
+            MetroSelector(
+                primary = accountKindLabel(chosen.kindLabel),
+                secondary = chosen.name,
+                accent = accent,
+            ) { showAccountPicker = true }
+            FieldLabel(stringResource(R.string.newcontact_country))
+            MetroSelector(
+                primary = region?.label ?: regionCode,
+                secondary = null,
+                accent = accent,
+            ) { showCountryPicker = true }
+        },
+        extraOverlayOpen = showAccountPicker || showCountryPicker,
+        extraOverlays = {
+            if (showAccountPicker) {
+                FullScreenPicker(
+                    title = stringResource(R.string.newcontact_save_to_caps),
+                    onDismiss = { showAccountPicker = false },
+                ) {
+                    accounts.forEach { account ->
+                        val selected = account == chosen
+                        Column(
+                            Modifier
                                 .fillMaxWidth()
                                 .clickable {
-                                    regionCode = r.code
-                                    showCountryPicker = false
+                                    if (account != chosen) {
+                                        // Labels belong to an account — drop the old account's.
+                                        update { c ->
+                                            c.copy(
+                                                raws = c.raws.map {
+                                                    it.copy(groupIds = emptySet(), newGroups = emptyList())
+                                                },
+                                            )
+                                        }
+                                    }
+                                    selectedAccount = account
+                                    showAccountPicker = false
                                 }
-                                .padding(vertical = 8.dp),
-                        )
+                                .padding(vertical = 10.dp),
+                        ) {
+                            Text(
+                                accountKindLabel(account.kindLabel),
+                                color = if (selected) accentText else Metro.Foreground,
+                                style = Metro.Type.SubHeader,
+                            )
+                            if (!account.name.isNullOrBlank()) {
+                                Text(
+                                    account.name,
+                                    color = Metro.Subtle,
+                                    style = Metro.Type.Small,
+                                    fontWeight = FontWeight.Light,
+                                )
+                            }
+                        }
                     }
                 }
             }
-        }
 
-        if (confirmDiscard) {
-            MetroConfirm(
-                title = stringResource(com.fancyshark.wpdialer.R.string.editor_discard_title),
-                message = stringResource(com.fancyshark.wpdialer.R.string.editor_discard_message),
-                confirmLabel = stringResource(
-                    com.fancyshark.wpdialer.R.string.editor_discard_button,
-                ),
-                cancelLabel = stringResource(com.fancyshark.wpdialer.R.string.editor_keep_editing),
-                onConfirm = {
-                    confirmDiscard = false
-                    onDone()
-                },
-                onCancel = { confirmDiscard = false },
-            )
-        }
-    }
-}
-
-/**
- * OpenStreetMap pin picker: pan/zoom the map under a fixed center pin, then
- * confirm to reverse-geocode the pin position into an address line.
- */
-@Composable
-private fun MapPinPicker(
-    accent: Color,
-    onCancel: () -> Unit,
-    onPicked: (String) -> Unit,
-) {
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    var resolving by remember { mutableStateOf(false) }
-    val mapView = remember {
-        org.osmdroid.config.Configuration.getInstance().apply {
-            userAgentValue = context.packageName
-            osmdroidBasePath = java.io.File(context.cacheDir, "osm")
-            osmdroidTileCache = java.io.File(context.cacheDir, "osm/tiles")
-        }
-        org.osmdroid.views.MapView(context).apply {
-            setTileSource(org.osmdroid.tileprovider.tilesource.TileSourceFactory.MAPNIK)
-            setMultiTouchControls(true)
-            controller.setZoom(15.0)
-            controller.setCenter(org.osmdroid.util.GeoPoint(33.8938, 35.5018))
-        }
-    }
-    LaunchedEffect(Unit) {
-        com.fancyshark.wpdialer.data.Geo.currentLocation(context)?.let {
-            mapView.controller.setCenter(org.osmdroid.util.GeoPoint(it.latitude, it.longitude))
-            mapView.controller.setZoom(17.0)
-        }
-    }
-    androidx.compose.runtime.DisposableEffect(Unit) {
-        onDispose { mapView.onDetach() }
-    }
-
-    MetroOverlay(onBack = onCancel) {
-    Column(Modifier.fillMaxSize()) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(start = 20.dp, end = 8.dp, top = 2.dp, bottom = 2.dp),
-        ) {
-            Text(
-                stringResource(com.fancyshark.wpdialer.R.string.newcontact_pick_a_location),
-                color = Metro.Foreground,
-                style = Metro.Type.Small,
-                fontWeight = FontWeight.SemiBold,
-                letterSpacing = 1.sp,
-                modifier = Modifier.weight(1f),
-            )
-            MetroCloseMark(stringResource(com.fancyshark.wpdialer.R.string.ui_close)) {
-                onCancel()
-            }
-        }
-        Box(Modifier.weight(1f).fillMaxWidth()) {
-            androidx.compose.ui.viewinterop.AndroidView(
-                factory = { mapView },
-                modifier = Modifier.fillMaxSize(),
-            )
-            androidx.compose.material3.Icon(
-                androidx.compose.material.icons.Icons.Filled.Place,
-                contentDescription = stringResource(
-                    com.fancyshark.wpdialer.R.string.newcontact_pin,
-                ),
-                tint = accent,
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .size(44.dp)
-                    .padding(bottom = 22.dp),
-            )
-        }
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp),
-        ) {
-            MetroButton(
-                if (resolving) {
-                    stringResource(com.fancyshark.wpdialer.R.string.newcontact_resolving)
-                } else {
-                    stringResource(com.fancyshark.wpdialer.R.string.newcontact_use_this_location)
-                },
-                fill = accent,
-                enabled = !resolving,
-                modifier = Modifier.weight(1f),
-            ) {
-                resolving = true
-                scope.launch {
-                    val center = mapView.mapCenter
-                    val addr = com.fancyshark.wpdialer.data.Geo.reverseGeocode(
-                        context, center.latitude, center.longitude,
-                    ) ?: String.format(
-                        // Stored text: ASCII digits and "." decimals in any locale.
-                        java.util.Locale.ROOT, "%.5f, %.5f", center.latitude, center.longitude,
-                    )
-                    onPicked(addr)
+            if (showCountryPicker) {
+                var query by rememberSaveable { mutableStateOf("") }
+                FullScreenPicker(
+                    title = stringResource(R.string.newcontact_country_caps),
+                    onDismiss = { showCountryPicker = false },
+                    header = {
+                        MetroTextBox(
+                            query,
+                            { query = it },
+                            accent,
+                            placeholder = stringResource(R.string.newcontact_search),
+                        )
+                        Spacer(Modifier.height(10.dp))
+                    },
+                ) {
+                    val filtered = regions.filter {
+                        query.isBlank() || it.name.contains(query, ignoreCase = true)
+                    }
+                    LazyColumn {
+                        items(filtered.size, key = { filtered[it].code }) { i ->
+                            val r = filtered[i]
+                            Text(
+                                r.label,
+                                color = if (r.code == regionCode) accentText else Metro.Foreground,
+                                style = Metro.Type.Large,
+                                fontWeight = FontWeight.Light,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        regionCode = r.code
+                                        showCountryPicker = false
+                                    }
+                                    .padding(vertical = 8.dp),
+                            )
+                        }
+                    }
                 }
             }
-            MetroButton(
-                stringResource(com.fancyshark.wpdialer.R.string.newcontact_cancel),
-                modifier = Modifier.weight(1f),
-            ) { onCancel() }
-        }
-    }
-    }
-}
-
-/** Full-screen Metro picker overlay; back and the close mark dismiss it. */
-@Composable
-private fun FullScreenPicker(
-    title: String,
-    onDismiss: () -> Unit,
-    header: @Composable () -> Unit = {},
-    content: @Composable () -> Unit,
-) {
-    MetroOverlay(onBack = onDismiss) {
-        Column(Modifier.fillMaxSize().padding(start = 20.dp, end = 8.dp)) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(top = 6.dp, bottom = 2.dp),
-            ) {
-                Text(
-                    title,
-                    color = Metro.Foreground,
-                    style = Metro.Type.Small,
-                    fontWeight = FontWeight.SemiBold,
-                    letterSpacing = 1.sp,
-                    modifier = Modifier.weight(1f),
-                )
-                MetroCloseMark(stringResource(com.fancyshark.wpdialer.R.string.ui_close)) {
-                    onDismiss()
-                }
-            }
-            Column(Modifier.padding(end = 12.dp)) {
-                header()
-                content()
-            }
-        }
-    }
-}
-
-/** WP-style select control: bordered box showing the current choice. */
-@Composable
-private fun MetroSelector(
-    primary: String,
-    secondary: String?,
-    accent: Color,
-    onClick: () -> Unit,
-) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .border(2.dp, Metro.Foreground)
-            .clickable { onClick() }
-            .padding(horizontal = 12.dp, vertical = 9.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(Modifier.weight(1f)) {
-            Text(
-                primary,
-                color = Metro.Foreground,
-                style = Metro.Type.Body,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            if (!secondary.isNullOrBlank()) {
-                Text(
-                    secondary,
-                    color = Metro.Subtle,
-                    style = Metro.Type.Small,
-                    fontWeight = FontWeight.Light,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
-        Text("▾", color = Metro.textAccent(accent), style = Metro.Type.Body)
-    }
-}
-
-@Composable
-private fun TypedSection(
-    title: String,
-    entries: androidx.compose.runtime.snapshots.SnapshotStateList<TypedEntry>,
-    typeLabels: List<String>,
-    accent: Color,
-    keyboardType: KeyboardType,
-    placeholder: String,
-) {
-    entries.forEachIndexed { i, entry ->
-        FieldLabel(title)
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            MetroTextBox(
-                entry.value,
-                { entries[i] = entry.copy(value = it) },
-                accent,
-                placeholder = placeholder,
-                keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
-                modifier = Modifier.weight(1f),
-            )
-            Spacer(Modifier.width(8.dp))
-            WpDropdown(
-                current = typeKeyLabel(typeLabels[entry.typeIdx]),
-                options = typeLabels.map { typeKeyLabel(it) },
-                onSelect = { t -> entries[i] = entry.copy(typeIdx = t) },
-                modifier = Modifier.width(110.dp),
-            )
-            RemoveMark { entries.removeAt(i) }
-        }
-        if (typeLabels[entry.typeIdx] == "custom") {
-            Spacer(Modifier.height(6.dp))
-            MetroTextBox(
-                entry.customLabel,
-                { entries[i] = entry.copy(customLabel = it) },
-                accent,
-                placeholder = stringResource(
-                    com.fancyshark.wpdialer.R.string.newcontact_custom_label,
-                ),
-            )
-        }
-    }
-    AddLink(
-        stringResource(com.fancyshark.wpdialer.R.string.newcontact_add_typed, title.lowercase()),
-        accent,
-    ) { entries.add(TypedEntry("", 0)) }
+        },
+    )
 }

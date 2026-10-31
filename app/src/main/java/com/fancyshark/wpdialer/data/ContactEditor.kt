@@ -5,11 +5,19 @@ import android.content.Context
 import android.provider.ContactsContract
 import android.provider.ContactsContract.CommonDataKinds.Email
 import android.provider.ContactsContract.CommonDataKinds.Event
+import android.provider.ContactsContract.CommonDataKinds.GroupMembership
+import android.provider.ContactsContract.CommonDataKinds.Im
+import android.provider.ContactsContract.CommonDataKinds.Nickname
 import android.provider.ContactsContract.CommonDataKinds.Note
+import android.provider.ContactsContract.CommonDataKinds.Organization
 import android.provider.ContactsContract.CommonDataKinds.Phone
 import android.provider.ContactsContract.CommonDataKinds.Photo
+import android.provider.ContactsContract.CommonDataKinds.Relation
+import android.provider.ContactsContract.CommonDataKinds.SipAddress
 import android.provider.ContactsContract.CommonDataKinds.StructuredName
 import android.provider.ContactsContract.CommonDataKinds.StructuredPostal
+import android.provider.ContactsContract.CommonDataKinds.Website
+import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -37,11 +45,54 @@ data class ContactAccount(val name: String?, val type: String?) {
         get() = if (name.isNullOrBlank()) kindLabel else "$kindLabel · $name"
 }
 
+/** The field kinds the editor can add ("+ add another field"). */
+enum class FieldKind { PHONE, EMAIL, ADDRESS, DATE, WEBSITE, RELATION, SIP, IM, NICKNAME, WORK, NOTE, LABELS }
+
+/**
+ * StructuredName parts. [display] is DISPLAY_NAME as loaded; edits clear it
+ * so the provider re-joins the parts (locale-aware ordering) on save.
+ */
+data class EditName(
+    val prefix: String = "",
+    val given: String = "",
+    val middle: String = "",
+    val family: String = "",
+    val suffix: String = "",
+    val phoneticGiven: String = "",
+    val phoneticFamily: String = "",
+    val display: String = "",
+) {
+    /** Western-order preview of the parts ("Dr. Alice Martin, Jr."). */
+    fun composed(): String {
+        val base = listOf(prefix, given, middle, family)
+            .map { it.trim() }.filter { it.isNotEmpty() }.joinToString(" ")
+        val sfx = suffix.trim()
+        return when {
+            sfx.isEmpty() -> base
+            base.isEmpty() -> sfx
+            else -> "$base, $sfx"
+        }
+    }
+
+    /** What the name box shows: the stored display name, else the parts. */
+    val shown: String get() = display.trim().ifEmpty { composed() }
+
+    val phonetic: String
+        get() = listOf(phoneticGiven, phoneticFamily)
+            .map { it.trim() }.filter { it.isNotEmpty() }.joinToString(" ")
+
+    val isBlank: Boolean get() = shown.isEmpty() && phonetic.isEmpty()
+
+    /** Same parts, ignoring the loaded display string. */
+    fun sameParts(other: EditName): Boolean = copy(display = "") == other.copy(display = "")
+}
+
 /**
  * [label] is the display string ("mobile", "work", a custom label). [type] /
  * [customLabel] are what save writes: null type keeps the row's current type
  * (TYPE_MOBILE for new rows); a non-blank [customLabel] with a null or
- * TYPE_CUSTOM type saves as TYPE_CUSTOM with that LABEL.
+ * TYPE_CUSTOM type saves as TYPE_CUSTOM with that LABEL. [isDefault] is the
+ * contact's default number for calls (IS_SUPER_PRIMARY).
  */
 data class EditPhone(
     val dataId: Long?,
@@ -49,6 +100,7 @@ data class EditPhone(
     val label: String,
     val type: Int? = null,
     val customLabel: String? = null,
+    val isDefault: Boolean = false,
 )
 
 data class EditEmail(
@@ -58,6 +110,7 @@ data class EditEmail(
     val customLabel: String = "",
 )
 
+/** [startDate] is "yyyy-MM-dd", or "--MM-dd" when the year is unknown. */
 data class EditEvent(
     val dataId: Long?,
     val startDate: String,
@@ -65,31 +118,178 @@ data class EditEvent(
     val customLabel: String = "",
 )
 
+data class EditAddress(
+    val dataId: Long?,
+    val formatted: String,
+    val type: Int = StructuredPostal.TYPE_HOME,
+    val customLabel: String = "",
+)
+
+data class EditRelation(
+    val dataId: Long?,
+    val name: String,
+    val type: Int,
+    val customLabel: String = "",
+)
+
+/** Chat handle; [type] (home/work/other) is kept as loaded, never edited. */
+data class EditIm(
+    val dataId: Long?,
+    val handle: String,
+    val protocol: Int,
+    val customProtocol: String = "",
+    val type: Int = Im.TYPE_OTHER,
+)
+
+/** One-value rows (website, SIP address); [type] is kept as loaded. */
+data class EditValue(val dataId: Long?, val value: String, val type: Int)
+
 data class EditRawContact(
     val rawContactId: Long,
     val account: ContactAccount,
     val nameDataId: Long?,
-    val name: String,
+    val name: EditName,
     val phones: List<EditPhone>,
     val noteDataId: Long? = null,
     val note: String = "",
     val emails: List<EditEmail> = emptyList(),
     val events: List<EditEvent> = emptyList(),
-    val addressDataId: Long? = null,
-    val address: String = "",
+    val addresses: List<EditAddress> = emptyList(),
     /** Existing photo bytes (thumbnail from the data row), for preview only. */
     val photo: ByteArray? = null,
     /** Newly picked photo bytes; non-null means "replace the photo on save". */
     val newPhoto: ByteArray? = null,
+    val nicknameDataId: Long? = null,
+    val nickname: String = "",
+    val orgDataId: Long? = null,
+    val company: String = "",
+    val jobTitle: String = "",
+    val websites: List<EditValue> = emptyList(),
+    val relations: List<EditRelation> = emptyList(),
+    val sips: List<EditValue> = emptyList(),
+    val ims: List<EditIm> = emptyList(),
+    /** Group (label) row ids this raw contact belongs to. */
+    val groupIds: Set<Long> = emptySet(),
+    /** Labels to create in this raw contact's account and join on save. */
+    val newGroups: List<String> = emptyList(),
+) {
+    val hasOrg: Boolean get() = orgDataId != null || company.isNotBlank() || jobTitle.isNotBlank()
+    val hasNote: Boolean get() = noteDataId != null || note.isNotBlank()
+    val hasNickname: Boolean get() = nicknameDataId != null || nickname.isNotBlank()
+    val hasName: Boolean get() = nameDataId != null || !name.isBlank
+    val hasPhoto: Boolean get() = photo != null || newPhoto != null
+    val hasLabels: Boolean get() = groupIds.isNotEmpty() || newGroups.isNotEmpty()
+}
+
+/**
+ * [readOnlyAccounts] are kind labels of the raw contacts left out because
+ * their accounts can't be written (WhatsApp, Telegram, ...).
+ */
+data class EditableContact(
+    val contactId: Long,
+    val raws: List<EditRawContact>,
+    val readOnlyAccounts: List<String> = emptyList(),
 )
 
-data class EditableContact(val contactId: Long, val raws: List<EditRawContact>)
+/** A user label (contact group) of one account. */
+data class ContactGroup(val id: Long, val title: String)
+
+/** A contact date split apart; [year] null = yearless ("--MM-dd"). */
+data class EventDate(val year: Int?, val month: Int, val day: Int)
+
+/** ContactsContract START_DATE parsing/formatting — ASCII digits in every locale. */
+object EventDates {
+    private val yearless = Regex("""^--(\d{2})-?(\d{2})$""")
+    private val dashed = Regex("""^(\d{4})-(\d{2})-(\d{2})""")
+    private val compact = Regex("""^(\d{4})(\d{2})(\d{2})$""")
+
+    fun parse(value: String): EventDate? {
+        val v = value.trim()
+        yearless.find(v)?.let { m ->
+            return valid(null, m.groupValues[1].toInt(), m.groupValues[2].toInt())
+        }
+        (dashed.find(v) ?: compact.find(v))?.let { m ->
+            return valid(
+                m.groupValues[1].toInt(), m.groupValues[2].toInt(), m.groupValues[3].toInt(),
+            )
+        }
+        return null
+    }
+
+    fun format(date: EventDate): String =
+        if (date.year == null) {
+            String.format(Locale.ROOT, "--%02d-%02d", date.month, date.day)
+        } else {
+            String.format(Locale.ROOT, "%04d-%02d-%02d", date.year, date.month, date.day)
+        }
+
+    private val monthDays = intArrayOf(31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
+
+    private fun valid(year: Int?, month: Int, day: Int): EventDate? =
+        if (month in 1..12 && day in 1..monthDays[month - 1]) EventDate(year, month, day) else null
+}
+
+/**
+ * One planned data-row write of a raw contact, kept free of Android types
+ * so the diff is unit-testable. Values map ContactsContract column names.
+ */
+sealed interface RowChange {
+    data class Insert(val mime: String, val values: Map<String, Any?>) : RowChange
+    data class Update(val dataId: Long, val values: Map<String, Any?>) : RowChange
+    data class Delete(val dataId: Long) : RowChange
+
+    /** Deletes this raw contact's [mime] rows whose [column] equals [value] (all rows when null). */
+    data class DeleteWhere(val mime: String, val column: String? = null, val value: String? = null) : RowChange
+
+    /** Creates a label titled [title] in the raw contact's account and joins it. */
+    data class JoinNewGroup(val title: String) : RowChange
+}
+
+/** Toggles the default number for calls: one phone across the whole contact, or none. */
+fun EditableContact.withDefaultPhone(rawIndex: Int, phoneIndex: Int): EditableContact {
+    val target = raws.getOrNull(rawIndex)?.phones?.getOrNull(phoneIndex) ?: return this
+    val makeDefault = !target.isDefault
+    return copy(
+        raws = raws.mapIndexed { i, r ->
+            r.copy(
+                phones = r.phones.mapIndexed { j, p ->
+                    val want = makeDefault && i == rawIndex && j == phoneIndex
+                    if (p.isDefault == want) p else p.copy(isDefault = want)
+                },
+            )
+        },
+    )
+}
+
+/** The contact's default number for calls, if one is set. */
+fun EditableContact.defaultPhone(): EditPhone? =
+    raws.asSequence().flatMap { it.phones.asSequence() }.firstOrNull { it.isDefault }
+
+/**
+ * Applies a contact-level edit (name, nickname, photo): every raw contact
+ * that already [has] the field gets it, else only raw contact [target].
+ */
+fun EditableContact.withContactWide(
+    target: Int,
+    has: (EditRawContact) -> Boolean,
+    apply: (EditRawContact) -> EditRawContact,
+): EditableContact {
+    if (raws.isEmpty()) return this
+    val holders = raws.indices.filter { has(raws[it]) }
+        .ifEmpty { listOf(target.coerceIn(raws.indices)) }
+    return copy(raws = raws.mapIndexed { i, r -> if (i in holders) apply(r) else r })
+}
+
+/** Default raw contact for new fields: the first synced account, else the first. */
+fun EditableContact.preferredTarget(): Int =
+    raws.indexOfFirst { it.account.type != null }.takeIf { it >= 0 } ?: 0
 
 object ContactEditor {
 
     suspend fun loadEditable(context: Context, contactId: Long): EditableContact? =
         withContext(Dispatchers.IO) {
             val raws = mutableListOf<EditRawContact>()
+            val readOnly = LinkedHashSet<String>()
             val adapters = contactSyncAdapters()
             runCatching {
                 context.contentResolver.query(
@@ -104,19 +304,19 @@ object ContactEditor {
                     null,
                 )?.use { c ->
                     while (c.moveToNext()) {
+                        val account = ContactAccount(c.getString(1), c.getString(2))
                         // Never surface raw contacts owned by read-only sync
                         // accounts (WhatsApp, Telegram, ...) — editing them
                         // fights their sync adapters and gets reverted.
-                        if (isReadOnly(c.getString(2), adapters)) continue
-                        raws += loadRawContact(
-                            context,
-                            rawContactId = c.getLong(0),
-                            account = ContactAccount(c.getString(1), c.getString(2)),
-                        )
+                        if (isReadOnly(account.type, adapters)) {
+                            readOnly += account.kindLabel
+                            continue
+                        }
+                        raws += loadRawContact(context, c.getLong(0), account)
                     }
                 }
             }
-            if (raws.isEmpty()) null else EditableContact(contactId, raws)
+            if (raws.isEmpty()) null else EditableContact(contactId, raws, readOnly.toList())
         }
 
     private fun loadRawContact(
@@ -124,16 +324,16 @@ object ContactEditor {
         rawContactId: Long,
         account: ContactAccount,
     ): EditRawContact {
-        var nameDataId: Long? = null
-        var name = ""
-        var noteDataId: Long? = null
-        var note = ""
-        var addressDataId: Long? = null
-        var address = ""
-        var photo: ByteArray? = null
+        var raw = EditRawContact(rawContactId, account, null, EditName(), emptyList())
         val phones = mutableListOf<EditPhone>()
         val emails = mutableListOf<EditEmail>()
         val events = mutableListOf<EditEvent>()
+        val addresses = mutableListOf<EditAddress>()
+        val websites = mutableListOf<EditValue>()
+        val relations = mutableListOf<EditRelation>()
+        val sips = mutableListOf<EditValue>()
+        val ims = mutableListOf<EditIm>()
+        val groups = LinkedHashSet<Long>()
         context.contentResolver.query(
             ContactsContract.Data.CONTENT_URI,
             arrayOf(
@@ -142,70 +342,340 @@ object ContactEditor {
                 ContactsContract.Data.DATA1,
                 ContactsContract.Data.DATA2,
                 ContactsContract.Data.DATA3,
+                ContactsContract.Data.DATA4,
+                ContactsContract.Data.DATA5,
+                ContactsContract.Data.DATA6,
+                ContactsContract.Data.DATA7,
+                ContactsContract.Data.DATA8,
+                ContactsContract.Data.DATA9,
                 ContactsContract.Data.DATA15,
+                ContactsContract.Data.IS_SUPER_PRIMARY,
             ),
             "${ContactsContract.Data.RAW_CONTACT_ID} = ?",
             arrayOf(rawContactId.toString()),
             null,
         )?.use { c ->
+            // DATAn sits at column n + 1.
+            fun s(n: Int): String = c.getString(n + 1) ?: ""
+            fun i(n: Int, fallback: Int): Int = if (c.isNull(n + 1)) fallback else c.getInt(n + 1)
             while (c.moveToNext()) {
+                val id = c.getLong(0)
                 when (c.getString(1)) {
-                    StructuredName.CONTENT_ITEM_TYPE -> {
-                        nameDataId = c.getLong(0)
-                        name = c.getString(2) ?: ""
+                    StructuredName.CONTENT_ITEM_TYPE -> if (raw.nameDataId == null) {
+                        raw = raw.copy(
+                            nameDataId = id,
+                            name = EditName(
+                                prefix = s(4), given = s(2), middle = s(5), family = s(3),
+                                suffix = s(6), phoneticGiven = s(7), phoneticFamily = s(9),
+                                display = s(1),
+                            ),
+                        )
                     }
                     Phone.CONTENT_ITEM_TYPE -> {
-                        val label = Phone.getTypeLabel(
-                            context.resources, c.getInt(3), c.getString(4),
-                        ).toString().lowercase()
                         val type = if (c.isNull(3)) null else c.getInt(3)
+                        val label = Phone.getTypeLabel(
+                            context.resources, type ?: Phone.TYPE_MOBILE, c.getString(4),
+                        ).toString().lowercase()
                         phones += EditPhone(
-                            c.getLong(0),
-                            c.getString(2) ?: "",
-                            label,
-                            type,
+                            id, s(1), label, type,
                             if (type == Phone.TYPE_CUSTOM) c.getString(4) else null,
+                            isDefault = !c.isNull(12) && c.getInt(12) != 0,
                         )
                     }
-                    Email.CONTENT_ITEM_TYPE -> {
-                        emails += EditEmail(
-                            c.getLong(0),
-                            c.getString(2) ?: "",
-                            if (c.isNull(3)) Email.TYPE_OTHER else c.getInt(3),
-                            c.getString(4) ?: "",
-                        )
+                    Email.CONTENT_ITEM_TYPE ->
+                        emails += EditEmail(id, s(1), i(2, Email.TYPE_OTHER), s(3))
+                    Event.CONTENT_ITEM_TYPE ->
+                        events += EditEvent(id, s(1), i(2, Event.TYPE_OTHER), s(3))
+                    StructuredPostal.CONTENT_ITEM_TYPE ->
+                        addresses += EditAddress(id, s(1), i(2, StructuredPostal.TYPE_HOME), s(3))
+                    Website.CONTENT_ITEM_TYPE ->
+                        websites += EditValue(id, s(1), i(2, Website.TYPE_OTHER))
+                    Relation.CONTENT_ITEM_TYPE ->
+                        relations += EditRelation(id, s(1), i(2, Relation.TYPE_CUSTOM), s(3))
+                    SipAddress.CONTENT_ITEM_TYPE ->
+                        sips += EditValue(id, s(1), i(2, SipAddress.TYPE_OTHER))
+                    Im.CONTENT_ITEM_TYPE ->
+                        ims += EditIm(id, s(1), i(5, Im.PROTOCOL_CUSTOM), s(6), i(2, Im.TYPE_OTHER))
+                    GroupMembership.CONTENT_ITEM_TYPE ->
+                        if (!c.isNull(2)) groups += c.getLong(2)
+                    Organization.CONTENT_ITEM_TYPE -> if (raw.orgDataId == null) {
+                        raw = raw.copy(orgDataId = id, company = s(1), jobTitle = s(4))
                     }
-                    Event.CONTENT_ITEM_TYPE -> {
-                        events += EditEvent(
-                            c.getLong(0),
-                            c.getString(2) ?: "",
-                            if (c.isNull(3)) Event.TYPE_OTHER else c.getInt(3),
-                            c.getString(4) ?: "",
-                        )
+                    Nickname.CONTENT_ITEM_TYPE -> if (raw.nicknameDataId == null) {
+                        raw = raw.copy(nicknameDataId = id, nickname = s(1))
                     }
-                    StructuredPostal.CONTENT_ITEM_TYPE -> {
-                        // The editor exposes a single formatted address per raw
-                        // contact; keep the first row and leave others untouched.
-                        if (addressDataId == null) {
-                            addressDataId = c.getLong(0)
-                            address = c.getString(2) ?: ""
-                        }
+                    Photo.CONTENT_ITEM_TYPE -> if (raw.photo == null) {
+                        raw = raw.copy(photo = runCatching { c.getBlob(11) }.getOrNull())
                     }
-                    Photo.CONTENT_ITEM_TYPE -> {
-                        if (photo == null) photo = runCatching { c.getBlob(5) }.getOrNull()
-                    }
-                    Note.CONTENT_ITEM_TYPE -> {
-                        noteDataId = c.getLong(0)
-                        note = c.getString(2) ?: ""
+                    // The editor exposes one note per raw contact; extra rows stay untouched.
+                    Note.CONTENT_ITEM_TYPE -> if (raw.noteDataId == null) {
+                        raw = raw.copy(noteDataId = id, note = s(1))
                     }
                 }
             }
         }
-        return EditRawContact(
-            rawContactId, account, nameDataId, name, phones, noteDataId, note,
-            emails, events, addressDataId, address, photo,
+        return raw.copy(
+            phones = phones, emails = emails, events = events, addresses = addresses,
+            websites = websites, relations = relations, sips = sips, ims = ims,
+            groupIds = groups,
         )
     }
+
+    /** A raw contact with nothing in it — the "before" side of a new contact. */
+    fun blankRaw(account: ContactAccount, rawContactId: Long = -1L): EditRawContact =
+        EditRawContact(rawContactId, account, null, EditName(), emptyList())
+
+    // ---- Diff (pure) --------------------------------------------------
+
+    /**
+     * Every row write that turns [orig] into [edited] (the same raw contact).
+     * Updates carry only the columns that changed, so untouched structured
+     * parts (postal city, phone legacy type, ...) are never rewritten.
+     */
+    internal fun planChanges(orig: EditRawContact, edited: EditRawContact): List<RowChange> {
+        val out = mutableListOf<RowChange>()
+
+        diffSingle(
+            out, StructuredName.CONTENT_ITEM_TYPE, edited.nameDataId,
+            if (edited.name.sameParts(orig.name) && edited.name.display == orig.name.display) {
+                null
+            } else {
+                nameValues(orig.name) to nameValues(edited.name)
+            },
+            newBlank = edited.name.isBlank,
+        )
+        diffSingle(
+            out, Nickname.CONTENT_ITEM_TYPE, edited.nicknameDataId,
+            if (edited.nickname == orig.nickname) null
+            else mapOf<String, Any?>(Nickname.NAME to orig.nickname.ifBlank { null }) to
+                mapOf<String, Any?>(Nickname.NAME to edited.nickname.ifBlank { null }),
+            newBlank = edited.nickname.isBlank(),
+            insertExtras = mapOf(Nickname.TYPE to Nickname.TYPE_DEFAULT),
+        )
+        diffSingle(
+            out, Organization.CONTENT_ITEM_TYPE, edited.orgDataId,
+            if (edited.company == orig.company && edited.jobTitle == orig.jobTitle) null
+            else orgValues(orig) to orgValues(edited),
+            newBlank = edited.company.isBlank() && edited.jobTitle.isBlank(),
+            insertExtras = mapOf(Organization.TYPE to Organization.TYPE_WORK),
+        )
+
+        diffList(
+            out, Phone.CONTENT_ITEM_TYPE, orig.phones, edited.phones,
+            id = { it.dataId }, blank = { it.number.isBlank() }, values = ::phoneValues,
+            insertValues = { p ->
+                val v = LinkedHashMap(phoneValues(p))
+                if (!v.containsKey(Phone.TYPE)) {
+                    v[Phone.TYPE] = Phone.TYPE_MOBILE
+                    v[Phone.LABEL] = null
+                }
+                if (!p.isDefault) {
+                    v.remove(ContactsContract.Data.IS_PRIMARY)
+                    v.remove(ContactsContract.Data.IS_SUPER_PRIMARY)
+                }
+                v
+            },
+        )
+        diffList(
+            out, Email.CONTENT_ITEM_TYPE, orig.emails, edited.emails,
+            id = { it.dataId }, blank = { it.address.isBlank() },
+            values = { e ->
+                mapOf(
+                    Email.ADDRESS to e.address,
+                    Email.TYPE to e.type,
+                    Email.LABEL to customLabel(e.type == Email.TYPE_CUSTOM, e.customLabel),
+                )
+            },
+        )
+        diffList(
+            out, StructuredPostal.CONTENT_ITEM_TYPE, orig.addresses, edited.addresses,
+            id = { it.dataId }, blank = { it.formatted.isBlank() },
+            values = { a ->
+                mapOf(
+                    StructuredPostal.FORMATTED_ADDRESS to a.formatted,
+                    StructuredPostal.TYPE to a.type,
+                    StructuredPostal.LABEL to
+                        customLabel(a.type == StructuredPostal.TYPE_CUSTOM, a.customLabel),
+                )
+            },
+        )
+        diffList(
+            out, Event.CONTENT_ITEM_TYPE, orig.events, edited.events,
+            id = { it.dataId }, blank = { it.startDate.isBlank() },
+            values = { ev ->
+                mapOf(
+                    Event.START_DATE to ev.startDate,
+                    Event.TYPE to ev.type,
+                    Event.LABEL to customLabel(ev.type == Event.TYPE_CUSTOM, ev.customLabel),
+                )
+            },
+        )
+        diffList(
+            out, Website.CONTENT_ITEM_TYPE, orig.websites, edited.websites,
+            id = { it.dataId }, blank = { it.value.isBlank() },
+            values = { w -> mapOf(Website.URL to w.value, Website.TYPE to w.type) },
+        )
+        diffList(
+            out, Relation.CONTENT_ITEM_TYPE, orig.relations, edited.relations,
+            id = { it.dataId }, blank = { it.name.isBlank() },
+            values = { r ->
+                mapOf(
+                    Relation.NAME to r.name,
+                    Relation.TYPE to r.type,
+                    Relation.LABEL to customLabel(r.type == Relation.TYPE_CUSTOM, r.customLabel),
+                )
+            },
+        )
+        diffList(
+            out, SipAddress.CONTENT_ITEM_TYPE, orig.sips, edited.sips,
+            id = { it.dataId }, blank = { it.value.isBlank() },
+            values = { s -> mapOf(SipAddress.SIP_ADDRESS to s.value, SipAddress.TYPE to s.type) },
+        )
+        diffList(
+            out, Im.CONTENT_ITEM_TYPE, orig.ims, edited.ims,
+            id = { it.dataId }, blank = { it.handle.isBlank() },
+            values = { im ->
+                mapOf(
+                    Im.DATA to im.handle,
+                    Im.TYPE to im.type,
+                    Im.PROTOCOL to im.protocol,
+                    Im.CUSTOM_PROTOCOL to customLabel(im.protocol == Im.PROTOCOL_CUSTOM, im.customProtocol),
+                )
+            },
+        )
+
+        diffSingle(
+            out, Note.CONTENT_ITEM_TYPE, edited.noteDataId,
+            if (edited.note == orig.note) null
+            else mapOf<String, Any?>(Note.NOTE to orig.note) to mapOf<String, Any?>(Note.NOTE to edited.note),
+            newBlank = edited.note.isBlank(),
+        )
+
+        (edited.groupIds - orig.groupIds).forEach { gid ->
+            out += RowChange.Insert(
+                GroupMembership.CONTENT_ITEM_TYPE,
+                mapOf(GroupMembership.GROUP_ROW_ID to gid),
+            )
+        }
+        (orig.groupIds - edited.groupIds).forEach { gid ->
+            out += RowChange.DeleteWhere(
+                GroupMembership.CONTENT_ITEM_TYPE, GroupMembership.GROUP_ROW_ID, gid.toString(),
+            )
+        }
+        edited.newGroups.map { it.trim() }.filter { it.isNotEmpty() }
+            .distinctBy { it.lowercase() }
+            .forEach { out += RowChange.JoinNewGroup(it) }
+
+        // Photo replacement: drop any existing photo rows on this raw
+        // contact, then insert the newly picked bytes.
+        if (edited.newPhoto != null) {
+            out += RowChange.DeleteWhere(Photo.CONTENT_ITEM_TYPE)
+            out += RowChange.Insert(Photo.CONTENT_ITEM_TYPE, mapOf(Photo.PHOTO to edited.newPhoto))
+        }
+        // Keyboards leave trailing spaces after suggestions — never store them.
+        return out.map { c ->
+            when (c) {
+                is RowChange.Insert -> c.copy(values = c.values.trimmed())
+                is RowChange.Update -> c.copy(values = c.values.trimmed())
+                else -> c
+            }
+        }
+    }
+
+    private fun Map<String, Any?>.trimmed(): Map<String, Any?> =
+        mapValues { (_, v) -> if (v is String) v.trim() else v }
+
+    private fun customLabel(isCustom: Boolean, label: String): String? =
+        if (isCustom) label.ifBlank { "custom" } else null
+
+    private fun nameValues(n: EditName): Map<String, Any?> = linkedMapOf(
+        // Null display + parts: the provider joins the parts itself.
+        StructuredName.DISPLAY_NAME to n.display.ifBlank { null },
+        StructuredName.PREFIX to n.prefix.trim().ifEmpty { null },
+        StructuredName.GIVEN_NAME to n.given.trim().ifEmpty { null },
+        StructuredName.MIDDLE_NAME to n.middle.trim().ifEmpty { null },
+        StructuredName.FAMILY_NAME to n.family.trim().ifEmpty { null },
+        StructuredName.SUFFIX to n.suffix.trim().ifEmpty { null },
+        StructuredName.PHONETIC_GIVEN_NAME to n.phoneticGiven.trim().ifEmpty { null },
+        StructuredName.PHONETIC_FAMILY_NAME to n.phoneticFamily.trim().ifEmpty { null },
+    )
+
+    private fun orgValues(r: EditRawContact): Map<String, Any?> = mapOf(
+        Organization.COMPANY to r.company.ifBlank { null },
+        Organization.TITLE to r.jobTitle.ifBlank { null },
+    )
+
+    /** NUMBER, TYPE/LABEL (only when a type is known) and the default flags. */
+    private fun phoneValues(p: EditPhone): Map<String, Any?> {
+        val m = linkedMapOf<String, Any?>(Phone.NUMBER to p.number)
+        val custom = p.customLabel?.takeIf { it.isNotBlank() }
+        if (p.type != null || custom != null) {
+            val type = p.type ?: Phone.TYPE_CUSTOM
+            m[Phone.TYPE] = type
+            m[Phone.LABEL] = if (type == Phone.TYPE_CUSTOM) custom ?: "custom" else null
+        }
+        val flag = if (p.isDefault) 1 else 0
+        m[ContactsContract.Data.IS_PRIMARY] = flag
+        m[ContactsContract.Data.IS_SUPER_PRIMARY] = flag
+        return m
+    }
+
+    /**
+     * Single-row field: [values] is (before, after) or null when unchanged.
+     * Blank after = delete the row; no row yet = insert.
+     */
+    private fun diffSingle(
+        out: MutableList<RowChange>,
+        mime: String,
+        dataId: Long?,
+        values: Pair<Map<String, Any?>, Map<String, Any?>>?,
+        newBlank: Boolean,
+        insertExtras: Map<String, Any?> = emptyMap(),
+    ) {
+        val (before, after) = values ?: return
+        when {
+            dataId != null && newBlank -> out += RowChange.Delete(dataId)
+            dataId != null -> changedColumns(before, after).takeIf { it.isNotEmpty() }
+                ?.let { out += RowChange.Update(dataId, it) }
+            !newBlank -> out += RowChange.Insert(mime, after.filterValues { it != null } + insertExtras)
+        }
+    }
+
+    private fun <T> diffList(
+        out: MutableList<RowChange>,
+        mime: String,
+        orig: List<T>,
+        edited: List<T>,
+        id: (T) -> Long?,
+        blank: (T) -> Boolean,
+        values: (T) -> Map<String, Any?>,
+        insertValues: (T) -> Map<String, Any?> = values,
+    ) {
+        edited.forEach { row ->
+            val dataId = id(row)
+            if (dataId == null) {
+                if (!blank(row)) out += RowChange.Insert(mime, insertValues(row))
+            } else {
+                val before = orig.firstOrNull { id(it) == dataId } ?: return@forEach
+                if (blank(row)) {
+                    out += RowChange.Delete(dataId)
+                } else {
+                    changedColumns(values(before), values(row)).takeIf { it.isNotEmpty() }
+                        ?.let { out += RowChange.Update(dataId, it) }
+                }
+            }
+        }
+        // Rows removed in the editor.
+        orig.forEach { before ->
+            val dataId = id(before) ?: return@forEach
+            if (edited.none { id(it) == dataId }) out += RowChange.Delete(dataId)
+        }
+    }
+
+    private fun changedColumns(before: Map<String, Any?>, after: Map<String, Any?>): Map<String, Any?> =
+        after.filter { (k, v) -> !before.containsKey(k) || before[k] != v }
+
+    // ---- Writes -------------------------------------------------------
 
     /**
      * Applies the diff between [original] and [edited]. Every change targets
@@ -218,206 +688,7 @@ object ContactEditor {
             edited.raws.forEach { raw ->
                 val orig = original.raws.firstOrNull { it.rawContactId == raw.rawContactId }
                     ?: return@forEach
-
-                if (raw.name != orig.name) {
-                    if (raw.nameDataId != null) {
-                        ops += ContentProviderOperation
-                            .newUpdate(ContactsContract.Data.CONTENT_URI)
-                            .withSelection(
-                                "${ContactsContract.Data._ID} = ?",
-                                arrayOf(raw.nameDataId.toString()),
-                            )
-                            .withValue(StructuredName.DISPLAY_NAME, raw.name)
-                            .build()
-                    } else if (raw.name.isNotBlank()) {
-                        ops += ContentProviderOperation
-                            .newInsert(ContactsContract.Data.CONTENT_URI)
-                            .withValue(ContactsContract.Data.RAW_CONTACT_ID, raw.rawContactId)
-                            .withValue(
-                                ContactsContract.Data.MIMETYPE,
-                                StructuredName.CONTENT_ITEM_TYPE,
-                            )
-                            .withValue(StructuredName.DISPLAY_NAME, raw.name)
-                            .build()
-                    }
-                }
-
-                raw.phones.forEach { phone ->
-                    if (phone.dataId == null) {
-                        if (phone.number.isNotBlank()) {
-                            val (type, label) = phoneTypeAndLabel(phone, Phone.TYPE_MOBILE)
-                            ops += insertRow(raw.rawContactId, Phone.CONTENT_ITEM_TYPE)
-                                .withValue(Phone.NUMBER, phone.number)
-                                .withValue(Phone.TYPE, type)
-                                .withValue(Phone.LABEL, label)
-                                .build()
-                        }
-                    } else {
-                        val origPhone = orig.phones.firstOrNull { it.dataId == phone.dataId }
-                        if (phone.number.isBlank()) {
-                            ops += deleteDataRow(phone.dataId)
-                        } else if (origPhone != null) {
-                            val numberChanged = origPhone.number != phone.number
-                            val typeChanged = phone.type != null && phone.type != origPhone.type
-                            val labelChanged =
-                                phone.customLabel.orEmpty() != origPhone.customLabel.orEmpty()
-                            if (numberChanged || typeChanged || labelChanged) {
-                                val update = updateDataRow(phone.dataId)
-                                    .withValue(Phone.NUMBER, phone.number)
-                                if (typeChanged || labelChanged) {
-                                    val (type, label) = phoneTypeAndLabel(
-                                        phone, origPhone.type ?: Phone.TYPE_MOBILE,
-                                    )
-                                    update.withValue(Phone.TYPE, type)
-                                        .withValue(Phone.LABEL, label)
-                                }
-                                ops += update.build()
-                            }
-                        }
-                    }
-                }
-
-                // Phones removed in the editor.
-                orig.phones.forEach { origPhone ->
-                    if (origPhone.dataId != null &&
-                        raw.phones.none { it.dataId == origPhone.dataId }
-                    ) {
-                        ops += deleteDataRow(origPhone.dataId)
-                    }
-                }
-
-                if (raw.note != orig.note) {
-                    when {
-                        raw.noteDataId != null && raw.note.isBlank() ->
-                            ops += deleteDataRow(raw.noteDataId)
-                        raw.noteDataId != null ->
-                            ops += ContentProviderOperation
-                                .newUpdate(ContactsContract.Data.CONTENT_URI)
-                                .withSelection(
-                                    "${ContactsContract.Data._ID} = ?",
-                                    arrayOf(raw.noteDataId.toString()),
-                                )
-                                .withValue(Note.NOTE, raw.note)
-                                .build()
-                        raw.note.isNotBlank() ->
-                            ops += ContentProviderOperation
-                                .newInsert(ContactsContract.Data.CONTENT_URI)
-                                .withValue(ContactsContract.Data.RAW_CONTACT_ID, raw.rawContactId)
-                                .withValue(ContactsContract.Data.MIMETYPE, Note.CONTENT_ITEM_TYPE)
-                                .withValue(Note.NOTE, raw.note)
-                                .build()
-                    }
-                }
-
-                raw.emails.forEach { email ->
-                    val label =
-                        if (email.type == Email.TYPE_CUSTOM) email.customLabel.ifBlank { "custom" }
-                        else null
-                    if (email.dataId == null) {
-                        if (email.address.isNotBlank()) {
-                            ops += insertRow(raw.rawContactId, Email.CONTENT_ITEM_TYPE)
-                                .withValue(Email.ADDRESS, email.address)
-                                .withValue(Email.TYPE, email.type)
-                                .withValue(Email.LABEL, label)
-                                .build()
-                        }
-                    } else {
-                        val origEmail = orig.emails.firstOrNull { it.dataId == email.dataId }
-                        if (email.address.isBlank()) {
-                            ops += deleteDataRow(email.dataId)
-                        } else if (origEmail != null &&
-                            (origEmail.address != email.address ||
-                                origEmail.type != email.type ||
-                                origEmail.customLabel != email.customLabel)
-                        ) {
-                            ops += updateDataRow(email.dataId)
-                                .withValue(Email.ADDRESS, email.address)
-                                .withValue(Email.TYPE, email.type)
-                                .withValue(Email.LABEL, label)
-                                .build()
-                        }
-                    }
-                }
-
-                // Emails removed in the editor.
-                orig.emails.forEach { origEmail ->
-                    if (origEmail.dataId != null &&
-                        raw.emails.none { it.dataId == origEmail.dataId }
-                    ) {
-                        ops += deleteDataRow(origEmail.dataId)
-                    }
-                }
-
-                raw.events.forEach { event ->
-                    val label =
-                        if (event.type == Event.TYPE_CUSTOM) event.customLabel.ifBlank { "custom" }
-                        else null
-                    if (event.dataId == null) {
-                        if (event.startDate.isNotBlank()) {
-                            ops += insertRow(raw.rawContactId, Event.CONTENT_ITEM_TYPE)
-                                .withValue(Event.START_DATE, event.startDate)
-                                .withValue(Event.TYPE, event.type)
-                                .withValue(Event.LABEL, label)
-                                .build()
-                        }
-                    } else {
-                        val origEvent = orig.events.firstOrNull { it.dataId == event.dataId }
-                        if (event.startDate.isBlank()) {
-                            ops += deleteDataRow(event.dataId)
-                        } else if (origEvent != null &&
-                            (origEvent.startDate != event.startDate ||
-                                origEvent.type != event.type ||
-                                origEvent.customLabel != event.customLabel)
-                        ) {
-                            ops += updateDataRow(event.dataId)
-                                .withValue(Event.START_DATE, event.startDate)
-                                .withValue(Event.TYPE, event.type)
-                                .withValue(Event.LABEL, label)
-                                .build()
-                        }
-                    }
-                }
-
-                // Dates removed in the editor.
-                orig.events.forEach { origEvent ->
-                    if (origEvent.dataId != null &&
-                        raw.events.none { it.dataId == origEvent.dataId }
-                    ) {
-                        ops += deleteDataRow(origEvent.dataId)
-                    }
-                }
-
-                if (raw.address != orig.address) {
-                    when {
-                        raw.addressDataId != null && raw.address.isBlank() ->
-                            ops += deleteDataRow(raw.addressDataId)
-                        raw.addressDataId != null ->
-                            ops += updateDataRow(raw.addressDataId)
-                                .withValue(StructuredPostal.FORMATTED_ADDRESS, raw.address)
-                                .build()
-                        raw.address.isNotBlank() ->
-                            ops += insertRow(raw.rawContactId, StructuredPostal.CONTENT_ITEM_TYPE)
-                                .withValue(StructuredPostal.FORMATTED_ADDRESS, raw.address)
-                                .withValue(StructuredPostal.TYPE, StructuredPostal.TYPE_HOME)
-                                .build()
-                    }
-                }
-
-                // Photo replacement: drop any existing photo rows on this raw
-                // contact, then insert the newly picked bytes.
-                if (raw.newPhoto != null) {
-                    ops += ContentProviderOperation
-                        .newDelete(ContactsContract.Data.CONTENT_URI)
-                        .withSelection(
-                            "${ContactsContract.Data.RAW_CONTACT_ID} = ? AND " +
-                                "${ContactsContract.Data.MIMETYPE} = ?",
-                            arrayOf(raw.rawContactId.toString(), Photo.CONTENT_ITEM_TYPE),
-                        )
-                        .build()
-                    ops += insertRow(raw.rawContactId, Photo.CONTENT_ITEM_TYPE)
-                        .withValue(Photo.PHOTO, raw.newPhoto)
-                        .build()
-                }
+                appendOps(ops, planChanges(orig, raw), raw.account, rawId = raw.rawContactId)
             }
             if (ops.isEmpty()) return@withContext true
             runCatching {
@@ -425,29 +696,161 @@ object ContactEditor {
             }.isSuccess.also { Repo.invalidateCaches() }
         }
 
-    /** TYPE/LABEL pair to write for [phone]; LABEL is only set for TYPE_CUSTOM. */
-    private fun phoneTypeAndLabel(phone: EditPhone, fallbackType: Int): Pair<Int, String?> {
-        val custom = phone.customLabel?.takeIf { it.isNotBlank() }
-        val type = phone.type ?: if (custom != null) Phone.TYPE_CUSTOM else fallbackType
-        return if (type == Phone.TYPE_CUSTOM) type to (custom ?: "custom") else type to null
+    /** Inserts [raw] as a brand-new raw contact in its account. */
+    suspend fun create(context: Context, raw: EditRawContact): Boolean =
+        withContext(Dispatchers.IO) {
+            val ops = arrayListOf<ContentProviderOperation>()
+            ops += ContentProviderOperation
+                .newInsert(ContactsContract.RawContacts.CONTENT_URI)
+                .withValue(ContactsContract.RawContacts.ACCOUNT_NAME, raw.account.name)
+                .withValue(ContactsContract.RawContacts.ACCOUNT_TYPE, raw.account.type)
+                .build()
+            appendOps(ops, planChanges(blankRaw(raw.account), raw), raw.account, rawBackRef = 0)
+            runCatching {
+                context.contentResolver.applyBatch(ContactsContract.AUTHORITY, ops)
+            }.isSuccess.also { Repo.invalidateCaches() }
+        }
+
+    /** Turns planned [changes] into provider ops for an existing ([rawId]) or new ([rawBackRef]) raw contact. */
+    private fun appendOps(
+        ops: ArrayList<ContentProviderOperation>,
+        changes: List<RowChange>,
+        account: ContactAccount,
+        rawId: Long? = null,
+        rawBackRef: Int? = null,
+    ) {
+        fun insert(mime: String): ContentProviderOperation.Builder {
+            val b = ContentProviderOperation.newInsert(ContactsContract.Data.CONTENT_URI)
+            if (rawId != null) {
+                b.withValue(ContactsContract.Data.RAW_CONTACT_ID, rawId)
+            } else {
+                b.withValueBackReference(ContactsContract.Data.RAW_CONTACT_ID, rawBackRef ?: 0)
+            }
+            return b.withValue(ContactsContract.Data.MIMETYPE, mime)
+        }
+        changes.forEach { change ->
+            when (change) {
+                is RowChange.Insert -> {
+                    val b = insert(change.mime)
+                    change.values.forEach { (k, v) -> b.withValue(k, v) }
+                    ops += b.build()
+                }
+                is RowChange.Update -> {
+                    val b = ContentProviderOperation
+                        .newUpdate(ContactsContract.Data.CONTENT_URI)
+                        .withSelection("${ContactsContract.Data._ID} = ?", arrayOf(change.dataId.toString()))
+                    change.values.forEach { (k, v) -> b.withValue(k, v) }
+                    ops += b.build()
+                }
+                is RowChange.Delete -> ops += ContentProviderOperation
+                    .newDelete(ContactsContract.Data.CONTENT_URI)
+                    .withSelection("${ContactsContract.Data._ID} = ?", arrayOf(change.dataId.toString()))
+                    .build()
+                is RowChange.DeleteWhere -> {
+                    // A new raw contact has nothing to delete yet.
+                    if (rawId == null) return@forEach
+                    val where = StringBuilder(
+                        "${ContactsContract.Data.RAW_CONTACT_ID} = ? AND ${ContactsContract.Data.MIMETYPE} = ?",
+                    )
+                    val args = arrayListOf(rawId.toString(), change.mime)
+                    if (change.column != null) {
+                        where.append(" AND ${change.column} = ?")
+                        args += change.value.orEmpty()
+                    }
+                    ops += ContentProviderOperation
+                        .newDelete(ContactsContract.Data.CONTENT_URI)
+                        .withSelection(where.toString(), args.toTypedArray())
+                        .build()
+                }
+                is RowChange.JoinNewGroup -> {
+                    val groupIndex = ops.size
+                    ops += ContentProviderOperation
+                        .newInsert(ContactsContract.Groups.CONTENT_URI)
+                        .withValue(ContactsContract.Groups.TITLE, change.title)
+                        .withValue(ContactsContract.Groups.ACCOUNT_NAME, account.name)
+                        .withValue(ContactsContract.Groups.ACCOUNT_TYPE, account.type)
+                        .withValue(ContactsContract.Groups.GROUP_VISIBLE, 1)
+                        .build()
+                    ops += insert(GroupMembership.CONTENT_ITEM_TYPE)
+                        .withValueBackReference(GroupMembership.GROUP_ROW_ID, groupIndex)
+                        .build()
+                }
+            }
+        }
     }
 
-    private fun deleteDataRow(dataId: Long): ContentProviderOperation =
-        ContentProviderOperation
-            .newDelete(ContactsContract.Data.CONTENT_URI)
-            .withSelection("${ContactsContract.Data._ID} = ?", arrayOf(dataId.toString()))
-            .build()
+    // ---- Accounts, labels, capabilities --------------------------------
 
-    private fun updateDataRow(dataId: Long): ContentProviderOperation.Builder =
-        ContentProviderOperation
-            .newUpdate(ContactsContract.Data.CONTENT_URI)
-            .withSelection("${ContactsContract.Data._ID} = ?", arrayOf(dataId.toString()))
+    /**
+     * User labels of [account]: not deleted, not read-only, and neither the
+     * auto-add "My Contacts" group nor the starred group — those are
+     * system bookkeeping, and the editor never touches their membership.
+     */
+    suspend fun listGroups(context: Context, account: ContactAccount): List<ContactGroup> =
+        withContext(Dispatchers.IO) {
+            val out = mutableListOf<ContactGroup>()
+            val type = account.type
+            val name = account.name
+            val accountWhere: String
+            val args: Array<String>
+            when {
+                type == null -> {
+                    accountWhere = "${ContactsContract.Groups.ACCOUNT_TYPE} IS NULL"
+                    args = emptyArray()
+                }
+                name == null -> {
+                    accountWhere = "${ContactsContract.Groups.ACCOUNT_TYPE} = ? AND " +
+                        "${ContactsContract.Groups.ACCOUNT_NAME} IS NULL"
+                    args = arrayOf(type)
+                }
+                else -> {
+                    accountWhere = "${ContactsContract.Groups.ACCOUNT_TYPE} = ? AND " +
+                        "${ContactsContract.Groups.ACCOUNT_NAME} = ?"
+                    args = arrayOf(type, name)
+                }
+            }
+            runCatching {
+                context.contentResolver.query(
+                    ContactsContract.Groups.CONTENT_URI,
+                    arrayOf(ContactsContract.Groups._ID, ContactsContract.Groups.TITLE),
+                    "$accountWhere AND ${ContactsContract.Groups.DELETED} = 0" +
+                        " AND ${ContactsContract.Groups.AUTO_ADD} = 0" +
+                        " AND ${ContactsContract.Groups.FAVORITES} = 0" +
+                        " AND ${ContactsContract.Groups.GROUP_IS_READ_ONLY} = 0",
+                    args,
+                    "${ContactsContract.Groups.TITLE} COLLATE NOCASE ASC",
+                )?.use { c ->
+                    while (c.moveToNext()) {
+                        val title = c.getString(1)?.takeIf { it.isNotBlank() } ?: continue
+                        out += ContactGroup(c.getLong(0), title)
+                    }
+                }
+            }
+            out
+        }
 
-    private fun insertRow(rawContactId: Long, mimeType: String): ContentProviderOperation.Builder =
-        ContentProviderOperation
-            .newInsert(ContactsContract.Data.CONTENT_URI)
-            .withValue(ContactsContract.Data.RAW_CONTACT_ID, rawContactId)
-            .withValue(ContactsContract.Data.MIMETYPE, mimeType)
+    private val ALL_KINDS = FieldKind.entries.toSet()
+    private val SIM_TYPE = Regex("""(^|[._])u?sim($|[._])""")
+
+    /**
+     * Field kinds [account] can store, by account-type heuristics: SIM
+     * cards hold numbers (and sometimes an email); Exchange/Outlook drop
+     * relationships, SIP addresses and labels. Everything else (Google,
+     * local phone storage, unknown adapters) is offered every kind — the
+     * per-adapter contacts.xml schema isn't parsed.
+     */
+    fun supportedKinds(account: ContactAccount): Set<FieldKind> {
+        val t = account.type?.lowercase() ?: return ALL_KINDS
+        return when {
+            // Before "google": Gmail's own Exchange type is com.google.android.gm.exchange.
+            t.contains("exchange") || t.contains("outlook") ||
+                t.contains("microsoft") || t.contains("office") ->
+                ALL_KINDS - setOf(FieldKind.RELATION, FieldKind.SIP, FieldKind.LABELS)
+            t.contains("google") -> ALL_KINDS
+            SIM_TYPE.containsMatchIn(t) -> setOf(FieldKind.PHONE, FieldKind.EMAIL)
+            else -> ALL_KINDS
+        }
+    }
 
     /**
      * Account types owned by messaging apps that expose read-only contact
@@ -521,9 +924,7 @@ object ContactEditor {
             accounts.toList()
         }
 
-    data class NewPhone(val number: String, val type: Int, val customLabel: String? = null)
-    data class NewEmail(val address: String, val type: Int, val customLabel: String? = null)
-    data class NewEvent(val date: String, val type: Int, val customLabel: String? = null)
+    // ---- Type tables (keys are English data; display via typeKeyLabel) --
 
     val PHONE_TYPES = listOf(
         "mobile" to Phone.TYPE_MOBILE,
@@ -548,71 +949,40 @@ object ContactEditor {
         "custom" to Event.TYPE_CUSTOM,
     )
 
-    suspend fun create(
-        context: Context,
-        account: ContactAccount,
-        name: String,
-        phones: List<NewPhone> = emptyList(),
-        emails: List<NewEmail> = emptyList(),
-        events: List<NewEvent> = emptyList(),
-        photo: ByteArray? = null,
-        note: String? = null,
-        address: String? = null,
-    ): Boolean = withContext(Dispatchers.IO) {
-        val ops = arrayListOf<ContentProviderOperation>()
-        ops += ContentProviderOperation
-            .newInsert(ContactsContract.RawContacts.CONTENT_URI)
-            .withValue(ContactsContract.RawContacts.ACCOUNT_NAME, account.name)
-            .withValue(ContactsContract.RawContacts.ACCOUNT_TYPE, account.type)
-            .build()
-        fun insert(mime: String) = ContentProviderOperation
-            .newInsert(ContactsContract.Data.CONTENT_URI)
-            .withValueBackReference(ContactsContract.Data.RAW_CONTACT_ID, 0)
-            .withValue(ContactsContract.Data.MIMETYPE, mime)
-        if (name.isNotBlank()) {
-            ops += insert(StructuredName.CONTENT_ITEM_TYPE)
-                .withValue(StructuredName.DISPLAY_NAME, name)
-                .build()
-        }
-        phones.filter { it.number.isNotBlank() }.forEach { p ->
-            ops += insert(Phone.CONTENT_ITEM_TYPE)
-                .withValue(Phone.NUMBER, p.number)
-                .withValue(Phone.TYPE, p.type)
-                .apply { if (p.type == Phone.TYPE_CUSTOM) withValue(Phone.LABEL, p.customLabel ?: "custom") }
-                .build()
-        }
-        emails.filter { it.address.isNotBlank() }.forEach { e ->
-            ops += insert(Email.CONTENT_ITEM_TYPE)
-                .withValue(Email.ADDRESS, e.address)
-                .withValue(Email.TYPE, e.type)
-                .apply { if (e.type == Email.TYPE_CUSTOM) withValue(Email.LABEL, e.customLabel ?: "custom") }
-                .build()
-        }
-        events.filter { it.date.isNotBlank() }.forEach { ev ->
-            ops += insert(Event.CONTENT_ITEM_TYPE)
-                .withValue(Event.START_DATE, ev.date)
-                .withValue(Event.TYPE, ev.type)
-                .apply { if (ev.type == Event.TYPE_CUSTOM) withValue(Event.LABEL, ev.customLabel ?: "custom") }
-                .build()
-        }
-        if (!note.isNullOrBlank()) {
-            ops += insert(Note.CONTENT_ITEM_TYPE)
-                .withValue(Note.NOTE, note)
-                .build()
-        }
-        if (!address.isNullOrBlank()) {
-            ops += insert(StructuredPostal.CONTENT_ITEM_TYPE)
-                .withValue(StructuredPostal.FORMATTED_ADDRESS, address)
-                .withValue(StructuredPostal.TYPE, StructuredPostal.TYPE_HOME)
-                .build()
-        }
-        if (photo != null) {
-            ops += insert(Photo.CONTENT_ITEM_TYPE)
-                .withValue(Photo.PHOTO, photo)
-                .build()
-        }
-        runCatching {
-            context.contentResolver.applyBatch(ContactsContract.AUTHORITY, ops)
-        }.isSuccess.also { Repo.invalidateCaches() }
-    }
+    val ADDRESS_TYPES = listOf(
+        "home" to StructuredPostal.TYPE_HOME,
+        "work" to StructuredPostal.TYPE_WORK,
+        "other" to StructuredPostal.TYPE_OTHER,
+        "custom" to StructuredPostal.TYPE_CUSTOM,
+    )
+
+    val RELATION_TYPES = listOf(
+        "spouse" to Relation.TYPE_SPOUSE,
+        "partner" to Relation.TYPE_PARTNER,
+        "domestic partner" to Relation.TYPE_DOMESTIC_PARTNER,
+        "parent" to Relation.TYPE_PARENT,
+        "mother" to Relation.TYPE_MOTHER,
+        "father" to Relation.TYPE_FATHER,
+        "child" to Relation.TYPE_CHILD,
+        "sister" to Relation.TYPE_SISTER,
+        "brother" to Relation.TYPE_BROTHER,
+        "relative" to Relation.TYPE_RELATIVE,
+        "friend" to Relation.TYPE_FRIEND,
+        "manager" to Relation.TYPE_MANAGER,
+        "assistant" to Relation.TYPE_ASSISTANT,
+        "referred by" to Relation.TYPE_REFERRED_BY,
+        "custom" to Relation.TYPE_CUSTOM,
+    )
+
+    /** Chat protocols (deprecated constants, still the stored values). */
+    @Suppress("DEPRECATION")
+    val IM_PROTOCOLS = listOf(
+        "skype" to Im.PROTOCOL_SKYPE,
+        "jabber" to Im.PROTOCOL_JABBER,
+        "qq" to Im.PROTOCOL_QQ,
+        "icq" to Im.PROTOCOL_ICQ,
+        "aim" to Im.PROTOCOL_AIM,
+        "yahoo" to Im.PROTOCOL_YAHOO,
+        "custom" to Im.PROTOCOL_CUSTOM,
+    )
 }

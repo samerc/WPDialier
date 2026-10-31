@@ -1,0 +1,218 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <string name="acc_phone_only">Téléphone uniquement</string>
+    <string name="acc_saved_in">enregistré dans</string>
+    <string name="acc_more">+%1$d autres</string>
+    <string name="acc_tile_call">appeler</string>
+    <string name="acc_tile_text">SMS</string>
+    <string name="acc_tile_email">e-mail</string>
+    <string name="acc_nickname_quoted">"« %1$s »"</string>
+    <string name="acc_coming_up">à venir</string>
+    <string name="acc_birthday_today">anniversaire aujourd\'hui</string>
+    <string name="acc_birthday_tomorrow">anniversaire demain</string>
+    <plurals name="acc_birthday_in">
+        <item quantity="one">anniversaire dans %d jour</item>
+        <item quantity="many">anniversaire dans %d jours</item>
+        <item quantity="other">anniversaire dans %d jours</item>
+    </plurals>
+    <string name="acc_anniversary_today">anniversaire de mariage aujourd\'hui</string>
+    <string name="acc_anniversary_tomorrow">anniversaire de mariage demain</string>
+    <plurals name="acc_anniversary_in">
+        <item quantity="one">anniversaire de mariage dans %d jour</item>
+        <item quantity="many">anniversaire de mariage dans %d jours</item>
+        <item quantity="other">anniversaire de mariage dans %d jours</item>
+    </plurals>
+    <plurals name="acc_turns">
+        <item quantity="one">fête ses %d an</item>
+        <item quantity="many">fête ses %d ans</item>
+        <item quantity="other">fête ses %d ans</item>
+    </plurals>
+    <plurals name="acc_years_married">
+        <item quantity="one">%d an</item>
+        <item quantity="many">%d ans</item>
+        <item quantity="other">%d ans</item>
+    </plurals>
+    <string name="acc_about">à propos</string>
+    <string name="acc_address_label">adresse (%1$s)</string>
+    <string name="acc_open_map">ouvrir dans Maps</string>
+    <string name="acc_relationship">relation</string>
+    <string name="acc_internet_call">appel Internet</string>
+    <string name="acc_chat">messagerie</string>
+    <string name="acc_phonetic">nom phonétique</string>
+    <string name="acc_labels">libellés</string>
+    <string name="acc_notes">notes</string>
+    <string name="acc_for_contact">pour ce contact</string>
+    <string name="acc_call_with">appeler avec</string>
+    <string name="acc_always_ask">toujours demander</string>
+    <string name="acc_speed_dial">numérotation rapide</string>
+    <string name="acc_speed_key">touche %1$d</string>
+    <string name="acc_speed_page">sur la page de numérotation rapide</string>
+    <string name="acc_speed_added_key">ajouté à la numérotation rapide, touche %1$d</string>
+    <string name="acc_speed_added">ajouté à la numérotation rapide</string>
+    <string name="acc_speed_remove_title">retirer de la numérotation rapide ?</string>
+    <string name="acc_remove">retirer</string>
+    <string name="acc_read_only">lecture seule</string>
+    <string name="acc_link_another">+ lier un autre contact</string>
+    <string name="acc_recent">récents</string>
+    <string name="acc_recent_line">%1$s · %2$s</string>
+    <string name="acc_see_all">tout voir sur la page historique</string>
+    <string name="acc_link">lier</string>
+    <string name="acc_block">bloquer</string>
+    <string name="acc_block_title">bloquer %1$s ?</string>
+    <string name="acc_block_body">Les appels de tous ses numéros seront bloqués.</string>
+    <string name="acc_blocked_toast">%1$s bloqué</string>
+    <string name="acc_block_failed">Impossible de bloquer tous les numéros. Le blocage exige que cette application soit l\'application Téléphone par défaut.</string>
+    <string name="acc_working">en cours</string>
+    <string name="acc_close">fermer</string>
+    <string name="acc_list_sep">", "</string>
+
+    <string name="acc_menu_move">déplacer vers un autre compte</string>
+    <string name="acc_menu_copy">copier vers un autre compte</string>
+    <string name="acc_menu_fields">afficher seulement les champs de ce compte</string>
+    <string name="acc_menu_unlink">dissocier de %1$s</string>
+    <string name="acc_menu_delete">supprimer de ce compte</string>
+    <string name="acc_unlinked_toast">dissocié — c\'est maintenant un contact distinct</string>
+    <string name="acc_unlink_failed">Impossible de dissocier. Rien n\'a changé.</string>
+    <string name="acc_delete_raw_title">supprimer de %1$s ?</string>
+    <string name="acc_delete_raw_body">Les informations de %1$s enregistrées dans %2$s seront supprimées, y compris dans le cloud de ce compte.</string>
+    <string name="acc_delete_raw_body_local">Les informations de %1$s enregistrées sur ce téléphone seront supprimées.</string>
+    <string name="acc_deleted_toast">supprimé de %1$s</string>
+    <string name="acc_delete_failed">Impossible de supprimer de %1$s.</string>
+    <string name="acc_fields_none">rien n\'est enregistré ici</string>
+    <string name="acc_field_name">nom</string>
+    <string name="acc_field_photo">photo</string>
+    <string name="acc_field_photo_value">enregistrée</string>
+    <string name="acc_field_address">adresse</string>
+    <string name="acc_field_label">libellé</string>
+
+    <plurals name="acc_sum_phones" tools:ignore="ImpliedQuantity">
+        <item quantity="one">téléphone</item>
+        <item quantity="many">%d téléphones</item>
+        <item quantity="other">%d téléphones</item>
+    </plurals>
+    <plurals name="acc_sum_emails" tools:ignore="ImpliedQuantity">
+        <item quantity="one">e-mail</item>
+        <item quantity="many">%d e-mails</item>
+        <item quantity="other">%d e-mails</item>
+    </plurals>
+    <plurals name="acc_sum_dates" tools:ignore="ImpliedQuantity">
+        <item quantity="one">date</item>
+        <item quantity="many">%d dates</item>
+        <item quantity="other">%d dates</item>
+    </plurals>
+    <plurals name="acc_sum_addresses" tools:ignore="ImpliedQuantity">
+        <item quantity="one">adresse</item>
+        <item quantity="many">%d adresses</item>
+        <item quantity="other">%d adresses</item>
+    </plurals>
+    <plurals name="acc_sum_other">
+        <item quantity="one">%d autre champ</item>
+        <item quantity="many">%d autres champs</item>
+        <item quantity="other">%d autres champs</item>
+    </plurals>
+    <string name="acc_sum_photo">photo</string>
+    <string name="acc_sum_birthday">anniversaire</string>
+    <string name="acc_sum_company">entreprise</string>
+    <string name="acc_sum_title">poste</string>
+    <string name="acc_sum_website">site web</string>
+    <string name="acc_sum_notes">notes</string>
+    <string name="acc_sum_labels">libellés</string>
+    <string name="acc_sum_name_only">nom seulement</string>
+
+    <string name="acc_move_header">déplacer %1$s</string>
+    <string name="acc_copy_header">copier %1$s</string>
+    <string name="acc_choose_account">choisir un compte</string>
+    <string name="acc_from">depuis %1$s</string>
+    <string name="acc_local_hint">synchronisé nulle part</string>
+    <string name="acc_already_has_part">contient déjà une partie de %1$s</string>
+    <string name="acc_current">actuel</string>
+    <string name="acc_no_targets">Aucun autre compte vers lequel le déplacer.</string>
+    <string name="acc_part_gone">cette partie du contact n\'existe plus</string>
+    <string name="acc_what_moves">ce qui est déplacé</string>
+    <string name="acc_what_copies">ce qui est copié</string>
+    <string name="acc_labels_matched">libellés %1$s → associés par nom, créés s\'ils manquent</string>
+    <string name="acc_stays">favori, sonnerie, choix de SIM et numérotation rapide restent</string>
+    <string name="acc_readonly_stay">%1$s restent liés</string>
+    <plurals name="acc_private_rows">
+        <item quantity="one">%d champ propre à une application n\'est pas copié</item>
+        <item quantity="many">%d champs propres à des applications ne sont pas copiés</item>
+        <item quantity="other">%d champs propres à des applications ne sont pas copiés</item>
+    </plurals>
+    <string name="acc_move">déplacer</string>
+    <string name="acc_copy">copier</string>
+    <string name="acc_move_confirm_title">déplacer vers %1$s ?</string>
+    <string name="acc_copy_confirm_title">copier vers %1$s ?</string>
+    <string name="acc_move_confirm_body">Les informations de %1$s seront copiées dans %2$s. Une fois la copie enregistrée, elles seront supprimées de %3$s, y compris dans le cloud de ce compte.</string>
+    <string name="acc_move_confirm_body_local">Les informations de %1$s seront copiées dans %2$s. Une fois la copie enregistrée, elles seront supprimées de ce téléphone.</string>
+    <string name="acc_copy_confirm_body">Les informations de %1$s seront copiées dans %2$s. L\'original reste dans %3$s.</string>
+    <string name="acc_move_confirm_safe">Si la copie échoue, rien n\'est supprimé.</string>
+    <string name="acc_moving">déplacement</string>
+    <string name="acc_copying">copie</string>
+    <string name="acc_moved_toast">%1$s déplacé vers %2$s</string>
+    <string name="acc_copied_toast">%1$s copié vers %2$s</string>
+    <string name="acc_moved_source_kept">%1$s copié vers %2$s, mais l\'original n\'a pas pu être supprimé.</string>
+    <string name="acc_move_failed">Impossible de déplacer %1$s. Rien n\'a été supprimé.</string>
+    <string name="acc_copy_failed">Impossible de copier %1$s.</string>
+
+    <string name="acc_link_header">lier à %1$s</string>
+    <string name="acc_suggestions">suggestions</string>
+    <string name="acc_all">tous</string>
+    <string name="acc_no_suggestions">aucune suggestion</string>
+    <string name="acc_reason_number">même numéro %1$s</string>
+    <string name="acc_reason_email">même e-mail %1$s</string>
+    <string name="acc_reason_name">nom similaire</string>
+    <string name="acc_link_explain">Lier affiche deux contacts comme un seul. Rien n\'est copié ni supprimé, et chaque partie reste dans son compte. Dissociez à tout moment depuis « enregistré dans ».</string>
+    <string name="acc_search">rechercher</string>
+    <string name="acc_search_hint">nom, numéro ou e-mail</string>
+    <string name="acc_link_pair">%1$s + %2$s</string>
+    <string name="acc_link_pair_accounts">%1$s et %2$s</string>
+    <string name="acc_link_desc">les afficher comme un seul contact. Les deux copies restent dans leurs comptes ; dissociez à tout moment.</string>
+    <string name="acc_merge">fusionner</string>
+    <string name="acc_merge_desc">tout réunir en un seul contact dans un seul compte, retirer les doublons et supprimer l\'autre copie.</string>
+    <string name="acc_linking">liaison</string>
+    <string name="acc_linked_toast">liés</string>
+    <string name="acc_link_failed">Impossible de lier. Rien n\'a changé.</string>
+    <string name="acc_link_confirm_title">lier %1$s ?</string>
+
+    <string name="acc_merge_header">fusionner des contacts</string>
+    <string name="acc_merge_preview">aperçu</string>
+    <string name="acc_merge_gone">ces contacts ont changé</string>
+    <string name="acc_merge_only_link">Ces contacts viennent uniquement d\'applications en lecture seule et ne peuvent pas être réunis. Ils seront liés à la place.</string>
+    <string name="acc_keep_in">conserver dans</string>
+    <string name="acc_tap_to_change">appuyez pour changer</string>
+    <string name="acc_choose">choisir</string>
+    <string name="acc_combined">résultat</string>
+    <string name="acc_phones">téléphones</string>
+    <string name="acc_emails">e-mails</string>
+    <string name="acc_in_both">dans les deux, gardé une fois</string>
+    <string name="acc_kind_dates">dates</string>
+    <string name="acc_kind_other">autres champs</string>
+    <string name="acc_from_sources">depuis %1$s</string>
+    <string name="acc_labels_created">%1$s sera créé dans %2$s</string>
+    <string name="acc_notes_both">les deux notes sont conservées, l\'une après l\'autre</string>
+    <string name="acc_stays_header">reste inchangé</string>
+    <string name="acc_stays_merge">sonnerie, favori, choix de SIM, numérotation rapide, historique des appels, notes d\'appel</string>
+    <string name="acc_merge_deletes">%1$s est supprimé (%2$s) uniquement après l\'enregistrement du contact fusionné.</string>
+    <string name="acc_merge_confirm_title">fusionner %1$s ?</string>
+    <string name="acc_merge_confirm_into">Le contact fusionné est enregistré dans %1$s.</string>
+    <string name="acc_merge_confirm_deletes">Les autres copies sont ensuite supprimées (%1$s). Les comptes synchronisés les suppriment aussi de leur cloud.</string>
+    <string name="acc_merging">fusion</string>
+    <string name="acc_merged_toast">fusionné dans %1$s</string>
+    <string name="acc_merged_partial">Fusionné, mais certaines anciennes copies n\'ont pas pu être supprimées.</string>
+    <string name="acc_merge_failed">Impossible de fusionner. Rien n\'a été supprimé.</string>
+
+    <string name="acc_dups_header">CONTACTS</string>
+    <string name="acc_dups_title">doublons</string>
+    <string name="acc_dups_none">aucun doublon trouvé</string>
+    <string name="acc_dups_none_hint">les contacts qui partagent un numéro ou un e-mail, ou dont les noms se ressemblent beaucoup, apparaissent ici</string>
+    <string name="acc_not_dups">pas des doublons</string>
+    <string name="acc_dups_reset">réafficher les groupes ignorés</string>
+    <string name="acc_settings_contacts_title">Contacts</string>
+    <string name="acc_settings_find_dups">rechercher les doublons</string>
+    <string name="acc_settings_find_dups_hint">contacts enregistrés plusieurs fois</string>
+    <plurals name="acc_settings_dups_count">
+        <item quantity="one">%d doublon possible</item>
+        <item quantity="many">%d doublons possibles</item>
+        <item quantity="other">%d doublons possibles</item>
+    </plurals>
+</resources>

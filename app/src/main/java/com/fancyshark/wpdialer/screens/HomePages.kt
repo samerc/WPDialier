@@ -39,7 +39,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -50,6 +52,7 @@ import androidx.compose.ui.unit.sp
 import com.fancyshark.wpdialer.data.ContactItem
 import com.fancyshark.wpdialer.data.HistoryItem
 import com.fancyshark.wpdialer.data.Repo
+import com.fancyshark.wpdialer.ui.CallerTile
 import com.fancyshark.wpdialer.ui.ContactTile
 import com.fancyshark.wpdialer.ui.Metro
 import com.fancyshark.wpdialer.ui.Continuum
@@ -157,6 +160,55 @@ private fun ReminderStrip(
     }
 }
 
+/** A history list entry: a day header or a grouped "(n)" row. */
+private sealed interface HistoryRow {
+    val key: Any
+
+    class Day(day: Long, val label: String) : HistoryRow {
+        override val key: Any = "day:$day"
+    }
+
+    class Group(val calls: List<HistoryItem>) : HistoryRow {
+        override val key: Any = calls.first().id
+    }
+}
+
+/** Local calendar day of [date] as a sortable number (year * 1000 + day). */
+private fun dayOf(date: Long): Long {
+    val c = java.util.Calendar.getInstance().apply { timeInMillis = date }
+    return c.get(java.util.Calendar.YEAR) * 1000L + c.get(java.util.Calendar.DAY_OF_YEAR)
+}
+
+/** "today" / "yesterday" strings, read once per composition. */
+@Composable
+private fun dayLabelStrings(): Pair<String, String> =
+    stringResource(com.fancyshark.wpdialer.R.string.refined_day_today) to
+        stringResource(com.fancyshark.wpdialer.R.string.refined_day_yesterday)
+
+/** WP day header: "today", "yesterday", a weekday this week, else the date. */
+private fun dayLabel(date: Long, words: Pair<String, String>): String {
+    val now = System.currentTimeMillis()
+    val day = dayOf(date)
+    val yesterday = java.util.Calendar.getInstance().apply {
+        add(java.util.Calendar.DAY_OF_YEAR, -1)
+    }.timeInMillis
+    val locale = java.util.Locale.getDefault()
+    val thisYear = dayOf(now) / 1000 == day / 1000
+    return when {
+        day == dayOf(now) -> words.first
+        day == dayOf(yesterday) -> words.second
+        else -> {
+            val skeleton = when {
+                now - date < 6 * 24 * 3600_000L -> "EEEE"
+                thisYear -> "MMMMd"
+                else -> "yMMMMd"
+            }
+            val pattern = android.text.format.DateFormat.getBestDateTimePattern(locale, skeleton)
+            java.text.SimpleDateFormat(pattern, locale).format(date).lowercase(locale)
+        }
+    }
+}
+
 @Composable
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 private fun HistoryList(
@@ -208,21 +260,43 @@ private fun HistoryList(
         }
         out
     }
-    var expandedId by remember { mutableStateOf<Long?>(null) }
-    var menuForId by remember { mutableStateOf<Long?>(null) }
     // One-handed mode anchors the list to the bottom: index 0 (the newest
     // call) renders just above the thumb, like the dialpad's T9 list.
     val oneHanded by com.fancyshark.wpdialer.data.AppPrefs.oneHandedLists.collectAsState()
+    // Day headers ("today", "yesterday", a date) interleaved with the groups.
+    // Groups never straddle a day, so a header goes wherever the day changes.
+    // Reversed layout draws higher indices ABOVE lower ones, so there the
+    // header follows its day's groups to still sit on top of them.
+    val dayLabels = dayLabelStrings()
+    val rows = remember(groups, oneHanded, dayLabels) {
+        val out = mutableListOf<HistoryRow>()
+        var day = Long.MIN_VALUE
+        var pending: HistoryRow.Day? = null
+        groups.forEach { group ->
+            val d = dayOf(group.first().date)
+            if (d != day) {
+                day = d
+                pending?.let { out += it }
+                val header = HistoryRow.Day(d, dayLabel(group.first().date, dayLabels))
+                if (oneHanded) pending = header else out += header
+            }
+            out += HistoryRow.Group(group)
+        }
+        pending?.let { out += it }
+        out
+    }
+    var expandedId by remember { mutableStateOf<Long?>(null) }
+    var menuForId by remember { mutableStateOf<Long?>(null) }
     val listState = rememberLazyListState()
     // Load-more: nearing the oldest loaded row asks for the next page. The
     // flow re-arms when the group count changes (a page arrived).
     val loadMore by androidx.compose.runtime.rememberUpdatedState(onLoadMore)
-    androidx.compose.runtime.LaunchedEffect(listState, groups.size, canLoadMore) {
+    androidx.compose.runtime.LaunchedEffect(listState, rows.size, canLoadMore) {
         if (!canLoadMore) return@LaunchedEffect
         androidx.compose.runtime.snapshotFlow {
             listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
         }.collect { last ->
-            if (com.fancyshark.wpdialer.data.HistoryPaging.nearEnd(last, groups.size)) {
+            if (com.fancyshark.wpdialer.data.HistoryPaging.nearEnd(last, rows.size)) {
                 loadMore()
             }
         }
@@ -232,7 +306,7 @@ private fun HistoryList(
     androidx.compose.runtime.SideEffect {
         feather.onContent(groups.isNotEmpty(), listState.firstVisibleItemIndex)
     }
-    val titleSize = Metro.Type.SubHeader.fontSize.value
+    val titleSize = Metro.Type.Large.fontSize.value
     LazyColumn(
         Modifier
             .fillMaxSize()
@@ -241,8 +315,25 @@ private fun HistoryList(
         reverseLayout = oneHanded,
         contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 20.dp, end = 20.dp, top = 6.dp, bottom = 20.dp),
     ) {
-        items(groups.size, key = { groups[it].first().id }) { i ->
-            val group = groups[i]
+        items(
+            rows.size,
+            key = { rows[it].key },
+            contentType = { if (rows[it] is HistoryRow.Day) 0 else 1 },
+        ) { i ->
+            val row = rows[i]
+            if (row is HistoryRow.Day) {
+                Text(
+                    row.label,
+                    color = accentText,
+                    style = Metro.Type.Small,
+                    modifier = Modifier
+                        .then(feather.rowModifier(i))
+                        .padding(top = 14.dp, bottom = 2.dp)
+                        .semantics { heading() },
+                )
+                return@items
+            }
+            val group = (row as HistoryRow.Group).calls
             val item = group.first()
             val missed = item.type == android.provider.CallLog.Calls.MISSED_TYPE
             val expanded = expandedId == item.id
@@ -262,14 +353,21 @@ private fun HistoryList(
                         onClick = { expandedId = if (expanded) null else item.id },
                         onLongClick = { menuForId = item.id },
                     )
-                    .padding(vertical = 9.dp),
+                    .padding(vertical = 8.dp),
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
+                    // Photo / initials / "#" — decorative, the name says it all.
+                    CallerTile(
+                        item.number, item.name, accent, 56.dp,
+                        Modifier.clearAndSetSemantics {},
+                    )
+                    Spacer(Modifier.width(14.dp))
+                    Column(Modifier.weight(1f).padding(end = 8.dp)) {
                         Text(
                             if (group.size > 1) "$label (${group.size})" else label,
                             color = if (missed) accentText else Metro.Foreground,
-                            style = Metro.Type.SubHeader,
+                            style = Metro.Type.Large,
+                            fontWeight = FontWeight.Light,
                             maxLines = 1,
                             overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                             modifier = Modifier
@@ -373,7 +471,8 @@ private fun HistoryList(
                 if (expanded) {
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(18.dp),
-                        modifier = Modifier.padding(top = 10.dp, bottom = 4.dp),
+                        // Indented past the thumbnail, under the name.
+                        modifier = Modifier.padding(start = 70.dp, top = 10.dp, bottom = 4.dp),
                     ) {
                         if (item.number.isNotBlank()) {
                             HistoryAction(
@@ -896,8 +995,8 @@ fun PeoplePage(
                                 .padding(vertical = 5.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            ContactTile(entry.name, entry.photoUri, accent, 46.dp)
-                            Spacer(Modifier.width(12.dp))
+                            ContactTile(entry.name, entry.photoUri, accent, 56.dp)
+                            Spacer(Modifier.width(14.dp))
                             Text(
                                 entry.name,
                                 color = Metro.Foreground,

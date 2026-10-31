@@ -21,11 +21,15 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Backspace
+import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -44,6 +48,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.fancyshark.wpdialer.ui.ContactTile
 import com.fancyshark.wpdialer.ui.Haptics
 import com.fancyshark.wpdialer.ui.Metro
 import com.fancyshark.wpdialer.ui.metroTilt
@@ -268,6 +273,13 @@ fun DialpadScreen(
                     .map { PreparedDialEntry(it) }
             }
         }
+        // Contact id -> thumbnail URI for the match tiles: one query up front
+        // instead of a lookup per row (ContactTile decodes + caches them).
+        val photos by androidx.compose.runtime.produceState(emptyMap<Long, String>()) {
+            value = com.fancyshark.wpdialer.data.Repo.loadContacts(context)
+                .mapNotNull { c -> c.photoUri?.let { c.id to it } }
+                .toMap()
+        }
         val input = number.filter { it.isDigit() }
         val suggestions = remember(number, entries) {
             if (input.length < 2 || number.any { it == '*' || it == '#' } ||
@@ -292,7 +304,7 @@ fun DialpadScreen(
         ) {
             items(suggestions.size) { i ->
                 val entry = suggestions[i]
-                Column(
+                Row(
                     Modifier
                         .fillMaxWidth()
                         .clickable {
@@ -300,23 +312,66 @@ fun DialpadScreen(
                             onCall(entry.number) { if (number == typed) number = "" }
                         }
                         .padding(horizontal = 10.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text(
-                        entry.name,
-                        color = Metro.Foreground,
-                        style = Metro.Type.Large,
-                        fontWeight = FontWeight.Light,
-                        maxLines = 1,
+                    ContactTile(
+                        entry.name, photos[entry.contactId], accent, 56.dp,
+                        Modifier.clearAndSetSemantics {},
                     )
-                    Text(
-                        com.fancyshark.wpdialer.data.Repo.pretty(context, entry.number),
-                        color = Metro.textAccent(accent),
-                        style = Metro.Type.Small,
-                    )
+                    Spacer(Modifier.width(14.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            entry.name,
+                            color = Metro.Foreground,
+                            style = Metro.Type.Large,
+                            fontWeight = FontWeight.Light,
+                            maxLines = 1,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            com.fancyshark.wpdialer.data.Repo.pretty(context, entry.number),
+                            color = Metro.textAccent(accent),
+                            style = Metro.Type.Small,
+                            maxLines = 1,
+                        )
+                    }
                 }
             }
         }
         if (suggestions.isNotEmpty()) Spacer(Modifier.height(8.dp))
+
+        // The SIM the call tile will use, when that's already decided —
+        // mirrors MainActivity.placeCall: contact preference, then the global
+        // one. "Ask every time", single-SIM and emergency numbers show none.
+        val sims by androidx.compose.runtime.produceState(
+            emptyList<com.fancyshark.wpdialer.data.SimOption>(),
+        ) {
+            value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                com.fancyshark.wpdialer.data.Sims.options(context)
+            }
+        }
+        val globalSim by com.fancyshark.wpdialer.data.AppPrefs.globalSim.collectAsState()
+        val simLabel by androidx.compose.runtime.produceState<String?>(
+            null, number, sims, globalSim,
+        ) {
+            if (sims.size < 2) {
+                value = null
+                return@produceState
+            }
+            value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                val dialable = SpecialCodes.splitPostDial(number).first
+                val emergency = dialable.isNotBlank() && runCatching {
+                    context.getSystemService(android.telephony.TelephonyManager::class.java)
+                        ?.isEmergencyNumber(dialable) == true
+                }.getOrDefault(false)
+                if (emergency) return@withContext null
+                val contactPref = dialable.takeIf { it.isNotBlank() }
+                    ?.let { com.fancyshark.wpdialer.data.SimPrefs.get(context, it) }
+                    ?.let { flat -> sims.firstOrNull { it.flat == flat } }
+                val global = globalSim?.let { flat -> sims.firstOrNull { it.flat == flat } }
+                (contactPref ?: global)?.label
+            }
+        }
 
         androidx.compose.runtime.CompositionLocalProvider(
             androidx.compose.ui.platform.LocalLayoutDirection provides
@@ -383,7 +438,7 @@ fun DialpadScreen(
 
         Spacer(Modifier.height(5.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-            CallTile(accent, height = keyHeight, modifier = Modifier.weight(2f)) {
+            CallTile(accent, height = keyHeight, sim = simLabel, modifier = Modifier.weight(2f)) {
                 if (number.isNotBlank()) {
                     val n = number
                     // Cleared only if the pad still shows what was dialed.
@@ -400,11 +455,19 @@ fun DialpadScreen(
     }
 }
 
-/** WP 8.1 keypad call button: accent-filled tile spanning two key columns. */
+/** The big glyph + small label layout only fits from this key height on. */
+private val LABELED_TILE = 56.dp
+
+/**
+ * WP 8.1 keypad call button: accent-filled tile spanning two key columns —
+ * a large phone glyph, "call" at the bottom start and, when the SIM is
+ * already decided, its name at the bottom end.
+ */
 @Composable
 private fun CallTile(
     accent: Color,
     height: androidx.compose.ui.unit.Dp,
+    sim: String?,
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
@@ -412,6 +475,13 @@ private fun CallTile(
     val pressed by interaction.collectIsPressedAsState()
     val focused by interaction.collectIsFocusedAsState()
     val tiltOn by com.fancyshark.wpdialer.data.AppPrefs.tilt.collectAsState()
+    val ink = if (pressed) Metro.Background else Metro.onAccent(accent)
+    val label = stringResource(com.fancyshark.wpdialer.R.string.dialpad_call)
+    val spoken = if (sim != null) {
+        stringResource(com.fancyshark.wpdialer.R.string.refined_call_via_sim, sim)
+    } else {
+        label
+    }
     Box(
         modifier
             .metroTilt(tiltOn)
@@ -421,19 +491,34 @@ private fun CallTile(
             .clickable(
                 interactionSource = interaction,
                 indication = null,
-            ) { onClick() },
-        contentAlignment = Alignment.Center,
+            ) { onClick() }
+            .clearAndSetSemantics {
+                contentDescription = spoken
+                role = Role.Button
+            },
     ) {
-        Text(
-            stringResource(com.fancyshark.wpdialer.R.string.dialpad_call),
-            color = if (pressed) Metro.Background else Metro.onAccent(accent),
-            style = Metro.Type.Small,
-            maxLines = 1,
-        )
+        TileGlyph(Icons.Filled.Phone, ink, height)
+        if (height >= LABELED_TILE) {
+            TileLabel(label, ink, Modifier.align(Alignment.BottomStart))
+            if (sim != null) {
+                Text(
+                    sim,
+                    color = ink.copy(alpha = 0.85f),
+                    style = Metro.Type.Tiny,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .fillMaxWidth(0.45f)
+                        .padding(end = 10.dp, bottom = 6.dp),
+                )
+            }
+        }
     }
 }
 
-/** WP 8.1 keypad save button: gray key tile with icon and small label. */
+/** WP 8.1 keypad save button: gray key tile with a large glyph and small label. */
 @Composable
 private fun SaveTile(
     accent: Color,
@@ -445,6 +530,7 @@ private fun SaveTile(
     val pressed by interaction.collectIsPressedAsState()
     val focused by interaction.collectIsFocusedAsState()
     val tiltOn by com.fancyshark.wpdialer.data.AppPrefs.tilt.collectAsState()
+    val label = stringResource(com.fancyshark.wpdialer.R.string.dialpad_save)
     Box(
         modifier
             .metroTilt(tiltOn)
@@ -454,30 +540,53 @@ private fun SaveTile(
             .clickable(
                 interactionSource = interaction,
                 indication = null,
-            ) { onClick() },
-        contentAlignment = Alignment.Center,
+            ) { onClick() }
+            .clearAndSetSemantics {
+                contentDescription = label
+                role = Role.Button
+            },
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(
-                Icons.Filled.Save,
-                contentDescription = stringResource(com.fancyshark.wpdialer.R.string.dialpad_save),
-                tint = Metro.Foreground,
-                modifier = Modifier.size(20.dp),
-            )
-            // Hidden on the shortest keys — the icon alone still fits.
-            if (height >= 48.dp) {
-                Text(
-                    stringResource(com.fancyshark.wpdialer.R.string.dialpad_save),
-                    color = Metro.Foreground,
-                    style = Metro.Type.Tiny,
-                    maxLines = 1,
-                    modifier = Modifier
-                        .padding(top = 2.dp)
-                        .clearAndSetSemantics {},
-                )
-            }
+        val ink = if (pressed) Metro.onAccent(accent) else Metro.Foreground
+        TileGlyph(Icons.Filled.Save, ink, height)
+        // Hidden on short keys — the glyph alone is centered instead.
+        if (height >= LABELED_TILE) {
+            TileLabel(label, ink, Modifier.align(Alignment.BottomStart))
         }
     }
+}
+
+/**
+ * The call/save glyph, sized like the 30sp digits. Tall tiles keep it near
+ * the top so the bottom row holds the labels; short tiles center a smaller one.
+ */
+@Composable
+private fun androidx.compose.foundation.layout.BoxScope.TileGlyph(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    tint: Color,
+    height: androidx.compose.ui.unit.Dp,
+) {
+    Icon(
+        icon,
+        contentDescription = null,
+        tint = tint,
+        modifier = if (height >= LABELED_TILE) {
+            Modifier.align(Alignment.TopCenter).padding(top = 6.dp).size(34.dp)
+        } else {
+            Modifier.align(Alignment.Center).size((height * 0.55f).coerceIn(20.dp, 34.dp))
+        },
+    )
+}
+
+@Composable
+private fun TileLabel(text: String, color: Color, modifier: Modifier) {
+    Text(
+        text,
+        color = color,
+        style = Metro.Type.Small,
+        fontSize = 14.sp,
+        maxLines = 1,
+        modifier = modifier.padding(start = 10.dp, bottom = 4.dp),
+    )
 }
 
 @OptIn(ExperimentalFoundationApi::class)

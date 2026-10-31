@@ -1,0 +1,230 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Contact profile (ContactDetailScreen.kt) -->
+    <string name="acc_phone_only">Phone only</string>
+    <string name="acc_saved_in">saved in</string>
+    <!-- 1 = how many other accounts -->
+    <string name="acc_more">+%1$d more</string>
+    <string name="acc_tile_call">call</string>
+    <string name="acc_tile_text">text</string>
+    <string name="acc_tile_email">email</string>
+    <!-- 1 = nickname, shown under the name -->
+    <string name="acc_nickname_quoted">"“%1$s”"</string>
+    <string name="acc_coming_up">coming up</string>
+    <string name="acc_birthday_today">birthday today</string>
+    <string name="acc_birthday_tomorrow">birthday tomorrow</string>
+    <plurals name="acc_birthday_in">
+        <item quantity="one">birthday in %d day</item>
+        <item quantity="other">birthday in %d days</item>
+    </plurals>
+    <string name="acc_anniversary_today">anniversary today</string>
+    <string name="acc_anniversary_tomorrow">anniversary tomorrow</string>
+    <plurals name="acc_anniversary_in">
+        <item quantity="one">anniversary in %d day</item>
+        <item quantity="other">anniversary in %d days</item>
+    </plurals>
+    <plurals name="acc_turns">
+        <item quantity="one">turns %d</item>
+        <item quantity="other">turns %d</item>
+    </plurals>
+    <plurals name="acc_years_married">
+        <item quantity="one">%d year</item>
+        <item quantity="other">%d years</item>
+    </plurals>
+    <string name="acc_about">about</string>
+    <!-- 1 = address type ("home") -->
+    <string name="acc_address_label">%1$s address</string>
+    <string name="acc_open_map">open in maps</string>
+    <string name="acc_relationship">relationship</string>
+    <string name="acc_internet_call">internet call</string>
+    <string name="acc_chat">chat</string>
+    <string name="acc_phonetic">phonetic name</string>
+    <string name="acc_labels">labels</string>
+    <string name="acc_notes">notes</string>
+    <string name="acc_for_contact">for this contact</string>
+    <string name="acc_call_with">call with</string>
+    <string name="acc_always_ask">always ask</string>
+    <string name="acc_speed_dial">speed dial</string>
+    <!-- 1 = dialpad key 2-9 -->
+    <string name="acc_speed_key">key %1$d</string>
+    <string name="acc_speed_page">on the speed dial page</string>
+    <string name="acc_speed_added_key">added to speed dial, key %1$d</string>
+    <string name="acc_speed_added">added to speed dial</string>
+    <string name="acc_speed_remove_title">remove from speed dial?</string>
+    <string name="acc_remove">remove</string>
+    <string name="acc_read_only">read only</string>
+    <string name="acc_link_another">+ link another contact</string>
+    <string name="acc_recent">recent</string>
+    <!-- 1 = call type ("Missed"), 2 = when -->
+    <string name="acc_recent_line">%1$s · %2$s</string>
+    <string name="acc_see_all">see all on the history page</string>
+    <string name="acc_link">link</string>
+    <string name="acc_block">block</string>
+    <string name="acc_block_title">block %1$s?</string>
+    <string name="acc_block_body">Calls from all of their numbers will be blocked.</string>
+    <string name="acc_blocked_toast">%1$s blocked</string>
+    <string name="acc_block_failed">Couldn\'t block every number. Blocking needs this to be the default phone app.</string>
+    <string name="acc_working">working</string>
+    <string name="acc_close">close</string>
+    <!-- Separator between list items ("family, book club") -->
+    <string name="acc_list_sep">", "</string>
+
+    <!-- "saved in" context menu -->
+    <string name="acc_menu_move">move to another account</string>
+    <string name="acc_menu_copy">copy to another account</string>
+    <string name="acc_menu_fields">show only this account\'s fields</string>
+    <string name="acc_menu_unlink">unlink from %1$s</string>
+    <string name="acc_menu_delete">delete from this account</string>
+    <string name="acc_unlinked_toast">unlinked — it\'s a separate contact now</string>
+    <string name="acc_unlink_failed">Couldn\'t unlink. Nothing changed.</string>
+    <!-- 1 = account kind ("Google") -->
+    <string name="acc_delete_raw_title">delete from %1$s?</string>
+    <!-- 1 = first name, 2 = account ("Google · a@gmail.com") -->
+    <string name="acc_delete_raw_body">%1$s\'s details saved in %2$s will be deleted, including from that account\'s cloud.</string>
+    <string name="acc_delete_raw_body_local">%1$s\'s details saved on this phone will be deleted.</string>
+    <string name="acc_deleted_toast">deleted from %1$s</string>
+    <string name="acc_delete_failed">Couldn\'t delete from %1$s.</string>
+    <string name="acc_fields_none">nothing saved here</string>
+    <string name="acc_field_name">name</string>
+    <string name="acc_field_photo">photo</string>
+    <string name="acc_field_photo_value">saved</string>
+    <string name="acc_field_address">address</string>
+    <string name="acc_field_label">label</string>
+
+    <!-- What a part holds ("2 phones, email, photo") -->
+    <plurals name="acc_sum_phones">
+        <item quantity="one">phone</item>
+        <item quantity="other">%d phones</item>
+    </plurals>
+    <plurals name="acc_sum_emails">
+        <item quantity="one">email</item>
+        <item quantity="other">%d emails</item>
+    </plurals>
+    <plurals name="acc_sum_dates">
+        <item quantity="one">date</item>
+        <item quantity="other">%d dates</item>
+    </plurals>
+    <plurals name="acc_sum_addresses">
+        <item quantity="one">address</item>
+        <item quantity="other">%d addresses</item>
+    </plurals>
+    <plurals name="acc_sum_other">
+        <item quantity="one">1 other field</item>
+        <item quantity="other">%d other fields</item>
+    </plurals>
+    <string name="acc_sum_photo">photo</string>
+    <string name="acc_sum_birthday">birthday</string>
+    <string name="acc_sum_company">company</string>
+    <string name="acc_sum_title">title</string>
+    <string name="acc_sum_website">website</string>
+    <string name="acc_sum_notes">notes</string>
+    <string name="acc_sum_labels">labels</string>
+    <string name="acc_sum_name_only">name only</string>
+
+    <!-- Move / copy (MoveToScreen.kt) -->
+    <string name="acc_move_header">move %1$s</string>
+    <string name="acc_copy_header">copy %1$s</string>
+    <string name="acc_choose_account">choose account</string>
+    <!-- 1 = source account -->
+    <string name="acc_from">from %1$s</string>
+    <string name="acc_local_hint">not synced anywhere</string>
+    <string name="acc_already_has_part">already has part of %1$s</string>
+    <string name="acc_current">current</string>
+    <string name="acc_no_targets">There\'s no other account to move this to.</string>
+    <string name="acc_part_gone">this part of the contact is gone</string>
+    <string name="acc_what_moves">what moves</string>
+    <string name="acc_what_copies">what\'s copied</string>
+    <string name="acc_labels_matched">labels %1$s → matched by name, created if missing</string>
+    <string name="acc_stays">favorite, ringtone, SIM choice and speed dial stay</string>
+    <!-- 1 = read-only apps ("WhatsApp, Telegram") -->
+    <string name="acc_readonly_stay">%1$s stay linked</string>
+    <plurals name="acc_private_rows">
+        <item quantity="one">%d app-specific field isn\'t copied</item>
+        <item quantity="other">%d app-specific fields aren\'t copied</item>
+    </plurals>
+    <string name="acc_move">move</string>
+    <string name="acc_copy">copy</string>
+    <string name="acc_move_confirm_title">move to %1$s?</string>
+    <string name="acc_copy_confirm_title">copy to %1$s?</string>
+    <!-- 1 = first name, 2 = target account, 3 = source account -->
+    <string name="acc_move_confirm_body">%1$s\'s details will be copied to %2$s. Once the copy is saved, they\'ll be deleted from %3$s, including that account\'s cloud.</string>
+    <string name="acc_move_confirm_body_local">%1$s\'s details will be copied to %2$s. Once the copy is saved, they\'ll be deleted from this phone.</string>
+    <string name="acc_copy_confirm_body">%1$s\'s details will be copied to %2$s. The original stays in %3$s.</string>
+    <string name="acc_move_confirm_safe">If the copy fails, nothing is deleted.</string>
+    <string name="acc_moving">moving</string>
+    <string name="acc_copying">copying</string>
+    <!-- 1 = first name, 2 = account kind -->
+    <string name="acc_moved_toast">%1$s moved to %2$s</string>
+    <string name="acc_copied_toast">%1$s copied to %2$s</string>
+    <string name="acc_moved_source_kept">%1$s copied to %2$s, but the original couldn\'t be deleted.</string>
+    <string name="acc_move_failed">Couldn\'t move %1$s. Nothing was deleted.</string>
+    <string name="acc_copy_failed">Couldn\'t copy %1$s.</string>
+
+    <!-- Link (LinkContactScreen.kt) -->
+    <string name="acc_link_header">link to %1$s</string>
+    <string name="acc_suggestions">suggestions</string>
+    <string name="acc_all">all</string>
+    <string name="acc_no_suggestions">no suggestions</string>
+    <string name="acc_reason_number">same number %1$s</string>
+    <string name="acc_reason_email">same email %1$s</string>
+    <string name="acc_reason_name">similar name</string>
+    <string name="acc_link_explain">Linking shows two contacts as one. Nothing is copied or deleted, and each part stays in its own account. Unlink any time from \"saved in\".</string>
+    <string name="acc_search">search</string>
+    <string name="acc_search_hint">name, number or email</string>
+    <!-- 1, 2 = the two names -->
+    <string name="acc_link_pair">%1$s + %2$s</string>
+    <string name="acc_link_pair_accounts">%1$s and %2$s</string>
+    <string name="acc_link_desc">show them as one contact. Both copies stay in their own accounts; unlink any time.</string>
+    <string name="acc_merge">merge</string>
+    <string name="acc_merge_desc">combine everything into one contact in one account, remove duplicates, and delete the other copy.</string>
+    <string name="acc_linking">linking</string>
+    <string name="acc_linked_toast">linked</string>
+    <string name="acc_link_failed">Couldn\'t link. Nothing changed.</string>
+    <string name="acc_link_confirm_title">link %1$s?</string>
+
+    <!-- Merge (MergeScreen.kt) -->
+    <string name="acc_merge_header">merge contacts</string>
+    <string name="acc_merge_preview">preview</string>
+    <string name="acc_merge_gone">these contacts changed</string>
+    <string name="acc_merge_only_link">These contacts only come from read-only apps, so they can\'t be combined. They\'ll be linked instead.</string>
+    <string name="acc_keep_in">keep in</string>
+    <string name="acc_tap_to_change">tap to change</string>
+    <string name="acc_choose">choose</string>
+    <string name="acc_combined">combined</string>
+    <string name="acc_phones">phones</string>
+    <string name="acc_emails">emails</string>
+    <string name="acc_in_both">in both, kept once</string>
+    <string name="acc_kind_dates">dates</string>
+    <string name="acc_kind_other">other fields</string>
+    <!-- 1 = account kinds ("Google, Outlook") -->
+    <string name="acc_from_sources">from %1$s</string>
+    <!-- 1 = labels to create, 2 = account kind -->
+    <string name="acc_labels_created">%1$s will be created in %2$s</string>
+    <string name="acc_notes_both">both notes kept, one after the other</string>
+    <string name="acc_stays_header">stays as is</string>
+    <string name="acc_stays_merge">ringtone, favorite, SIM choice, speed dial, call history, call notes</string>
+    <!-- 1 = name, 2 = account -->
+    <string name="acc_merge_deletes">%1$s is deleted (%2$s) only after the merged contact is saved.</string>
+    <string name="acc_merge_confirm_title">merge %1$s?</string>
+    <string name="acc_merge_confirm_into">The merged contact is saved in %1$s.</string>
+    <string name="acc_merge_confirm_deletes">Then the other copies are deleted (%1$s). Synced accounts also delete them from their cloud.</string>
+    <string name="acc_merging">merging</string>
+    <string name="acc_merged_toast">merged into %1$s</string>
+    <string name="acc_merged_partial">Merged, but some old copies couldn\'t be deleted.</string>
+    <string name="acc_merge_failed">Couldn\'t merge. Nothing was deleted.</string>
+
+    <!-- Duplicates (DuplicatesScreen.kt, Settings) -->
+    <string name="acc_dups_header">CONTACTS</string>
+    <string name="acc_dups_title">duplicates</string>
+    <string name="acc_dups_none">no duplicates found</string>
+    <string name="acc_dups_none_hint">contacts that share a number or email, or have very similar names, show up here</string>
+    <string name="acc_not_dups">not duplicates</string>
+    <string name="acc_dups_reset">show dismissed groups again</string>
+    <string name="acc_settings_contacts_title">Contacts</string>
+    <string name="acc_settings_find_dups">find duplicates</string>
+    <string name="acc_settings_find_dups_hint">contacts saved more than once</string>
+    <plurals name="acc_settings_dups_count">
+        <item quantity="one">%d possible duplicate</item>
+        <item quantity="other">%d possible duplicates</item>
+    </plurals>
+</resources>

@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Contact form (new + edit) — screens/ContactForm*.kt -->
+    <string name="cform_photo_change">تغيير</string>
+    <string name="cform_name_placeholder">إضافة اسم</string>
+    <string name="cform_name_hint">انقر للاسم الأول والأوسط والأخير واللقب…</string>
+    <string name="cform_nickname_quoted">«%1$s»</string>
+    <string name="cform_legend_hint">يُحفظ كل حقل في حسابه الخاص</string>
+    <string name="cform_saved_to_account">محفوظ في %1$s</string>
+    <string name="cform_section_work">العمل</string>
+    <string name="cform_company">الشركة</string>
+    <string name="cform_job_title">المسمى الوظيفي</string>
+    <string name="cform_section_phone">الهاتف</string>
+    <string name="cform_section_email">البريد الإلكتروني</string>
+    <string name="cform_section_address">العنوان</string>
+    <string name="cform_section_dates">التواريخ</string>
+    <string name="cform_section_more">المزيد</string>
+    <string name="cform_add_address">إضافة عنوان</string>
+    <string name="cform_default_number">★ الرقم الافتراضي للمكالمات: %1$s — اضغط مطولاً على رقم لتغييره</string>
+    <string name="cform_default_none">اضغط مطولاً على رقم لجعله الافتراضي للمكالمات</string>
+    <string name="cform_set_default">جعله افتراضياً للمكالمات</string>
+    <string name="cform_map">الخريطة</string>
+    <string name="cform_here">هنا</string>
+    <string name="cform_locating">جارٍ تحديد الموقع…</string>
+    <string name="cform_year_optional">السنة اختيارية</string>
+    <string name="cform_no_year">بدون سنة</string>
+    <string name="cform_website">الموقع الإلكتروني</string>
+    <string name="cform_relationship">صلة القرابة</string>
+    <string name="cform_related_name">الاسم</string>
+    <string name="cform_pick_contact">اختيار من جهات الاتصال</string>
+    <string name="cform_pick_contact_caps">اختيار جهة اتصال</string>
+    <string name="cform_internet_call">اتصال عبر الإنترنت</string>
+    <string name="cform_sip_address">عنوان SIP</string>
+    <string name="cform_chat">الدردشة</string>
+    <string name="cform_chat_handle">اسم المستخدم</string>
+    <string name="cform_labels">التصنيفات</string>
+    <string name="cform_labels_none">لا شيء</string>
+    <string name="cform_notes">ملاحظات</string>
+    <string name="cform_nickname">اللقب</string>
+    <string name="cform_add_another">إضافة حقل آخر</string>
+    <string name="cform_new_fields_to">تُحفظ الحقول الجديدة في</string>
+    <string name="cform_change">تغيير</string>
+    <string name="cform_read_only">%1$s: للقراءة فقط، غير معروض هنا</string>
+    <string name="cform_need_name_or_number">أضف اسماً أو رقماً أولاً</string>
+    <string name="cform_done">تم</string>
+
+    <!-- Name details page -->
+    <string name="cform_name_caption">الاسم</string>
+    <string name="cform_first_name">الاسم الأول</string>
+    <string name="cform_middle_name">الاسم الأوسط</string>
+    <string name="cform_last_name">اسم العائلة</string>
+    <string name="cform_name_prefix">اللقب</string>
+    <string name="cform_name_suffix">اللاحقة</string>
+    <string name="cform_phonetic_first">الاسم الأول صوتياً</string>
+    <string name="cform_phonetic_last">اسم العائلة صوتياً</string>
+    <string name="cform_name_shown_as">يُعرض كـ «%1$s». تساعد الأسماء الصوتية في الترتيب والاتصال الصوتي.</string>
+    <string name="cform_name_phonetic_help">تساعد الأسماء الصوتية في الترتيب والاتصال الصوتي.</string>
+
+    <!-- Add another field -->
+    <string name="cform_add_title">إضافة</string>
+    <string name="cform_kind_date">تاريخ</string>
+    <string name="cform_sub_date">عيد ميلاد، ذكرى سنوية، مخصص</string>
+    <string name="cform_sub_work">الشركة، المسمى الوظيفي</string>
+    <string name="cform_sub_relationship">زوج، والد، أخت، مساعد…</string>
+    <string name="cform_sub_chat">Skype، Jabber، مخصص</string>
+    <string name="cform_already_added">مُضاف بالفعل</string>
+    <string name="cform_add_footer">تُعرض فقط الحقول التي يدعمها الحساب المستهدف. فمثلاً لا يستطيع Exchange حفظ صلات القرابة.</string>
+
+    <!-- Labels -->
+    <string name="cform_no_labels">لا توجد تصنيفات في هذا الحساب بعد</string>
+    <string name="cform_new_label">تصنيف جديد</string>
+    <string name="cform_new_label_in">يُنشأ في %1$s</string>
+    <string name="cform_label_name">اسم التصنيف</string>
+    <string name="cform_create">إنشاء</string>
+
+    <!-- Relationship types -->
+    <string name="type_rel_spouse">الزوج</string>
+    <string name="type_rel_partner">الشريك</string>
+    <string name="type_rel_domestic_partner">شريك المنزل</string>
+    <string name="type_rel_parent">أحد الوالدين</string>
+    <string name="type_rel_mother">الأم</string>
+    <string name="type_rel_father">الأب</string>
+    <string name="type_rel_child">الابن</string>
+    <string name="type_rel_sister">الأخت</string>
+    <string name="type_rel_brother">الأخ</string>
+    <string name="type_rel_relative">قريب</string>
+    <string name="type_rel_friend">صديق</string>
+    <string name="type_rel_manager">المدير</string>
+    <string name="type_rel_assistant">المساعد</string>
+    <string name="type_rel_referred_by">بتوصية من</string>
+</resources>

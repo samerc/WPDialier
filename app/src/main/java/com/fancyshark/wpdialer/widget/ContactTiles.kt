@@ -57,6 +57,14 @@ object ContactTileStore {
 
     fun clear(context: Context) = prefs(context).edit().clear().apply()
 
+    /** Every placed tile's binding, by widget id (the pending pin excluded). */
+    fun all(context: Context): Map<Int, TileBinding> =
+        prefs(context).all.keys
+            .filter { it.startsWith("w") && it.endsWith(".lookup") }
+            .mapNotNull { k -> k.removePrefix("w").removeSuffix(".lookup").toIntOrNull() }
+            .mapNotNull { id -> get(context, id)?.let { id to it } }
+            .toMap()
+
     /** Remembered right before requestPinAppWidget, for the configure step. */
     fun setPendingPin(context: Context, binding: TileBinding) = write(context, PENDING, binding)
 
@@ -135,6 +143,25 @@ object ContactTiles {
             )
         }
     }.getOrNull()
+
+    /**
+     * Re-points tiles bound to any of [oldKeys] at [newKey] (a move/merge
+     * replaced the contact's parts, retiring its lookup key). Keeps each
+     * tile's action. True when any binding changed.
+     */
+    fun rebind(context: Context, oldKeys: Set<String>, newKey: String, newName: String): Boolean {
+        var changed = false
+        ContactTileStore.all(context).forEach { (id, binding) ->
+            if (binding.lookupKey in oldKeys && binding.lookupKey != newKey) {
+                ContactTileStore.put(
+                    context, id,
+                    binding.copy(lookupKey = newKey, name = newName.ifBlank { binding.name }),
+                )
+                changed = true
+            }
+        }
+        return changed
+    }
 
     /** LOOKUP_KEY + display name for an aggregate id (picker rows carry ids only). */
     fun lookupKeyFor(context: Context, contactId: Long): Pair<String, String>? = runCatching {

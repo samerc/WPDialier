@@ -47,6 +47,20 @@ import com.fancyshark.wpdialer.data.SimOption
 import com.fancyshark.wpdialer.ui.Metro
 import com.fancyshark.wpdialer.ui.MetroEmptyState
 import com.fancyshark.wpdialer.ui.MetroProgressDots
+import com.fancyshark.wpdialer.ui.AccentStore
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.unit.IntOffset
+import kotlinx.coroutines.launch
 
 /*
  * The contact pivot's "history" and "notes" pages. Both read the same
@@ -261,6 +275,85 @@ fun ContactNotesPage(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
+        }
+    }
+}
+
+/**
+ * The WP pivot (same look as ui.Pivot) driven by a caller-owned
+ * [PagerState], so a page can switch the pivot itself — the profile's
+ * "see all on the history page". Create the state with rememberPagerState
+ * (saveable) so the page survives recreation.
+ */
+@Composable
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+fun StatePivot(
+    title: String,
+    state: PagerState,
+    pages: List<Pair<String, @Composable () -> Unit>>,
+    modifier: Modifier = Modifier,
+) {
+    val scope = rememberCoroutineScope()
+    Column(modifier) {
+        Text(
+            title,
+            color = Metro.Foreground,
+            style = Metro.Type.AppTitle,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(start = 20.dp, top = 18.dp, end = 20.dp),
+        )
+        val titleWidths = remember(pages.size) { IntArray(pages.size) }
+        var widthTick by remember { mutableStateOf(0) }
+        Row(
+            Modifier
+                .padding(start = 12.dp, top = 2.dp)
+                .horizontalScroll(rememberScrollState(), enabled = false)
+                .offset {
+                    widthTick
+                    val progress = state.currentPage + state.currentPageOffsetFraction
+                    val whole = progress.toInt().coerceIn(0, pages.size - 1)
+                    val base = (0 until whole).sumOf { titleWidths[it] }
+                    val frac = (progress - whole) * titleWidths.getOrElse(whole) { 0 }
+                    // Toward-start pan; offset mirrors for RTL by itself.
+                    IntOffset(-(base + frac.toInt()), 0)
+                },
+        ) {
+            val accent by AccentStore.accent.collectAsState()
+            pages.forEachIndexed { i, (name, _) ->
+                val interaction = remember { MutableInteractionSource() }
+                val focused by interaction.collectIsFocusedAsState()
+                Text(
+                    name,
+                    maxLines = 1,
+                    softWrap = false,
+                    color = if (focused) Metro.textAccent(accent.color) else Metro.Foreground,
+                    style = Metro.Type.PageTitle,
+                    modifier = Modifier
+                        .graphicsLayer {
+                            val progress = state.currentPage + state.currentPageOffsetFraction
+                            val distance = kotlin.math.abs(progress - i).coerceIn(0f, 1f)
+                            alpha = if (focused) 1f else 1f - 0.6f * distance
+                        }
+                        .onSizeChanged {
+                            if (titleWidths[i] != it.width) {
+                                titleWidths[i] = it.width
+                                widthTick++
+                            }
+                        }
+                        .padding(end = 16.dp)
+                        .clickable(interactionSource = interaction, indication = null) {
+                            scope.launch { state.animateScrollToPage(i) }
+                        },
+                )
+            }
+        }
+        HorizontalPager(
+            state = state,
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+            verticalAlignment = Alignment.Top,
+        ) { page ->
+            pages[page].second()
         }
     }
 }

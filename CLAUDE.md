@@ -335,3 +335,20 @@ releaseTest R8 smoke test, store listing refresh, then Play upload.
 Unverifiable here (need real carrier/phone): dual-SIM chooser, RTT,
 STIR badge, voicemail notification, reminder firing under Doze, Android
 13 paths, ColorOS behavior of screening/FGS/shortcut aliases.
+
+## 2026-10-31 design batch (NOT yet released)
+- Metro motion (ui/MetroMotion.kt: turnstile/slide-up/continuum/feather),
+  swivel dialogs, Metro.Type tokens, MetroToast/ProgressDots/EmptyState
+  (ui/MetroFeedback.kt). User rejected a "modern" restyle (cards, glass,
+  pills, photo tints) — stay classic Metro: square, black, accent tiles.
+- Contact page = one long profile (action tiles, coming up, about, saved
+  in, recent) + history/notes pivots. Account ops in data/ContactAccounts.kt
+  (copy/move verify-before-delete, link/unlink via AggregationExceptions,
+  merge), data/Duplicates.kt + DuplicatesScreen (Settings).
+- Editor: one shared form (screens/ContactForm.kt + ContactFormPickers.kt),
+  ContactEditor.planChanges is the unit-tested diff (values trimmed).
+- ui/ContactTile.kt ContactThumbs = shared photo cache (bounds-only decode
+  returns null BY DESIGN — don't treat it as failure).
+- Untested without real accounts: move/copy between Google/Outlook, label
+  sync, read-only (WhatsApp) parts. Design mockups: claude.ai artifact
+  "Dialer 8 contact page".

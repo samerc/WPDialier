@@ -85,6 +85,12 @@ object AppPrefs {
     private val _speedDialNumbers = MutableStateFlow<List<String>>(emptyList())
     val speedDialNumbers: StateFlow<List<String>> = _speedDialNumbers
 
+    /** Duplicate groups the user marked "not duplicates" (DuplicateFinder signatures). */
+    private val _dupDismissed = MutableStateFlow<Set<String>>(emptySet())
+    val dupDismissed: StateFlow<Set<String>> = _dupDismissed
+
+    const val KEY_DUP_DISMISSED = "dup_dismissed"
+
     private fun prefs(context: Context) =
         context.getSharedPreferences("wp", Context.MODE_PRIVATE)
 
@@ -118,6 +124,23 @@ object AppPrefs {
         _setupDone.value = p.bool("setup_done", false)
         wizardSeen = p.bool("wizard_seen", false)
         _speedDialNumbers.value = decodeList(p.str("speed_dial")) ?: emptyList()
+        _dupDismissed.value = p.str(KEY_DUP_DISMISSED)
+            ?.split(SEPARATOR)?.filter { it.isNotBlank() }?.toSet() ?: emptySet()
+    }
+
+    fun dismissDuplicate(context: Context, signature: String) {
+        if (signature.isBlank()) return
+        setDupDismissed(context, _dupDismissed.value + signature.replace(SEPARATOR, " "))
+    }
+
+    fun clearDismissedDuplicates(context: Context) = setDupDismissed(context, emptySet())
+
+    private fun setDupDismissed(context: Context, set: Set<String>) {
+        _dupDismissed.value = set
+        prefs(context).edit().apply {
+            if (set.isEmpty()) remove(KEY_DUP_DISMISSED)
+            else putString(KEY_DUP_DISMISSED, set.joinToString(SEPARATOR))
+        }.apply()
     }
 
     fun setRelativeTimes(context: Context, on: Boolean) {

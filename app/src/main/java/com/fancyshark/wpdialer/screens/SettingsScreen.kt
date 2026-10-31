@@ -152,6 +152,7 @@ fun SettingsScreen(
     onRequestDefault: () -> Unit,
     onAbout: () -> Unit = {},
     onRerunSetup: (() -> Unit)? = null,
+    onFindDuplicates: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val resources = androidx.compose.ui.platform.LocalResources.current
@@ -716,6 +717,47 @@ fun SettingsScreen(
                     modifier = Modifier
                         .clickable(role = Role.Button) { confirmUnblock = rowId to number }
                         .padding(vertical = 12.dp, horizontal = 4.dp),
+                )
+            }
+        }
+
+        if (onFindDuplicates != null) {
+            Spacer(Modifier.height(30.dp))
+            Text(
+                stringResource(R.string.acc_settings_contacts_title),
+                color = accentText,
+                style = Metro.Type.Small,
+                fontWeight = FontWeight.SemiBold,
+            )
+            // Counted in the background (off the main thread, at most once
+            // a minute) so the row can say how many groups it found.
+            val dupCount by com.fancyshark.wpdialer.data.Duplicates.lastCount.collectAsState()
+            androidx.compose.runtime.LaunchedEffect(Unit) {
+                if (context.checkSelfPermission(android.Manifest.permission.READ_CONTACTS) ==
+                    android.content.pm.PackageManager.PERMISSION_GRANTED
+                ) {
+                    com.fancyshark.wpdialer.data.Duplicates.refreshCount(context)
+                }
+            }
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .clickable { onFindDuplicates() }
+                    .padding(vertical = 8.dp),
+            ) {
+                Text(
+                    stringResource(R.string.acc_settings_find_dups),
+                    color = Metro.Foreground,
+                    style = Metro.Type.Large,
+                    fontWeight = FontWeight.Light,
+                )
+                Text(
+                    dupCount?.let {
+                        androidx.compose.ui.res.pluralStringResource(R.plurals.acc_settings_dups_count, it, it)
+                    } ?: stringResource(R.string.acc_settings_find_dups_hint),
+                    color = Metro.Subtle,
+                    style = Metro.Type.Small,
+                    fontWeight = FontWeight.Light,
                 )
             }
         }

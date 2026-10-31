@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Contact form (new + edit) — screens/ContactForm*.kt -->
+    <string name="cform_photo_change">modifier</string>
+    <string name="cform_name_placeholder">ajouter un nom</string>
+    <string name="cform_name_hint">touchez pour prénom, deuxième prénom, nom, titre…</string>
+    <string name="cform_nickname_quoted">« %1$s »</string>
+    <string name="cform_legend_hint">chaque champ est enregistré dans son propre compte</string>
+    <string name="cform_saved_to_account">enregistré dans %1$s</string>
+    <string name="cform_section_work">travail</string>
+    <string name="cform_company">entreprise</string>
+    <string name="cform_job_title">poste</string>
+    <string name="cform_section_phone">téléphone</string>
+    <string name="cform_section_email">e-mail</string>
+    <string name="cform_section_address">adresse</string>
+    <string name="cform_section_dates">dates</string>
+    <string name="cform_section_more">plus</string>
+    <string name="cform_add_address">ajouter une adresse</string>
+    <string name="cform_default_number">★ numéro par défaut pour les appels : %1$s — appui long sur un numéro pour changer</string>
+    <string name="cform_default_none">appui long sur un numéro pour en faire le numéro par défaut des appels</string>
+    <string name="cform_set_default">définir par défaut pour les appels</string>
+    <string name="cform_map">carte</string>
+    <string name="cform_here">ici</string>
+    <string name="cform_locating">localisation…</string>
+    <string name="cform_year_optional">l\'année est facultative</string>
+    <string name="cform_no_year">sans année</string>
+    <string name="cform_website">site web</string>
+    <string name="cform_relationship">relation</string>
+    <string name="cform_related_name">nom</string>
+    <string name="cform_pick_contact">choisir dans les contacts</string>
+    <string name="cform_pick_contact_caps">CHOISIR UN CONTACT</string>
+    <string name="cform_internet_call">appel internet</string>
+    <string name="cform_sip_address">adresse SIP</string>
+    <string name="cform_chat">messagerie</string>
+    <string name="cform_chat_handle">nom d\'utilisateur</string>
+    <string name="cform_labels">libellés</string>
+    <string name="cform_labels_none">aucun</string>
+    <string name="cform_notes">notes</string>
+    <string name="cform_nickname">surnom</string>
+    <string name="cform_add_another">ajouter un autre champ</string>
+    <string name="cform_new_fields_to">les nouveaux champs sont enregistrés dans</string>
+    <string name="cform_change">changer</string>
+    <string name="cform_read_only">%1$s : lecture seule, non affiché ici</string>
+    <string name="cform_need_name_or_number">ajoutez d\'abord un nom ou un numéro</string>
+    <string name="cform_done">terminé</string>
+
+    <!-- Name details page -->
+    <string name="cform_name_caption">NOM</string>
+    <string name="cform_first_name">prénom</string>
+    <string name="cform_middle_name">deuxième prénom</string>
+    <string name="cform_last_name">nom</string>
+    <string name="cform_name_prefix">titre</string>
+    <string name="cform_name_suffix">suffixe</string>
+    <string name="cform_phonetic_first">prénom phonétique</string>
+    <string name="cform_phonetic_last">nom phonétique</string>
+    <string name="cform_name_shown_as">Affiché comme « %1$s ». Les noms phonétiques aident au tri et à la numérotation vocale.</string>
+    <string name="cform_name_phonetic_help">Les noms phonétiques aident au tri et à la numérotation vocale.</string>
+
+    <!-- Add another field -->
+    <string name="cform_add_title">ajouter</string>
+    <string name="cform_kind_date">date</string>
+    <string name="cform_sub_date">anniversaire, anniversaire de mariage, personnalisé</string>
+    <string name="cform_sub_work">entreprise, poste</string>
+    <string name="cform_sub_relationship">conjoint, parent, sœur, assistant…</string>
+    <string name="cform_sub_chat">Skype, Jabber, personnalisé</string>
+    <string name="cform_already_added">déjà ajouté</string>
+    <string name="cform_add_footer">Seuls les champs pris en charge par le compte cible sont proposés. Exchange, par exemple, ne peut pas stocker les relations.</string>
+
+    <!-- Labels -->
+    <string name="cform_no_labels">aucun libellé dans ce compte pour l\'instant</string>
+    <string name="cform_new_label">nouveau libellé</string>
+    <string name="cform_new_label_in">créé dans %1$s</string>
+    <string name="cform_label_name">nom du libellé</string>
+    <string name="cform_create">créer</string>
+
+    <!-- Relationship types -->
+    <string name="type_rel_spouse">conjoint</string>
+    <string name="type_rel_partner">partenaire</string>
+    <string name="type_rel_domestic_partner">concubin</string>
+    <string name="type_rel_parent">parent</string>
+    <string name="type_rel_mother">mère</string>
+    <string name="type_rel_father">père</string>
+    <string name="type_rel_child">enfant</string>
+    <string name="type_rel_sister">sœur</string>
+    <string name="type_rel_brother">frère</string>
+    <string name="type_rel_relative">proche</string>
+    <string name="type_rel_friend">ami</string>
+    <string name="type_rel_manager">responsable</string>
+    <string name="type_rel_assistant">assistant</string>
+    <string name="type_rel_referred_by">recommandé par</string>
+</resources>

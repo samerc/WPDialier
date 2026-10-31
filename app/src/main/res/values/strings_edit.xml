@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Contact form (new + edit) — screens/ContactForm*.kt -->
+    <string name="cform_photo_change">change</string>
+    <string name="cform_name_placeholder">add a name</string>
+    <string name="cform_name_hint">tap for first, middle, last, prefix…</string>
+    <string name="cform_nickname_quoted">“%1$s”</string>
+    <string name="cform_legend_hint">each field saves to its own account</string>
+    <string name="cform_saved_to_account">saved to %1$s</string>
+    <string name="cform_section_work">work</string>
+    <string name="cform_company">company</string>
+    <string name="cform_job_title">job title</string>
+    <string name="cform_section_phone">phone</string>
+    <string name="cform_section_email">email</string>
+    <string name="cform_section_address">address</string>
+    <string name="cform_section_dates">dates</string>
+    <string name="cform_section_more">more</string>
+    <string name="cform_add_address">add address</string>
+    <string name="cform_default_number">★ default number for calls: %1$s — long-press a number to change</string>
+    <string name="cform_default_none">long-press a number to make it the default for calls</string>
+    <string name="cform_set_default">make default for calls</string>
+    <string name="cform_map">map</string>
+    <string name="cform_here">here</string>
+    <string name="cform_locating">locating…</string>
+    <string name="cform_year_optional">year is optional</string>
+    <string name="cform_no_year">no year</string>
+    <string name="cform_website">website</string>
+    <string name="cform_relationship">relationship</string>
+    <string name="cform_related_name">name</string>
+    <string name="cform_pick_contact">pick from contacts</string>
+    <string name="cform_pick_contact_caps">PICK A CONTACT</string>
+    <string name="cform_internet_call">internet call</string>
+    <string name="cform_sip_address">SIP address</string>
+    <string name="cform_chat">chat</string>
+    <string name="cform_chat_handle">user name</string>
+    <string name="cform_labels">labels</string>
+    <string name="cform_labels_none">none</string>
+    <string name="cform_notes">notes</string>
+    <string name="cform_nickname">nickname</string>
+    <string name="cform_add_another">add another field</string>
+    <string name="cform_new_fields_to">new fields are saved to</string>
+    <string name="cform_change">change</string>
+    <string name="cform_read_only">%1$s: read only, not shown here</string>
+    <string name="cform_need_name_or_number">add a name or a number first</string>
+    <string name="cform_done">done</string>
+
+    <!-- Name details page -->
+    <string name="cform_name_caption">NAME</string>
+    <string name="cform_first_name">first name</string>
+    <string name="cform_middle_name">middle name</string>
+    <string name="cform_last_name">last name</string>
+    <string name="cform_name_prefix">title</string>
+    <string name="cform_name_suffix">suffix</string>
+    <string name="cform_phonetic_first">phonetic first</string>
+    <string name="cform_phonetic_last">phonetic last</string>
+    <string name="cform_name_shown_as">Shown as “%1$s”. Phonetic names help sorting and voice dialing.</string>
+    <string name="cform_name_phonetic_help">Phonetic names help sorting and voice dialing.</string>
+
+    <!-- Add another field -->
+    <string name="cform_add_title">add</string>
+    <string name="cform_kind_date">date</string>
+    <string name="cform_sub_date">birthday, anniversary, custom</string>
+    <string name="cform_sub_work">company, job title</string>
+    <string name="cform_sub_relationship">spouse, parent, sister, assistant…</string>
+    <string name="cform_sub_chat">Skype, Jabber, custom</string>
+    <string name="cform_already_added">already added</string>
+    <string name="cform_add_footer">Only fields the target account supports are listed. Exchange, for example, can\'t store relationships.</string>
+
+    <!-- Labels -->
+    <string name="cform_no_labels">no labels in this account yet</string>
+    <string name="cform_new_label">new label</string>
+    <string name="cform_new_label_in">created in %1$s</string>
+    <string name="cform_label_name">label name</string>
+    <string name="cform_create">create</string>
+
+    <!-- Relationship types (keys stay English data) -->
+    <string name="type_rel_spouse">spouse</string>
+    <string name="type_rel_partner">partner</string>
+    <string name="type_rel_domestic_partner">domestic partner</string>
+    <string name="type_rel_parent">parent</string>
+    <string name="type_rel_mother">mother</string>
+    <string name="type_rel_father">father</string>
+    <string name="type_rel_child">child</string>
+    <string name="type_rel_sister">sister</string>
+    <string name="type_rel_brother">brother</string>
+    <string name="type_rel_relative">relative</string>
+    <string name="type_rel_friend">friend</string>
+    <string name="type_rel_manager">manager</string>
+    <string name="type_rel_assistant">assistant</string>
+    <string name="type_rel_referred_by">referred by</string>
+</resources>

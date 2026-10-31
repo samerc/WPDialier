@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- HomePages.kt / DialpadScreen.kt "Metro, refined" pass -->
+    <string name="refined_day_today">aujourd’hui</string>
+    <string name="refined_day_yesterday">hier</string>
+    <!-- Call tile's spoken label when a SIM is preselected; %1$s = SIM name -->
+    <string name="refined_call_via_sim">appeler avec %1$s</string>
+</resources>

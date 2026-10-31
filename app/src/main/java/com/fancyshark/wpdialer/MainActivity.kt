@@ -127,6 +127,10 @@ sealed interface Screen {
     data object Search : Screen
     data object Settings : Screen
     data object About : Screen
+    data class LinkContact(val contactId: Long) : Screen
+    data class Merge(val contactIds: List<Long>) : Screen
+    data object Duplicates : Screen
+    data class MoveTo(val contactId: Long, val rawId: Long, val copy: Boolean) : Screen
 }
 
 /**
@@ -195,6 +199,11 @@ private val ScreenStackSaver = androidx.compose.runtime.saveable.listSaver<
                 Screen.Search -> "search"
                 Screen.Settings -> "settings"
                 Screen.About -> "about"
+                is Screen.LinkContact -> "link$SCREEN_SEP${screen.contactId}"
+                is Screen.Merge -> "merge$SCREEN_SEP${screen.contactIds.joinToString(",")}"
+                Screen.Duplicates -> "dups"
+                is Screen.MoveTo ->
+                    "move$SCREEN_SEP${screen.contactId}$SCREEN_SEP${screen.rawId}$SCREEN_SEP${screen.copy}"
             }
         }
     },
@@ -215,6 +224,16 @@ private val ScreenStackSaver = androidx.compose.runtime.saveable.listSaver<
                         "search" -> Screen.Search
                         "settings" -> Screen.Settings
                         "about" -> Screen.About
+                        "link" -> Screen.LinkContact(parts.getOrNull(1)?.toLongOrNull() ?: 0L)
+                        "merge" -> Screen.Merge(
+                            parts.getOrElse(1) { "" }.split(',').mapNotNull { it.toLongOrNull() },
+                        )
+                        "dups" -> Screen.Duplicates
+                        "move" -> Screen.MoveTo(
+                            parts.getOrNull(1)?.toLongOrNull() ?: 0L,
+                            parts.getOrNull(2)?.toLongOrNull() ?: 0L,
+                            parts.getOrNull(3) == "true",
+                        )
                         else -> Screen.Home
                     },
                 )
@@ -794,6 +813,12 @@ class MainActivity : ComponentActivity() {
             if (backStack.size > 1) popTop()
             refreshTick.value += 1
         }
+        // A link / merge / move finished: back to the page below, whose
+        // profile follows ContactRedirects to the resulting contact.
+        fun finishContactOp(oldIds: Collection<Long>, newId: Long?) {
+            com.fancyshark.wpdialer.data.ContactRedirects.record(oldIds, newId)
+            popAndRefresh()
+        }
         BackHandler(enabled = backStack.size > 1) {
             // Refresh on plain back too — e.g. pin/unpin on a profile must
             // show up on the speed dial page immediately.
@@ -1142,8 +1167,12 @@ class MainActivity : ComponentActivity() {
                             history = history,
                             onCall = { placeCall(it) },
                             onText = { sendText(it) },
-                            onEdit = { push(Screen.EditContact(top.id)) },
+                            onEdit = { push(Screen.EditContact(it)) },
                             onDeleted = { popAndRefresh() },
+                            onLink = { push(Screen.LinkContact(it)) },
+                            onMoveTo = { contactId, rawId, copy ->
+                                push(Screen.MoveTo(contactId, rawId, copy))
+                            },
                             onReachDown = if (reachEnabled) {
                                 { triggerReach(contentHeightPx * 0.42f) }
                             } else {
@@ -1188,6 +1217,7 @@ class MainActivity : ComponentActivity() {
                             isDefaultDialer = default,
                             onRequestDefault = { requestDefaultDialer() },
                             onAbout = { push(Screen.About) },
+                            onFindDuplicates = { push(Screen.Duplicates) },
                             onRerunSetup = {
                                 wizardRerun = true
                                 com.fancyshark.wpdialer.data.AppPrefs
@@ -1196,6 +1226,38 @@ class MainActivity : ComponentActivity() {
                         )
 
                         Screen.About -> com.fancyshark.wpdialer.screens.AboutScreen(accent)
+
+                        is Screen.LinkContact -> com.fancyshark.wpdialer.screens.LinkContactScreen(
+                            contactId = top.contactId,
+                            accent = accent.color,
+                            onLinked = { newId -> finishContactOp(listOf(top.contactId), newId) },
+                            onMerge = { ids ->
+                                // The merge preview replaces the link picker.
+                                popTop()
+                                push(Screen.Merge(ids))
+                            },
+                        )
+
+                        is Screen.Merge -> com.fancyshark.wpdialer.screens.MergeScreen(
+                            contactIds = top.contactIds,
+                            accent = accent.color,
+                            onMerged = { newId -> finishContactOp(top.contactIds, newId) },
+                            onCancel = { popTop() },
+                        )
+
+                        Screen.Duplicates -> com.fancyshark.wpdialer.screens.DuplicatesScreen(
+                            accent = accent.color,
+                            refreshKey = tick,
+                            onOpen = { ids -> push(Screen.Merge(ids)) },
+                        )
+
+                        is Screen.MoveTo -> com.fancyshark.wpdialer.screens.MoveToScreen(
+                            contactId = top.contactId,
+                            rawId = top.rawId,
+                            copy = top.copy,
+                            accent = accent.color,
+                            onDone = { newId -> finishContactOp(listOf(top.contactId), newId) },
+                        )
                     }
                 }
                 }
