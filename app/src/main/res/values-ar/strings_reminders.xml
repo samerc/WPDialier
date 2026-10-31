@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Call-back reminders (ReminderReceiver, MissedCalls, history) -->
+    <string name="notif_remind_me">ذكّرني</string>
+    <string name="notif_channel_reminders">تذكيرات معاودة الاتصال</string>
+    <string name="notif_reminder_title">عاود الاتصال بـ %1$s</string>
+    <string name="notif_reminder_text">طلبت أن نذكّرك</string>
+    <string name="notif_reminder_dismiss">تجاهل</string>
+    <string name="home_remind_me">ذكّرني</string>
+    <string name="home_reminder_strip">تذكير: اتصل بـ %1$s الساعة %2$s</string>
+    <string name="home_reminder_cancel">إلغاء التذكير</string>
+    <string name="main_remind_title">ذكّرني بمعاودة الاتصال</string>
+    <string name="main_remind_15_min">بعد 15 دقيقة</string>
+    <string name="main_remind_1_hour">بعد ساعة</string>
+    <string name="main_remind_3_hours">بعد 3 ساعات</string>
+    <string name="main_remind_tomorrow">غدًا الساعة 9:00</string>
+    <string name="main_confirm_cancel_reminder">إلغاء هذا التذكير؟</string>
+    <string name="main_button_cancel_reminder">إلغاؤه</string>
+    <string name="main_button_keep_reminder">إبقاء</string>
+
+    <!-- Call notes (call details page) -->
+    <string name="home_note_present">توجد ملاحظة</string>
+    <string name="home_note_hint">اضغط على مكالمة لإضافة ملاحظة</string>
+    <string name="home_note_title">ملاحظة المكالمة</string>
+    <string name="home_note_placeholder">عمّ كانت هذه المكالمة؟</string>
+    <string name="home_note_save">حفظ</string>
+    <string name="home_note_delete">حذف الملاحظة</string>
+    <string name="home_note_confirm_delete">حذف هذه الملاحظة؟</string>
+
+    <!-- SearchScreen.kt -->
+    <string name="search_history_header">السجل</string>
+</resources>

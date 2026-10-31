@@ -95,8 +95,10 @@ class InCallActivity : ComponentActivity() {
         AccentStore.init(this)
         FontStore.init(this)
         com.fancyshark.wpdialer.data.AppPrefs.init(this)
-        Metro.light = com.fancyshark.wpdialer.data.AppPrefs.light.value
+        Metro.light = com.fancyshark.wpdialer.data.AppPrefs.isLight(this)
         setContent {
+            // "Follow system" re-resolves on night-mode flips mid-call.
+            com.fancyshark.wpdialer.ui.MetroThemeSync()
             // Light theme needs dark status/nav icons (edge-to-edge on 35+).
             com.fancyshark.wpdialer.ui.MetroSystemBars(window)
             val selawik by FontStore.selawik.collectAsState()

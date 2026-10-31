@@ -14,6 +14,9 @@ import org.json.JSONObject
  * Blocked numbers live in the system provider and ride along as a list.
  * Values are type-tagged so numeric prefs round-trip as the exact type
  * SharedPreferences expects (a Long read back as Int would throw later).
+ * Call notes ("call_notes") and call-back reminders ("reminders") live in
+ * their own files on purpose and are never exported: they are personal
+ * content tied to this phone's call log, not settings.
  */
 object SettingsBackup {
 
@@ -48,6 +51,10 @@ object SettingsBackup {
         "reject_msgs" to "s",
         "speed_dial" to "s",
         "theme_light" to "b",
+        "theme_mode" to "s",
+        "screen_hidden" to "b",
+        "screen_unknown" to "b",
+        "screen_spoofed" to "b",
         "tilt" to "b",
         "relative_times" to "b",
         "one_handed_lists" to "b",
@@ -65,6 +72,9 @@ object SettingsBackup {
         val expected = KNOWN_TYPES[key] ?: currentTag
         return expected == null || expected == tag
     }
+
+    internal fun legacyThemeOnly(restoredKeys: Set<String>): Boolean =
+        "theme_light" in restoredKeys && "theme_mode" !in restoredKeys
 
     internal fun tagOf(v: Any?): String? = when (v) {
         is Boolean -> "b"
@@ -142,6 +152,7 @@ object SettingsBackup {
             val sp = context.getSharedPreferences("wp", Context.MODE_PRIVATE)
             val current = sp.all
             val edit = sp.edit()
+            val restoredKeys = mutableSetOf<String>()
             for (i in 0 until payload.prefs.length()) {
                 runCatching {
                     val e = payload.prefs.getJSONObject(i)
@@ -157,9 +168,13 @@ object SettingsBackup {
                         else -> return@runCatching
                     }
                     applied++
+                    restoredKeys += k
                 }
             }
             if (applied == 0) return@withContext false
+            // A pre-1.2 export carries only theme_light: drop the newer
+            // theme_mode so the restored boolean (its fallback) decides.
+            if (legacyThemeOnly(restoredKeys)) edit.remove("theme_mode")
             edit.commit() // synchronous: stores re-init right after
             for (i in 0 until payload.blocked.length()) {
                 runCatching { Repo.blockNumber(context, payload.blocked.getString(i)) }

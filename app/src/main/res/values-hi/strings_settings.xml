@@ -48,7 +48,6 @@
     <string name="settings_dup_notif_body">Google का फ़ोन ऐप डिफ़ॉल्ट डायलर न होने पर भी अपनी कॉल सूचनाएँ दिखाता है। सिर्फ़ इस ऐप की सूचनाएँ देखने के लिए उसकी सूचनाएँ बंद कर दें।</string>
     <string name="settings_dup_notif_button">Google Phone की सूचना सेटिंग खोलें</string>
     <string name="settings_dup_notif_locked_hint">कुछ फ़ोन (OnePlus, OPPO...) पर वे टॉगल लॉक होते हैं। ऐसा हो तो नीचे दिए गए ऐप जानकारी पेज को खोलकर \"अक्षम करें\" पर टैप करें — यह ऐप Google के फ़ोन ऐप की जगह पूरी तरह ले लेता है, और आप उसे वहाँ से कभी भी फिर चालू कर सकते हैं।</string>
-    <string name="settings_light_theme_title">हल्की थीम</string>
     <string name="settings_tilt_title">टाइल झुकाव इफ़ेक्ट</string>
     <string name="settings_relative_times_title">इतिहास में सापेक्ष समय</string>
     <string name="settings_relative_times_hint">चालू: \"2 घंटे पहले\" — बंद: Windows Phone स्टाइल \"शनि 01:06\"</string>

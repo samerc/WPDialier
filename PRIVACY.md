@@ -1,6 +1,6 @@
 # Privacy Policy — Dialer 8
 
-**Effective date:** August 4, 2026
+**Effective date:** August 4, 2026 (updated October 31, 2026)
 **Developer contact:** fancyshark505@gmail.com
 
 Dialer 8 is a phone (dialer) application styled after Windows Phone 8. It is
@@ -28,6 +28,15 @@ permissions. All processing happens locally on your device:
 | Vibration | Haptic feedback on the keypad (optional, can be turned off) |
 | Location (optional) | Only used if you tap "use current location" or the map when adding an address to a contact. Never accessed otherwise |
 | Internet | Only used to load map tiles from OpenStreetMap if you open the map picker. The app has no other network features |
+| Call screening (optional, off by default) | If you turn on blocking hidden/spoofed calls or silencing unknown callers, incoming numbers are checked on your phone against your contacts and the numbers you have called. Nothing is sent anywhere |
+| Run at startup | Re-arming "remind me to call back" reminders after the phone restarts |
+
+## Content you create in the app
+
+Call notes and call-back reminders you add are stored only on your phone,
+in the app's private storage. They are never included in settings backups
+and are removed when you delete the call, cancel the reminder, or uninstall
+the app. Settings backups are written only to a file you choose.
 
 ## What the app does NOT do
 

@@ -627,7 +627,6 @@ object Repo {
 
     private fun formatEventDate(raw: String): String = tryFormatEventDate(raw) ?: raw
 
-    private const val HISTORY_LIMIT = 300
 
     /** Current contacts-provider identity of a number, for call-log refresh. */
     private sealed interface CallerMatch {
@@ -672,12 +671,20 @@ object Repo {
     }.getOrDefault(CallerMatch.Unknown)
 
     /**
-     * Newest [HISTORY_LIMIT] calls. CACHED_NAME is only written when the call
+     * Newest [limit] calls ([missedOnly]: newest [limit] MISSED rows, so the
+     * filter reaches past the first page). Load-more grows [limit] by a page
+     * and reloads (see [HistoryPaging]) instead of offset paging: rows that
+     * land while the list is open would shift offsets and duplicate or skip
+     * entries. CACHED_NAME is only written when the call
      * lands, so renamed/deleted contacts would show stale names forever —
      * each distinct number is re-resolved once per load and drifted rows are
      * written back (WRITE_CALL_LOG, held as default dialer).
      */
-    suspend fun loadHistory(context: Context): List<HistoryItem> = withContext(Dispatchers.IO) {
+    suspend fun loadHistory(
+        context: Context,
+        limit: Int = HistoryPaging.PAGE_SIZE,
+        missedOnly: Boolean = false,
+    ): List<HistoryItem> = withContext(Dispatchers.IO) {
         val out = mutableListOf<HistoryItem>()
         // Telecom-set CACHED_LOOKUP_URI per row: non-null means the name came
         // from a contact (vs a CNAP name, which a lookup miss must not erase).
@@ -688,12 +695,18 @@ object Repo {
                     android.content.ContentResolver.QUERY_ARG_SQL_SORT_ORDER,
                     "${CallLog.Calls.DATE} DESC",
                 )
-                putInt(android.content.ContentResolver.QUERY_ARG_LIMIT, HISTORY_LIMIT)
+                putInt(android.content.ContentResolver.QUERY_ARG_LIMIT, limit)
+                if (missedOnly) {
+                    putString(
+                        android.content.ContentResolver.QUERY_ARG_SQL_SELECTION,
+                        "${CallLog.Calls.TYPE} = ${CallLog.Calls.MISSED_TYPE}",
+                    )
+                }
             }
             // The call-log provider ignores QUERY_ARG_LIMIT on some builds;
             // its own "limit" URI parameter is the long-standing contract.
             val uri = CallLog.Calls.CONTENT_URI.buildUpon()
-                .appendQueryParameter(CallLog.Calls.LIMIT_PARAM_KEY, HISTORY_LIMIT.toString())
+                .appendQueryParameter(CallLog.Calls.LIMIT_PARAM_KEY, limit.toString())
                 .build()
             context.contentResolver.query(
                 uri,
@@ -709,7 +722,7 @@ object Repo {
                 args,
                 null,
             )?.use { c ->
-                while (c.moveToNext() && out.size < HISTORY_LIMIT) {
+                while (c.moveToNext() && out.size < limit) {
                     out += HistoryItem(
                         id = c.getLong(0),
                         number = c.getString(1) ?: "",
@@ -783,6 +796,51 @@ object Repo {
         refreshed
     }
 
+    /**
+     * Call screening's "known caller" test: a contact, or a number this
+     * phone has dialed (newest 1000 outgoing rows, matched in code via
+     * [numbersMatch] — SQL can't unify national/E.164 spellings). Blocking
+     * on purpose (the screening service runs it off the main thread with a
+     * deadline); null when either provider can't be read, so the caller
+     * can fall back to letting the call ring.
+     */
+    fun isKnownNumber(context: Context, number: String): Boolean? {
+        if (number.isBlank()) return false
+        val inContacts = runCatching {
+            context.contentResolver.query(
+                Uri.withAppendedPath(
+                    ContactsContract.PhoneLookup.CONTENT_FILTER_URI, Uri.encode(number),
+                ),
+                arrayOf(ContactsContract.PhoneLookup._ID),
+                null, null, null,
+            )?.use { it.moveToFirst() }
+        }.getOrNull() ?: return null
+        if (inContacts) return true
+        return runCatching {
+            val args = android.os.Bundle().apply {
+                putString(
+                    android.content.ContentResolver.QUERY_ARG_SQL_SELECTION,
+                    "${CallLog.Calls.TYPE} = ${CallLog.Calls.OUTGOING_TYPE}",
+                )
+                putString(
+                    android.content.ContentResolver.QUERY_ARG_SQL_SORT_ORDER,
+                    "${CallLog.Calls.DATE} DESC",
+                )
+            }
+            val uri = CallLog.Calls.CONTENT_URI.buildUpon()
+                .appendQueryParameter(CallLog.Calls.LIMIT_PARAM_KEY, "1000")
+                .build()
+            context.contentResolver.query(uri, arrayOf(CallLog.Calls.NUMBER), args, null)
+                ?.use { c ->
+                    var found = false
+                    while (!found && c.moveToNext()) {
+                        found = numbersMatch(c.getString(0) ?: "", number)
+                    }
+                    found
+                }
+        }.getOrNull()
+    }
+
     /** Returns display name + photo uri for a phone number, if it belongs to a contact. */
     suspend fun lookupCaller(context: Context, number: String): Pair<String?, String?> =
         withContext(Dispatchers.IO) {
@@ -845,7 +903,7 @@ object Repo {
     suspend fun clearHistory(context: Context): Boolean = withContext(Dispatchers.IO) {
         runCatching {
             context.contentResolver.delete(CallLog.Calls.CONTENT_URI, null, null) >= 0
-        }.getOrDefault(false)
+        }.getOrDefault(false).also { if (it) CallNotes.clear(context) }
     }
 
     suspend fun deleteContact(context: Context, id: Long): Boolean =
@@ -957,7 +1015,7 @@ object Repo {
                     "${CallLog.Calls._ID} = ?",
                     arrayOf(id.toString()),
                 ) > 0
-            }.getOrDefault(false)
+            }.getOrDefault(false).also { if (it) CallNotes.remove(context, listOf(id)) }
         }
 
     /**
@@ -1072,6 +1130,6 @@ object Repo {
                     "${CallLog.Calls._ID} IN (${ids.joinToString(",")})",
                     null,
                 ) > 0
-            }.getOrDefault(false)
+            }.getOrDefault(false).also { if (it) CallNotes.remove(context, ids) }
         }
 }

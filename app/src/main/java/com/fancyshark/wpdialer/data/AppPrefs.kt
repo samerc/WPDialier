@@ -32,8 +32,22 @@ object AppPrefs {
     private val _globalSim = MutableStateFlow<String?>(null)
     val globalSim: StateFlow<String?> = _globalSim
 
-    private val _light = MutableStateFlow(false)
-    val light: StateFlow<Boolean> = _light
+    const val THEME_DARK = "dark"
+    const val THEME_LIGHT = "light"
+    const val THEME_SYSTEM = "system"
+    private val THEME_MODES = setOf(THEME_DARK, THEME_LIGHT, THEME_SYSTEM)
+
+    /** dark / light / follow the system night mode. */
+    private val _themeMode = MutableStateFlow(THEME_DARK)
+    val themeMode: StateFlow<String> = _themeMode
+
+    // Call screening (all default off): see call/ScreeningPolicy.
+    private val _screenHidden = MutableStateFlow(false)
+    val screenHidden: StateFlow<Boolean> = _screenHidden
+    private val _screenUnknown = MutableStateFlow(false)
+    val screenUnknown: StateFlow<Boolean> = _screenUnknown
+    private val _screenSpoofed = MutableStateFlow(false)
+    val screenSpoofed: StateFlow<Boolean> = _screenSpoofed
 
     private val _tilt = MutableStateFlow(true)
     val tilt: StateFlow<Boolean> = _tilt
@@ -80,7 +94,13 @@ object AppPrefs {
         _rejectMessages.value = decodeList(p.str("reject_msgs"))
             ?: DEFAULT_REJECT_MESSAGES
         _globalSim.value = p.str("sim_global")
-        _light.value = p.bool("theme_light", false)
+        _themeMode.value = themeModeFrom(
+            p.str("theme_mode"),
+            if (p.contains("theme_light")) p.bool("theme_light", false) else null,
+        )
+        _screenHidden.value = p.bool(KEY_SCREEN_HIDDEN, false)
+        _screenUnknown.value = p.bool(KEY_SCREEN_UNKNOWN, false)
+        _screenSpoofed.value = p.bool(KEY_SCREEN_SPOOFED, false)
         _tilt.value = p.bool("tilt", true)
         _relativeTimes.value = p.bool("relative_times", false)
         _oneHandedLists.value = p.bool("one_handed_lists", false)
@@ -147,9 +167,69 @@ object AppPrefs {
         }.apply()
     }
 
-    fun setLight(context: Context, on: Boolean) {
-        _light.value = on
-        prefs(context).edit().putBoolean("theme_light", on).apply()
+    /**
+     * The stored mode; pre-1.2 installs only have the theme_light boolean,
+     * which stays the fallback so their choice carries over untouched.
+     */
+    internal fun themeModeFrom(stored: String?, legacyLight: Boolean?): String = when {
+        stored in THEME_MODES -> stored!!
+        legacyLight == true -> THEME_LIGHT
+        else -> THEME_DARK
+    }
+
+    /** Whether the Metro light palette applies for [mode]. */
+    fun resolveLight(mode: String, systemDark: Boolean): Boolean = when (mode) {
+        THEME_LIGHT -> true
+        THEME_SYSTEM -> !systemDark
+        else -> false
+    }
+
+    /** [resolveLight] against [context]'s current configuration (activity onCreate). */
+    fun isLight(context: Context): Boolean {
+        val night = context.resources.configuration.uiMode and
+            android.content.res.Configuration.UI_MODE_NIGHT_MASK
+        return resolveLight(
+            themeMode.value, night == android.content.res.Configuration.UI_MODE_NIGHT_YES,
+        )
+    }
+
+    fun setThemeMode(context: Context, mode: String) {
+        if (mode !in THEME_MODES) return
+        _themeMode.value = mode
+        // theme_light is still written so a downgrade keeps a sane choice.
+        prefs(context).edit()
+            .putString("theme_mode", mode)
+            .putBoolean("theme_light", mode == THEME_LIGHT)
+            .apply()
+    }
+
+    const val KEY_SCREEN_HIDDEN = "screen_hidden"
+    const val KEY_SCREEN_UNKNOWN = "screen_unknown"
+    const val KEY_SCREEN_SPOOFED = "screen_spoofed"
+
+    fun setScreenHidden(context: Context, on: Boolean) {
+        _screenHidden.value = on
+        prefs(context).edit().putBoolean(KEY_SCREEN_HIDDEN, on).apply()
+    }
+
+    fun setScreenUnknown(context: Context, on: Boolean) {
+        _screenUnknown.value = on
+        prefs(context).edit().putBoolean(KEY_SCREEN_UNKNOWN, on).apply()
+    }
+
+    fun setScreenSpoofed(context: Context, on: Boolean) {
+        _screenSpoofed.value = on
+        prefs(context).edit().putBoolean(KEY_SCREEN_SPOOFED, on).apply()
+    }
+
+    /** Fresh read for the screening service (may run in a cold process). */
+    fun screeningSettings(context: Context): com.fancyshark.wpdialer.call.ScreeningSettings {
+        val p = prefs(context)
+        return com.fancyshark.wpdialer.call.ScreeningSettings(
+            blockHidden = p.bool(KEY_SCREEN_HIDDEN, false),
+            silenceUnknown = p.bool(KEY_SCREEN_UNKNOWN, false),
+            blockSpoofed = p.bool(KEY_SCREEN_SPOOFED, false),
+        )
     }
 
     fun setTilt(context: Context, on: Boolean) {

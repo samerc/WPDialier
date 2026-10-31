@@ -19,6 +19,9 @@
          (CallStyle requires it; also keeps the process alive mid-call). -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_PHONE_CALL" />
+    <!-- Re-arms pending call-back reminders (the system drops alarms on
+         shutdown). Inexact alarms only: no SCHEDULE_EXACT_ALARM. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
@@ -140,6 +143,35 @@
             android:name=".ShortcutLauncher"
             android:targetActivity=".MainActivity"
             android:exported="false" />
+
+        <!-- Non-exported entry point for call-back reminder notifications:
+             MainActivity places the reminder's call only via this alias. -->
+        <activity-alias
+            android:name=".ReminderLauncher"
+            android:targetActivity=".MainActivity"
+            android:exported="false" />
+
+        <!-- Call-back reminders: our own alarm/notification PendingIntents
+             plus BOOT_COMPLETED (sent by the system uid, which reaches
+             non-exported receivers). -->
+        <receiver
+            android:name=".call.ReminderReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Call screening. Telecom binds the default dialer's screening
+             service for incoming calls; only it holds BIND_SCREENING_SERVICE. -->
+        <service
+            android:name=".call.WpScreeningService"
+            android:exported="true"
+            android:permission="android.permission.BIND_SCREENING_SERVICE">
+            <intent-filter>
+                <action android:name="android.telecom.CallScreeningService" />
+            </intent-filter>
+        </service>
 
         <receiver
             android:name=".widget.TileWidget"

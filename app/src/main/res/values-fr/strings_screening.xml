@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Settings: theme -->
+    <string name="settings_theme_title">Thème</string>
+    <string name="settings_theme_dark">sombre</string>
+    <string name="settings_theme_light">clair</string>
+    <string name="settings_theme_system">selon le système</string>
+    <string name="settings_accent_taupe">taupe</string>
+
+    <!-- Settings: call screening -->
+    <string name="settings_screening_title">Filtrage des appels</string>
+    <string name="settings_screening_hint">les appels filtrés restent dans votre historique ; les appels bloqués y sont marqués comme tels et ne vous notifient pas</string>
+    <string name="settings_screening_needs_default">fonctionne uniquement si Dialer 8 est votre application Téléphone</string>
+    <string name="settings_screen_hidden_title">Bloquer les numéros masqués</string>
+    <string name="settings_screen_unknown_title">Rendre muets les inconnus</string>
+    <string name="settings_screen_unknown_hint">les appelants absents de vos contacts et que vous n\'avez jamais appelés sonnent en silence, mais restent affichés à l\'écran</string>
+    <string name="settings_screen_spoofed_title">Bloquer les appels usurpés</string>
+    <string name="settings_screen_spoofed_hint">rejette les appels dont le réseau signale le numéro comme falsifié (si votre opérateur prend en charge la vérification de l\'appelant)</string>
+</resources>

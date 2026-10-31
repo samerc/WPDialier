@@ -108,7 +108,7 @@ class ContactTileConfigActivity : ComponentActivity() {
         AccentStore.init(this)
         FontStore.init(this)
         com.fancyshark.wpdialer.data.AppPrefs.init(this)
-        Metro.light = com.fancyshark.wpdialer.data.AppPrefs.light.value
+        Metro.light = com.fancyshark.wpdialer.data.AppPrefs.isLight(this)
         hasContacts.value = granted()
         val permission = registerForActivityResult(
             ActivityResultContracts.RequestPermission(),
@@ -118,6 +118,7 @@ class ContactTileConfigActivity : ComponentActivity() {
         setContent {
             val accent by AccentStore.accent.collectAsState()
             val selawik by FontStore.selawik.collectAsState()
+            com.fancyshark.wpdialer.ui.MetroThemeSync()
             MetroSystemBars(window)
             CompositionLocalProvider(
                 LocalTextStyle provides TextStyle(

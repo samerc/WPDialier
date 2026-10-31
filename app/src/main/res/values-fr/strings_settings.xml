@@ -48,7 +48,6 @@
     <string name="settings_dup_notif_body">L\'application téléphone de Google publie ses propres notifications d\'appel même quand elle n\'est pas le composeur par défaut. Désactivez ses notifications pour ne voir que celles de cette application.</string>
     <string name="settings_dup_notif_button">ouvrir les paramètres de notification de Téléphone Google</string>
     <string name="settings_dup_notif_locked_hint">Sur certains téléphones (OnePlus, OPPO...), ces options sont verrouillées. Dans ce cas, ouvrez la page d\'infos de l\'application ci-dessous et appuyez sur « Désactiver » — cette application remplace entièrement l\'application téléphone de Google, et vous pouvez la réactiver à tout moment.</string>
-    <string name="settings_light_theme_title">Thème clair</string>
     <string name="settings_tilt_title">Effet d\'inclinaison des tuiles</string>
     <string name="settings_relative_times_title">Heures relatives dans l\'historique</string>
     <string name="settings_relative_times_hint">activé : « il y a 2 heures » — désactivé : style Windows Phone « sam. 01:06 »</string>

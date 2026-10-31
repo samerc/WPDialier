@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Call-back reminders (ReminderReceiver, MissedCalls, history) -->
+    <string name="notif_remind_me">me le rappeler</string>
+    <string name="notif_channel_reminders">Rappels pour rappeler</string>
+    <string name="notif_reminder_title">rappeler %1$s</string>
+    <string name="notif_reminder_text">vous avez demandé un rappel</string>
+    <string name="notif_reminder_dismiss">ignorer</string>
+    <string name="home_remind_me">me le rappeler</string>
+    <string name="home_reminder_strip">rappel : appeler %1$s à %2$s</string>
+    <string name="home_reminder_cancel">annuler le rappel</string>
+    <string name="main_remind_title">me rappeler de rappeler</string>
+    <string name="main_remind_15_min">dans 15 minutes</string>
+    <string name="main_remind_1_hour">dans 1 heure</string>
+    <string name="main_remind_3_hours">dans 3 heures</string>
+    <string name="main_remind_tomorrow">demain à 9:00</string>
+    <string name="main_confirm_cancel_reminder">annuler ce rappel ?</string>
+    <string name="main_button_cancel_reminder">l\'annuler</string>
+    <string name="main_button_keep_reminder">garder</string>
+
+    <!-- Call notes (call details page) -->
+    <string name="home_note_present">contient une note</string>
+    <string name="home_note_hint">touchez un appel pour ajouter une note</string>
+    <string name="home_note_title">note d\'appel</string>
+    <string name="home_note_placeholder">de quoi parlait cet appel ?</string>
+    <string name="home_note_save">enregistrer</string>
+    <string name="home_note_delete">supprimer la note</string>
+    <string name="home_note_confirm_delete">supprimer cette note ?</string>
+
+    <!-- SearchScreen.kt -->
+    <string name="search_history_header">historique</string>
+</resources>

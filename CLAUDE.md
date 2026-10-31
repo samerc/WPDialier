@@ -295,3 +295,43 @@ in-call SIM label, Android-13 route path (tester is the vehicle),
 v1.1 features (widget, backup, BT picker, Hindi rendering), D-pad.
 Remaining candidates: shared caller-name resolver cleanup (chain is
 hand-repeated at ~6 sites), history filter persistence if users ask.
+
+## 2026-10-31 review + build-out (commits 69c9f94..HEAD, NOT yet released)
+
+Whole-app review (3 subsystem reviewers) then everything was built, in
+batches, each verified on the API 37 emulator where possible:
+- Call stack: STATE_SELECT_PHONE_ACCOUNT handled (calls from other apps
+  hung on "ask every time" dual-SIM); ongoing CallStyle notification via
+  startForeground(phoneCall FGS) — plain notify() was silently REJECTED
+  by the system; DND Person tel: URI; onBringToForeground; capability-
+  gated hold/merge; disconnect reasons; InCallActivity own taskAffinity.
+- Data: type-checked merge restore (SettingsBackup.accepts + KNOWN_TYPES —
+  ADD EVERY NEW PREF KEY THERE); history CACHED_NAME refresh/write-back;
+  Repo.exactNumberKey (E.164) for block dedupe + SimPrefs (legacy 7-digit
+  keys still read); post-dial stripping via Repo.networkPortion.
+- UI: ui/MetroOverlay (MetroOverlay/MetroDialog/MetroConfirm — use these,
+  never hand-roll overlays; they block touches + own back);
+  MetroSystemBars/MetroThemeSync; Metro.textAccent()/onAccent() for
+  contrast; editors use rememberSaveable + discard confirm;
+  screens/ContactFormParts.kt shared by New/Edit contact.
+- Tests + CI: JVM unit tests in app/src/test (69), GitHub Actions runs
+  testDebugUnitTest + lintRelease + assembleRelease on every push. Full
+  lintRelease must stay at 0 errors.
+- Features: secret codes (screens/SpecialCodes), hold 2-9 speed dial,
+  pause/wait + post-dial prompt, STIR/SHAKEN badge, RTT, voicemail
+  notification receiver, contact live tiles (widget/ContactTileWidget,
+  bound by LOOKUP KEY), launcher shortcuts + QS dialpad tile, call
+  screening service (off by default), call-back reminders (inexact
+  alarms + boot re-arm), call notes (call_notes prefs, never backed up),
+  history search/paging/live ContentObservers, theme dark/light/system
+  (theme_mode; theme_light still read as fallback), 21 accents.
+- Entry points that act (place calls / voicemail) only run via
+  NON-EXPORTED activity-aliases (.VoicemailLauncher, .ShortcutLauncher,
+  .ReminderLauncher) — keep that pattern for any new action intent.
+- Hardware keys go through ui/DialKeys (Shift+8/3 = * #).
+- PRIVACY.md updated (screening, notes, reminders, boot).
+Next release needs: versionCode/versionName bump, What's-new content,
+releaseTest R8 smoke test, store listing refresh, then Play upload.
+Unverifiable here (need real carrier/phone): dual-SIM chooser, RTT,
+STIR badge, voicemail notification, reminder firing under Doze, Android
+13 paths, ColorOS behavior of screening/FGS/shortcut aliases.

@@ -119,6 +119,23 @@ object Metro {
 }
 
 /**
+ * Keeps [Metro.light] in step with the theme mode pref and, for "follow
+ * system", the configuration's night mode. Activities declare uiMode in
+ * configChanges, so a system dark-mode flip updates LocalConfiguration
+ * (and isSystemInDarkTheme) without recreation — this re-reads it.
+ * Call at the root of every setContent, before [MetroSystemBars].
+ */
+@Composable
+fun MetroThemeSync() {
+    val mode by com.fancyshark.wpdialer.data.AppPrefs.themeMode.collectAsState()
+    val systemDark = androidx.compose.foundation.isSystemInDarkTheme()
+    val light = com.fancyshark.wpdialer.data.AppPrefs.resolveLight(mode, systemDark)
+    androidx.compose.runtime.SideEffect {
+        if (Metro.light != light) Metro.light = light
+    }
+}
+
+/**
  * System-bar icon appearance for the current theme. targetSdk 36 forces
  * edge-to-edge (the theme's bar colors are ignored on 35+), so dark icons
  * must be requested explicitly on the light theme; pre-35 the bars are
@@ -284,7 +301,10 @@ val WpAccents = listOf(
     Accent("olive", Color(0xFF6D8764)),
     Accent("steel", Color(0xFF647687)),
     Accent("mauve", Color(0xFF76608A)),
+    // Not a WP accent, but kept: it shipped before taupe, and the stored
+    // pref is the accent name.
     Accent("sienna", Color(0xFFA0522D)),
+    Accent("taupe", Color(0xFF87794E)),
 )
 
 object AccentStore {

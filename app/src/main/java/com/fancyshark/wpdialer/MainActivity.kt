@@ -185,6 +185,12 @@ class MainActivity : ComponentActivity() {
         const val EXTRA_SHORTCUT_ID = "com.fancyshark.wpdialer.SHORTCUT_ID"
         val SHORTCUT_LAUNCHER: String =
             MainActivity::class.java.name.substringBeforeLast('.') + ".ShortcutLauncher"
+
+        // Call-back reminder notification tap / "call back" action. Honored
+        // only through the non-exported ReminderLauncher alias.
+        const val ACTION_REMINDER_CALL = "com.fancyshark.wpdialer.REMINDER_CALL"
+        val REMINDER_LAUNCHER: String =
+            MainActivity::class.java.name.substringBeforeLast('.') + ".ReminderLauncher"
     }
 
     /** Navigation asked for by a shortcut / tile, applied once the UI is up. */
@@ -219,6 +225,22 @@ class MainActivity : ComponentActivity() {
     private var appVersionCode = 0
     private var appVersionName = ""
 
+    // Live updates while resumed: call-log / contacts changes (a call that
+    // just ended, a contact edited elsewhere) reload the lists. Debounced —
+    // a single call end touches the call log several times in a burst.
+    private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val providerRefresh = Runnable {
+        Repo.invalidateCaches()
+        refreshTick.value += 1
+    }
+    private val providerObserver = object : android.database.ContentObserver(mainHandler) {
+        override fun onChange(selfChange: Boolean) {
+            mainHandler.removeCallbacks(providerRefresh)
+            mainHandler.postDelayed(providerRefresh, 500)
+        }
+    }
+    private var observing = false
+
     private lateinit var permissionLauncher: ActivityResultLauncher<Array<String>>
     private lateinit var roleLauncher: ActivityResultLauncher<Intent>
 
@@ -228,7 +250,9 @@ class MainActivity : ComponentActivity() {
         Haptics.init(this)
         FontStore.init(this)
         com.fancyshark.wpdialer.data.AppPrefs.init(this)
-        Metro.light = com.fancyshark.wpdialer.data.AppPrefs.light.value
+        Metro.light = com.fancyshark.wpdialer.data.AppPrefs.isLight(this)
+        com.fancyshark.wpdialer.data.CallNotes.init(this)
+        com.fancyshark.wpdialer.data.Reminders.init(this)
 
         permissionLauncher = registerForActivityResult(
             ActivityResultContracts.RequestMultiplePermissions(),
@@ -300,6 +324,18 @@ class MainActivity : ComponentActivity() {
         updatePermissionState()
         refreshDefaultState()
         refreshTick.value += 1
+        // Registration throws without the read permissions (pre-wizard).
+        if (!observing && permissionsGranted.value) {
+            observing = runCatching {
+                contentResolver.registerContentObserver(
+                    android.provider.CallLog.Calls.CONTENT_URI, true, providerObserver,
+                )
+                contentResolver.registerContentObserver(
+                    android.provider.ContactsContract.Contacts.CONTENT_URI, true, providerObserver,
+                )
+            }.isSuccess
+            if (!observing) runCatching { contentResolver.unregisterContentObserver(providerObserver) }
+        }
         // Consumes tips that completed while the app was closed (killed
         // mid-flow, pending payment settling later) — unconsumed purchases
         // are auto-refunded by Play after 3 days. No-op once connected.
@@ -332,6 +368,15 @@ class MainActivity : ComponentActivity() {
         ) {
             startActivity(Intent(this, com.fancyshark.wpdialer.call.InCallActivity::class.java))
         }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        if (observing) {
+            runCatching { contentResolver.unregisterContentObserver(providerObserver) }
+            observing = false
+        }
+        mainHandler.removeCallbacks(providerRefresh)
     }
 
     // Hardware keypad support (flip/keypad phones): digits open or type into
@@ -369,6 +414,18 @@ class MainActivity : ComponentActivity() {
         }
         if (intent != null && intent.component?.className == SHORTCUT_LAUNCHER) {
             handleShortcut(intent)
+            return
+        }
+        if (intent?.action == ACTION_REMINDER_CALL &&
+            intent.component?.className == REMINDER_LAUNCHER
+        ) {
+            // Recents redelivers the launch intent — never re-dial from it.
+            if (intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0) return
+            val id = intent.getLongExtra(com.fancyshark.wpdialer.data.Reminders.EXTRA_ID, -1L)
+            com.fancyshark.wpdialer.call.ReminderReceiver.cancelNotification(this, id)
+            val number = intent.data?.takeIf { it.scheme == "tel" }?.schemeSpecificPart
+            // Same SIM-aware path as every in-app call.
+            if (!number.isNullOrBlank()) placeCall(number)
             return
         }
         when (intent?.action) {
@@ -624,6 +681,13 @@ class MainActivity : ComponentActivity() {
         var wizardRerun by androidx.compose.runtime.saveable.rememberSaveable {
             mutableStateOf(false)
         }
+        // History row "remind me": the number whose delay picker is open.
+        var remindPickerFor by remember { mutableStateOf<String?>(null) }
+        var confirmCancelReminder by remember {
+            mutableStateOf<com.fancyshark.wpdialer.data.Reminder?>(null)
+        }
+        val reminders by com.fancyshark.wpdialer.data.Reminders.pending.collectAsState()
+        com.fancyshark.wpdialer.ui.MetroThemeSync()
         MetroSystemBars(window)
 
         // Keeps each stack entry's rememberSaveable state (typed dialpad
@@ -662,8 +726,28 @@ class MainActivity : ComponentActivity() {
         val contacts by produceState(emptyList<ContactItem>(), granted, tick) {
             if (granted) value = Repo.loadContacts(this@MainActivity)
         }
-        val history by produceState(emptyList<HistoryItem>(), granted, tick) {
-            if (granted) value = Repo.loadHistory(this@MainActivity)
+        // Load-more grows these by a page (HistoryPaging); the missed-only
+        // filter pages its own MISSED-typed query so it reaches past the
+        // newest page of all calls.
+        var historyLimit by androidx.compose.runtime.saveable.rememberSaveable {
+            androidx.compose.runtime.mutableIntStateOf(com.fancyshark.wpdialer.data.HistoryPaging.PAGE_SIZE)
+        }
+        var missedLimit by androidx.compose.runtime.saveable.rememberSaveable {
+            androidx.compose.runtime.mutableIntStateOf(com.fancyshark.wpdialer.data.HistoryPaging.PAGE_SIZE)
+        }
+        // WP-style history filter: session-scoped, toggled from the app-bar
+        // menu (hoisted here so the missed query only runs while it's on).
+        var missedOnly by androidx.compose.runtime.saveable
+            .rememberSaveable { mutableStateOf(false) }
+        val history by produceState(emptyList<HistoryItem>(), granted, tick, historyLimit) {
+            if (granted) value = Repo.loadHistory(this@MainActivity, historyLimit)
+        }
+        val missedHistory by produceState(
+            emptyList<HistoryItem>(), granted, tick, missedLimit, missedOnly,
+        ) {
+            if (granted && missedOnly) {
+                value = Repo.loadHistory(this@MainActivity, missedLimit, missedOnly = true)
+            }
         }
 
         val setupDone by com.fancyshark.wpdialer.data.AppPrefs.setupDone.collectAsState()
@@ -713,7 +797,7 @@ class MainActivity : ComponentActivity() {
         val simReq by simRequest.collectAsState()
         val overlayOpen = fullPageOverlay || simReq != null || confirmClearHistory ||
             confirmDeleteGroup != null || confirmBlock != null || confirmRemoveSpeedDial != null ||
-            showDeviceIds
+            showDeviceIds || remindPickerFor != null || confirmCancelReminder != null
 
         val selawik by FontStore.selawik.collectAsState()
         MaterialTheme(colorScheme = darkColorScheme(primary = accent.color)) {
@@ -797,11 +881,8 @@ class MainActivity : ComponentActivity() {
                                     )
                                 }
                             }
-                            // WP-style history filter: session-scoped, toggled
-                            // from the app-bar menu.
-                            var missedOnly by androidx.compose.runtime.saveable
-                                .rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
-                            // The "missed calls" launcher shortcut turns it on.
+                            // The "missed calls" launcher shortcut turns the
+                            // missed-only filter on.
                             val missedReq by missedFilterRequest.collectAsState()
                             LaunchedEffect(missedReq) {
                                 if (missedReq) {
@@ -814,14 +895,40 @@ class MainActivity : ComponentActivity() {
                                 modifier = Modifier.weight(1f),
                                 pages = listOf<Pair<String, @Composable () -> Unit>>(
                                     stringResource(R.string.main_page_history) to {
-                                        HistoryPage(
-                                            items = if (missedOnly) {
+                                        // The missed query lags one load behind
+                                        // the toggle: filter the main page meanwhile.
+                                        val shown = if (missedOnly) {
+                                            missedHistory.ifEmpty {
                                                 history.filter {
                                                     it.type ==
                                                         android.provider.CallLog.Calls.MISSED_TYPE
                                                 }
+                                            }
+                                        } else {
+                                            history
+                                        }
+                                        val paging = com.fancyshark.wpdialer.data.HistoryPaging
+                                        HistoryPage(
+                                            items = shown,
+                                            reminders = reminders,
+                                            onRemind = { remindPickerFor = it },
+                                            onCancelReminder = { confirmCancelReminder = it },
+                                            canLoadMore = if (missedOnly) {
+                                                paging.hasMore(missedHistory.size, missedLimit)
                                             } else {
-                                                history
+                                                paging.hasMore(history.size, historyLimit)
+                                            },
+                                            // hasMore turns false until the bigger
+                                            // page lands, so scroll events can't
+                                            // stack several bumps.
+                                            onLoadMore = {
+                                                if (missedOnly) {
+                                                    if (paging.hasMore(missedHistory.size, missedLimit)) {
+                                                        missedLimit = paging.nextLimit(missedLimit)
+                                                    }
+                                                } else if (paging.hasMore(history.size, historyLimit)) {
+                                                    historyLimit = paging.nextLimit(historyLimit)
+                                                }
                                             },
                                             emptyText = if (missedOnly) {
                                                 stringResource(R.string.home_history_empty_missed)
@@ -952,7 +1059,12 @@ class MainActivity : ComponentActivity() {
                             onText = { sendText(it) },
                         )
 
-                        Screen.Search -> SearchScreen(contacts, accent.color) {
+                        Screen.Search -> SearchScreen(
+                            contacts,
+                            accent.color,
+                            history = history,
+                            onOpenCall = { push(Screen.CallDetails(it.number, it.name)) },
+                        ) {
                             push(Screen.Contact(it.id))
                         }
 
@@ -1055,6 +1167,65 @@ class MainActivity : ComponentActivity() {
                                 .removeSpeedDial(this@MainActivity, number)
                         },
                         onCancel = { confirmRemoveSpeedDial = null },
+                    )
+                }
+
+                remindPickerFor?.let { number ->
+                    com.fancyshark.wpdialer.ui.MetroDialog(onDismiss = { remindPickerFor = null }) {
+                        Text(
+                            stringResource(R.string.main_remind_title),
+                            color = Metro.Foreground,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            letterSpacing = 1.sp,
+                        )
+                        Text(
+                            Repo.pretty(this@MainActivity, number),
+                            color = Metro.Subtle,
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.Light,
+                            modifier = Modifier.padding(bottom = 12.dp),
+                        )
+                        listOf(
+                            R.string.main_remind_15_min to
+                                com.fancyshark.wpdialer.data.ReminderDelay.IN_15_MIN,
+                            R.string.main_remind_1_hour to
+                                com.fancyshark.wpdialer.data.ReminderDelay.IN_1_HOUR,
+                            R.string.main_remind_3_hours to
+                                com.fancyshark.wpdialer.data.ReminderDelay.IN_3_HOURS,
+                            R.string.main_remind_tomorrow to
+                                com.fancyshark.wpdialer.data.ReminderDelay.TOMORROW_9,
+                        ).forEach { (label, delay) ->
+                            Text(
+                                stringResource(label),
+                                color = Metro.Foreground,
+                                fontSize = 24.sp,
+                                fontWeight = FontWeight.Light,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        remindPickerFor = null
+                                        com.fancyshark.wpdialer.data.Reminders
+                                            .schedule(this@MainActivity, number, delay)
+                                    }
+                                    .padding(vertical = 10.dp),
+                            )
+                        }
+                    }
+                }
+
+                confirmCancelReminder?.let { reminder ->
+                    MetroConfirm(
+                        title = stringResource(R.string.main_confirm_cancel_reminder),
+                        message = Repo.pretty(this@MainActivity, reminder.number),
+                        confirmLabel = stringResource(R.string.main_button_cancel_reminder),
+                        cancelLabel = stringResource(R.string.main_button_keep_reminder),
+                        onConfirm = {
+                            confirmCancelReminder = null
+                            com.fancyshark.wpdialer.data.Reminders
+                                .cancel(this@MainActivity, reminder.id)
+                        },
+                        onCancel = { confirmCancelReminder = null },
                     )
                 }
 

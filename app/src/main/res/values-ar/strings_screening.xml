@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Settings: theme -->
+    <string name="settings_theme_title">السمة</string>
+    <string name="settings_theme_dark">داكنة</string>
+    <string name="settings_theme_light">فاتحة</string>
+    <string name="settings_theme_system">حسب النظام</string>
+    <string name="settings_accent_taupe">رمادي بني</string>
+
+    <!-- Settings: call screening -->
+    <string name="settings_screening_title">فحص المكالمات</string>
+    <string name="settings_screening_hint">تبقى المكالمات المفحوصة في السجل؛ وتُعلَّم المحظورة منها بأنها محظورة ولا تصلك عنها إشعارات</string>
+    <string name="settings_screening_needs_default">يعمل فقط عندما يكون Dialer 8 تطبيق الهاتف لديك</string>
+    <string name="settings_screen_hidden_title">حظر الأرقام المخفية</string>
+    <string name="settings_screen_unknown_title">كتم المتصلين المجهولين</string>
+    <string name="settings_screen_unknown_hint">المتصلون غير الموجودين في جهات الاتصال والذين لم تتصل بهم قط يرنّون بصمت، لكنهم يظهرون على الشاشة</string>
+    <string name="settings_screen_spoofed_title">حظر المكالمات المزيفة</string>
+    <string name="settings_screen_spoofed_hint">يرفض المكالمات التي تشير الشبكة إلى أن رقمها مزيف (إذا كان مشغّلك يدعم التحقق من المتصل)</string>
+</resources>

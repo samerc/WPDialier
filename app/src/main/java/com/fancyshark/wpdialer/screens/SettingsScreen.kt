@@ -79,6 +79,7 @@ private fun accentDisplayName(name: String): String {
         "steel" -> R.string.settings_accent_steel
         "mauve" -> R.string.settings_accent_mauve
         "sienna" -> R.string.settings_accent_sienna
+        "taupe" -> R.string.settings_accent_taupe
         else -> return name
     }
     return stringResource(id)
@@ -480,10 +481,32 @@ fun SettingsScreen(
         }
 
         Spacer(Modifier.height(30.dp))
-        val light by AppPrefs.light.collectAsState()
-        WpToggleRow(stringResource(R.string.settings_light_theme_title), light, accent.color) {
-            AppPrefs.setLight(context, it)
-            Metro.light = it
+        // Same WP list style as the font choice; MetroThemeSync applies it.
+        val themeMode by AppPrefs.themeMode.collectAsState()
+        Text(
+            stringResource(R.string.settings_theme_title),
+            color = accentText,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.SemiBold,
+            letterSpacing = 1.sp,
+        )
+        listOf(
+            stringResource(R.string.settings_theme_dark) to AppPrefs.THEME_DARK,
+            stringResource(R.string.settings_theme_light) to AppPrefs.THEME_LIGHT,
+            stringResource(R.string.settings_theme_system) to AppPrefs.THEME_SYSTEM,
+        ).forEach { (label, mode) ->
+            Text(
+                label,
+                color = if (themeMode == mode) accentText else Metro.Foreground,
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Light,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .selectable(selected = themeMode == mode, role = Role.RadioButton) {
+                        AppPrefs.setThemeMode(context, mode)
+                    }
+                    .padding(vertical = 7.dp),
+            )
         }
 
         Spacer(Modifier.height(30.dp))
@@ -571,6 +594,53 @@ fun SettingsScreen(
                 )
             }
         }
+
+        Spacer(Modifier.height(30.dp))
+        Text(
+            stringResource(R.string.settings_screening_title),
+            color = accentText,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.SemiBold,
+            letterSpacing = 1.sp,
+        )
+        Text(
+            stringResource(
+                if (isDefaultDialer) R.string.settings_screening_hint
+                else R.string.settings_screening_needs_default,
+            ),
+            color = Metro.Subtle,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Light,
+            modifier = Modifier.padding(top = 4.dp, bottom = 14.dp),
+        )
+        val screenHidden by AppPrefs.screenHidden.collectAsState()
+        WpToggleRow(stringResource(R.string.settings_screen_hidden_title), screenHidden, accent.color) {
+            AppPrefs.setScreenHidden(context, it)
+        }
+        Spacer(Modifier.height(20.dp))
+        val screenUnknown by AppPrefs.screenUnknown.collectAsState()
+        WpToggleRow(stringResource(R.string.settings_screen_unknown_title), screenUnknown, accent.color) {
+            AppPrefs.setScreenUnknown(context, it)
+        }
+        Text(
+            stringResource(R.string.settings_screen_unknown_hint),
+            color = Metro.Subtle,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Light,
+            modifier = Modifier.padding(top = 6.dp),
+        )
+        Spacer(Modifier.height(20.dp))
+        val screenSpoofed by AppPrefs.screenSpoofed.collectAsState()
+        WpToggleRow(stringResource(R.string.settings_screen_spoofed_title), screenSpoofed, accent.color) {
+            AppPrefs.setScreenSpoofed(context, it)
+        }
+        Text(
+            stringResource(R.string.settings_screen_spoofed_hint),
+            color = Metro.Subtle,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Light,
+            modifier = Modifier.padding(top = 6.dp),
+        )
 
         Spacer(Modifier.height(30.dp))
         // Keyed on the role too: the provider only answers the default
@@ -758,7 +828,7 @@ fun SettingsScreen(
                         com.fancyshark.wpdialer.ui.AccentStore.init(context)
                         com.fancyshark.wpdialer.ui.FontStore.init(context)
                         com.fancyshark.wpdialer.ui.Haptics.init(context)
-                        Metro.light = AppPrefs.light.value
+                        // Metro.light follows via MetroThemeSync.
                         // The home-screen tile wears the restored accent.
                         com.fancyshark.wpdialer.widget.TileWidget.updateAll(context)
                     }

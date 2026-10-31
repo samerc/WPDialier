@@ -169,6 +169,14 @@ object MissedCalls {
                     text,
                 ).build(),
             )
+            // Schedules a call-back reminder in an hour and clears this notice.
+            .addAction(
+                Notification.Action.Builder(
+                    null,
+                    context.getString(com.fancyshark.wpdialer.R.string.notif_remind_me),
+                    ReminderReceiver.remindLaterIntent(context, number, tag),
+                ).build(),
+            )
             .build()
         // Fixed ID outside the call-notification ID space (1/2) —
         // number.hashCode() as the ID could collide with them.

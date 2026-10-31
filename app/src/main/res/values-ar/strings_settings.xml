@@ -48,7 +48,6 @@
     <string name="settings_dup_notif_body">ينشر تطبيق الهاتف من Google إشعارات مكالمات خاصة به حتى عندما لا يكون تطبيق الاتصال الافتراضي. أوقف إشعاراته لترى إشعارات هذا التطبيق فقط.</string>
     <string name="settings_dup_notif_button">فتح إعدادات إشعارات هاتف Google</string>
     <string name="settings_dup_notif_locked_hint">في بعض الهواتف (OnePlus وOPPO...) تكون هذه المفاتيح مقفلة. في هذه الحالة، افتح صفحة معلومات التطبيق أدناه واضغط على \"تعطيل\" — هذا التطبيق يحل تمامًا محل تطبيق الهاتف من Google، ويمكنك إعادة تمكينه هناك في أي وقت.</string>
-    <string name="settings_light_theme_title">السمة الفاتحة</string>
     <string name="settings_tilt_title">تأثير إمالة المربعات</string>
     <string name="settings_relative_times_title">الأوقات النسبية في السجل</string>
     <string name="settings_relative_times_hint">تشغيل: \"قبل ساعتين\" — إيقاف: بنمط Windows Phone ‏\"السبت 01:06\"</string>

@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Call-back reminders (ReminderReceiver, MissedCalls, history) -->
+    <string name="notif_remind_me">याद दिलाएँ</string>
+    <string name="notif_channel_reminders">वापस कॉल करने के रिमाइंडर</string>
+    <string name="notif_reminder_title">%1$s को वापस कॉल करें</string>
+    <string name="notif_reminder_text">आपने याद दिलाने को कहा था</string>
+    <string name="notif_reminder_dismiss">खारिज करें</string>
+    <string name="home_remind_me">याद दिलाएँ</string>
+    <string name="home_reminder_strip">रिमाइंडर: %2$s बजे %1$s को कॉल करें</string>
+    <string name="home_reminder_cancel">रिमाइंडर रद्द करें</string>
+    <string name="main_remind_title">वापस कॉल करना याद दिलाएँ</string>
+    <string name="main_remind_15_min">15 मिनट में</string>
+    <string name="main_remind_1_hour">1 घंटे में</string>
+    <string name="main_remind_3_hours">3 घंटे में</string>
+    <string name="main_remind_tomorrow">कल 9:00 बजे</string>
+    <string name="main_confirm_cancel_reminder">यह रिमाइंडर रद्द करें?</string>
+    <string name="main_button_cancel_reminder">रद्द करें</string>
+    <string name="main_button_keep_reminder">रखें</string>
+
+    <!-- Call notes (call details page) -->
+    <string name="home_note_present">नोट है</string>
+    <string name="home_note_hint">नोट जोड़ने के लिए किसी कॉल पर टैप करें</string>
+    <string name="home_note_title">कॉल नोट</string>
+    <string name="home_note_placeholder">यह कॉल किस बारे में थी?</string>
+    <string name="home_note_save">सहेजें</string>
+    <string name="home_note_delete">नोट हटाएँ</string>
+    <string name="home_note_confirm_delete">यह नोट हटाएँ?</string>
+
+    <!-- SearchScreen.kt -->
+    <string name="search_history_header">इतिहास</string>
+</resources>

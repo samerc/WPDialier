@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Settings: theme -->
+    <string name="settings_theme_title">Theme</string>
+    <string name="settings_theme_dark">dark</string>
+    <string name="settings_theme_light">light</string>
+    <string name="settings_theme_system">follow system</string>
+    <string name="settings_accent_taupe">taupe</string>
+
+    <!-- Settings: call screening -->
+    <string name="settings_screening_title">Call screening</string>
+    <string name="settings_screening_hint">screened calls still appear in your history; blocked ones are marked as blocked and don\'t notify you</string>
+    <string name="settings_screening_needs_default">works only while Dialer 8 is your phone app</string>
+    <string name="settings_screen_hidden_title">Block hidden numbers</string>
+    <string name="settings_screen_unknown_title">Silence unknown callers</string>
+    <string name="settings_screen_unknown_hint">callers who aren\'t in your contacts and whom you never called ring silently, but still show on screen</string>
+    <string name="settings_screen_spoofed_title">Block spoofed calls</string>
+    <string name="settings_screen_spoofed_hint">rejects calls whose number the network flags as faked (where your carrier supports caller verification)</string>
+</resources>

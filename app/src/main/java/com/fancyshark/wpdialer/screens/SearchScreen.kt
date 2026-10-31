@@ -40,6 +40,8 @@ import com.fancyshark.wpdialer.ui.Metro
 fun SearchScreen(
     contacts: List<ContactItem>,
     accent: Color,
+    history: List<com.fancyshark.wpdialer.data.HistoryItem> = emptyList(),
+    onOpenCall: (com.fancyshark.wpdialer.data.HistoryItem) -> Unit = {},
     onOpen: (ContactItem) -> Unit,
 ) {
     // Saveable: the state holder keeps the query alive while a result's
@@ -90,9 +92,15 @@ fun SearchScreen(
             )
         }
     }
+    // Call-log matches (loaded history pages), one row per line.
+    val callResults = remember(query, history) {
+        com.fancyshark.wpdialer.data.HistorySearch.search(history, query)
+    }
+    val accentText = Metro.textAccent(accent)
+
     val resultsList: @Composable (Modifier) -> Unit = { modifier ->
         LazyColumn(modifier, reverseLayout = oneHanded) {
-            items(results.size, key = { results[it].id }) { i ->
+            items(results.size, key = { "c" + results[it].id }) { i ->
                 val contact = results[i]
                 Row(
                     Modifier
@@ -110,6 +118,47 @@ fun SearchScreen(
                         fontWeight = FontWeight.Light,
                         maxLines = 1,
                 overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            if (callResults.isNotEmpty()) {
+                item(key = "history_header") {
+                    Text(
+                        stringResource(com.fancyshark.wpdialer.R.string.search_history_header),
+                        color = accentText,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        letterSpacing = 1.sp,
+                        modifier = Modifier.padding(top = 14.dp, bottom = 4.dp),
+                    )
+                }
+            }
+            items(callResults.size, key = { "h" + callResults[it].id }) { i ->
+                val call = callResults[i]
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable { onOpenCall(call) }
+                        .padding(vertical = 6.dp),
+                ) {
+                    Text(
+                        call.name?.takeIf { it.isNotBlank() }
+                            ?: com.fancyshark.wpdialer.data.Repo.pretty(context, call.number),
+                        color = Metro.Foreground,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Light,
+                        maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        stringResource(
+                            com.fancyshark.wpdialer.R.string.home_history_subtitle,
+                            com.fancyshark.wpdialer.data.Repo.historyTypeShort(context, call.type),
+                            com.fancyshark.wpdialer.data.Repo.historyWhen(call.date),
+                        ),
+                        color = Metro.Subtle,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Light,
                     )
                 }
             }

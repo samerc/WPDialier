@@ -3,6 +3,7 @@
 import androidx.compose.foundation.background
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Message
+import androidx.compose.material.icons.automirrored.filled.StickyNote2
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Person
@@ -51,6 +52,7 @@ import com.fancyshark.wpdialer.data.Repo
 import com.fancyshark.wpdialer.ui.ContactTile
 import com.fancyshark.wpdialer.ui.Metro
 import com.fancyshark.wpdialer.ui.MetroCloseMark
+import com.fancyshark.wpdialer.ui.hiddenFromAccessibility
 import kotlinx.coroutines.launch
 
 @androidx.compose.runtime.Composable
@@ -67,21 +69,100 @@ fun HistoryPage(
     onDetails: (HistoryItem) -> Unit,
     onAddSpeedDial: (String) -> Unit,
     emptyText: String? = null,
+    onRemind: (String) -> Unit = {},
+    reminders: List<com.fancyshark.wpdialer.data.Reminder> = emptyList(),
+    onCancelReminder: (com.fancyshark.wpdialer.data.Reminder) -> Unit = {},
+    canLoadMore: Boolean = false,
+    onLoadMore: () -> Unit = {},
+) {
+    Column(Modifier.fillMaxSize()) {
+        // Pending call-back reminders sit above the list, newest-due first.
+        reminders.forEach { r ->
+            ReminderStrip(r, items, onCancel = { onCancelReminder(r) })
+        }
+        if (items.isEmpty()) {
+            Text(
+                // A filtered-empty list must not read like a wiped call log —
+                // the caller passes filter-specific text when a filter is on.
+                emptyText ?: stringResource(com.fancyshark.wpdialer.R.string.home_history_empty),
+                color = Metro.Subtle,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Light,
+                modifier = Modifier.padding(20.dp),
+            )
+        } else {
+            HistoryList(
+                items, accent, onCall, onText, onSave, onProfile, onDelete, onBlock,
+                onDetails, onAddSpeedDial, onRemind, canLoadMore, onLoadMore,
+            )
+        }
+    }
+}
+
+/** "reminder: call Alice at 14:30 ✕" — the ✕ asks for confirmation upstream. */
+@Composable
+private fun ReminderStrip(
+    reminder: com.fancyshark.wpdialer.data.Reminder,
+    history: List<HistoryItem>,
+    onCancel: () -> Unit,
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    // Contact name first (the caller may have been saved since), then the
+    // history's cached/CNAP name, then the formatted number.
+    val historyName = remember(reminder.number, history) {
+        history.firstOrNull { Repo.numbersMatch(it.number, reminder.number) }?.name
+    }
+    val name by androidx.compose.runtime.produceState<String?>(historyName, reminder.number) {
+        value = Repo.lookupCaller(context, reminder.number).first ?: historyName
+    }
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 20.dp, end = 8.dp, top = 4.dp)
+            .background(Metro.Chrome)
+            .padding(start = 12.dp),
+    ) {
+        Text(
+            stringResource(
+                com.fancyshark.wpdialer.R.string.home_reminder_strip,
+                name?.takeIf { it.isNotBlank() } ?: Repo.pretty(context, reminder.number),
+                Repo.wpTime(reminder.at),
+            ),
+            color = Metro.Foreground,
+            fontSize = 15.sp,
+            fontWeight = FontWeight.Light,
+            maxLines = 1,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+        MetroCloseMark(
+            stringResource(com.fancyshark.wpdialer.R.string.home_reminder_cancel),
+            fontSize = 16.sp,
+        ) { onCancel() }
+    }
+}
+
+@Composable
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+private fun HistoryList(
+    items: List<HistoryItem>,
+    accent: Color,
+    onCall: (String) -> Unit,
+    onText: (String) -> Unit,
+    onSave: (String) -> Unit,
+    onProfile: (String) -> Unit,
+    onDelete: (List<HistoryItem>) -> Unit,
+    onBlock: (String) -> Unit,
+    onDetails: (HistoryItem) -> Unit,
+    onAddSpeedDial: (String) -> Unit,
+    onRemind: (String) -> Unit,
+    canLoadMore: Boolean,
+    onLoadMore: () -> Unit,
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val accentText = Metro.textAccent(accent)
-    if (items.isEmpty()) {
-        Text(
-            // A filtered-empty list must not read like a wiped call log —
-            // the caller passes filter-specific text when a filter is on.
-            emptyText ?: stringResource(com.fancyshark.wpdialer.R.string.home_history_empty),
-            color = Metro.Subtle,
-            fontSize = 20.sp,
-            fontWeight = FontWeight.Light,
-            modifier = Modifier.padding(20.dp),
-        )
-        return
-    }
+    val notes by com.fancyshark.wpdialer.data.CallNotes.notes.collectAsState()
     // WP 8.1 groups consecutive calls with the same number and type: "(2)".
     // Bounded to the same calendar day so a group delete never removes old
     // entries the row's single timestamp doesn't represent.
@@ -118,8 +199,23 @@ fun HistoryPage(
     // One-handed mode anchors the list to the bottom: index 0 (the newest
     // call) renders just above the thumb, like the dialpad's T9 list.
     val oneHanded by com.fancyshark.wpdialer.data.AppPrefs.oneHandedLists.collectAsState()
+    val listState = rememberLazyListState()
+    // Load-more: nearing the oldest loaded row asks for the next page. The
+    // flow re-arms when the group count changes (a page arrived).
+    val loadMore by androidx.compose.runtime.rememberUpdatedState(onLoadMore)
+    androidx.compose.runtime.LaunchedEffect(listState, groups.size, canLoadMore) {
+        if (!canLoadMore) return@LaunchedEffect
+        androidx.compose.runtime.snapshotFlow {
+            listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: -1
+        }.collect { last ->
+            if (com.fancyshark.wpdialer.data.HistoryPaging.nearEnd(last, groups.size)) {
+                loadMore()
+            }
+        }
+    }
     LazyColumn(
         Modifier.fillMaxSize(),
+        state = listState,
         reverseLayout = oneHanded,
         contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 20.dp, end = 20.dp, top = 6.dp, bottom = 20.dp),
     ) {
@@ -151,16 +247,29 @@ fun HistoryPage(
                             maxLines = 1,
                             overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                         )
-                        Text(
-                            stringResource(
-                                com.fancyshark.wpdialer.R.string.home_history_subtitle,
-                                Repo.historyTypeShort(context, item.type),
-                                Repo.historyWhen(item.date),
-                            ),
-                            color = Metro.Subtle,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Light,
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            // A grouped row shows the mark if any of its calls has a note.
+                            if (group.any { notes.containsKey(it.id) }) {
+                                androidx.compose.material3.Icon(
+                                    Icons.AutoMirrored.Filled.StickyNote2,
+                                    contentDescription = stringResource(
+                                        com.fancyshark.wpdialer.R.string.home_note_present,
+                                    ),
+                                    tint = Metro.Subtle,
+                                    modifier = Modifier.padding(end = 4.dp).size(14.dp),
+                                )
+                            }
+                            Text(
+                                stringResource(
+                                    com.fancyshark.wpdialer.R.string.home_history_subtitle,
+                                    Repo.historyTypeShort(context, item.type),
+                                    Repo.historyWhen(item.date),
+                                ),
+                                color = Metro.Subtle,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Light,
+                            )
+                        }
                     }
                     if (item.number.isNotBlank()) {
                         Box(
@@ -201,6 +310,7 @@ fun HistoryPage(
                                     listOf(
                                         stringResource(com.fancyshark.wpdialer.R.string.home_details) to { onDetails(item) },
                                         stringResource(com.fancyshark.wpdialer.R.string.home_delete) to { onDelete(group.toList()) },
+                                        stringResource(com.fancyshark.wpdialer.R.string.home_remind_me) to { onRemind(item.number) },
                                         stringResource(com.fancyshark.wpdialer.R.string.home_add_to_speed_dial) to { onAddSpeedDial(item.number) },
                                         stringResource(com.fancyshark.wpdialer.R.string.home_block) to { onBlock(item.number) },
                                     )
@@ -325,9 +435,17 @@ fun CallDetailsScreen(
     val entries = remember(history, number) {
         history.filter { Repo.numbersMatch(it.number, number) }
     }
+    val notes by com.fancyshark.wpdialer.data.CallNotes.notes.collectAsState()
+    // Call-log row id whose note editor is open / whose note awaits delete.
+    var editingNoteFor by androidx.compose.runtime.saveable.rememberSaveable {
+        mutableStateOf<Long?>(null)
+    }
+    var confirmDeleteNote by remember { mutableStateOf<Long?>(null) }
+    Box(Modifier.fillMaxSize()) {
     Column(
         Modifier
             .fillMaxSize()
+            .hiddenFromAccessibility(editingNoteFor != null)
             .padding(horizontal = 20.dp),
     ) {
         Text(
@@ -365,11 +483,23 @@ fun CallDetailsScreen(
                 stringResource(com.fancyshark.wpdialer.R.string.home_text), accent,
             ) { onText(number) }
         }
-        Spacer(Modifier.height(14.dp))
+        Text(
+            stringResource(com.fancyshark.wpdialer.R.string.home_note_hint),
+            color = Metro.Subtle,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Light,
+            modifier = Modifier.padding(top = 12.dp),
+        )
+        Spacer(Modifier.height(8.dp))
         LazyColumn(Modifier.fillMaxSize()) {
             items(entries.size, key = { entries[it].id }) { i ->
                 val e = entries[i]
-                Column(Modifier.padding(vertical = 7.dp)) {
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable { editingNoteFor = e.id }
+                        .padding(vertical = 7.dp),
+                ) {
                     Text(
                         Repo.wpTime(e.date),
                         color = Metro.Foreground,
@@ -388,9 +518,93 @@ fun CallDetailsScreen(
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Light,
                     )
+                    notes[e.id]?.let { note ->
+                        Text(
+                            note,
+                            color = Metro.textAccent(accent),
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Light,
+                            modifier = Modifier.padding(top = 2.dp),
+                        )
+                    }
                 }
             }
         }
+    }
+
+    editingNoteFor?.let { callId ->
+        val existing = notes[callId]
+        // Saveable: an IME config change must not lose a half-typed note.
+        var draft by androidx.compose.runtime.saveable.rememberSaveable(callId) {
+            mutableStateOf(existing.orEmpty())
+        }
+        com.fancyshark.wpdialer.ui.MetroDialog(
+            onDismiss = { editingNoteFor = null },
+            // A stray backdrop tap must not throw away typed text.
+            dismissOnBackdrop = false,
+        ) {
+            Text(
+                stringResource(com.fancyshark.wpdialer.R.string.home_note_title),
+                color = Metro.Foreground,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold,
+                letterSpacing = 1.sp,
+                modifier = Modifier.padding(bottom = 12.dp),
+            )
+            com.fancyshark.wpdialer.ui.MetroTextBox(
+                draft,
+                { draft = it.take(com.fancyshark.wpdialer.data.CallNotes.MAX_LENGTH) },
+                accent,
+                placeholder = stringResource(com.fancyshark.wpdialer.R.string.home_note_placeholder),
+                singleLine = false,
+                minLines = 3,
+            )
+            Spacer(Modifier.height(12.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                com.fancyshark.wpdialer.ui.MetroButton(
+                    stringResource(com.fancyshark.wpdialer.R.string.home_note_save),
+                    fill = accent,
+                    enabled = draft.isNotBlank(),
+                    modifier = Modifier.weight(1f),
+                ) {
+                    com.fancyshark.wpdialer.data.CallNotes.set(context, callId, draft)
+                    editingNoteFor = null
+                }
+                com.fancyshark.wpdialer.ui.MetroButton(
+                    stringResource(com.fancyshark.wpdialer.R.string.main_button_cancel),
+                    modifier = Modifier.weight(1f),
+                ) { editingNoteFor = null }
+            }
+            if (existing != null) {
+                Text(
+                    stringResource(com.fancyshark.wpdialer.R.string.home_note_delete),
+                    color = Metro.Foreground,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Light,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { confirmDeleteNote = callId }
+                        .padding(vertical = 12.dp),
+                )
+            }
+        }
+    }
+
+    // After the editor so it stacks (and takes back) above it.
+    confirmDeleteNote?.let { callId ->
+        com.fancyshark.wpdialer.ui.MetroConfirm(
+            title = stringResource(com.fancyshark.wpdialer.R.string.home_note_confirm_delete),
+            message = notes[callId],
+            confirmLabel = stringResource(com.fancyshark.wpdialer.R.string.main_button_delete),
+            cancelLabel = stringResource(com.fancyshark.wpdialer.R.string.main_button_cancel),
+            onConfirm = {
+                com.fancyshark.wpdialer.data.CallNotes.remove(context, listOf(callId))
+                confirmDeleteNote = null
+                editingNoteFor = null
+            },
+            onCancel = { confirmDeleteNote = null },
+        )
+    }
     }
 }
 

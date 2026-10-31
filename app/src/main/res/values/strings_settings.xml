@@ -48,7 +48,6 @@
     <string name="settings_dup_notif_body">Google\'s phone app posts its own call notifications even when it isn\'t the default dialer. Turn its notifications off to see only this app\'s.</string>
     <string name="settings_dup_notif_button">open Google Phone notification settings</string>
     <string name="settings_dup_notif_locked_hint">On some phones (OnePlus, OPPO...) those toggles are locked. If so, open the app info page below and tap \"Disable\" — this app fully replaces Google\'s phone app, and you can re-enable it there anytime.</string>
-    <string name="settings_light_theme_title">Light theme</string>
     <string name="settings_tilt_title">Tile tilt effect</string>
     <string name="settings_relative_times_title">Relative times in history</string>
     <string name="settings_relative_times_hint">on: \"2 hours ago\" — off: Windows Phone style \"Sat 01:06\"</string>
