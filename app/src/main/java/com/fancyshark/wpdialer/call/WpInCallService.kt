@@ -140,10 +140,14 @@ class WpInCallService : InCallService() {
             )
             return
         }
-        val number = call.details.handle?.schemeSpecificPart
-            ?: getString(com.fancyshark.wpdialer.R.string.call_unknown)
-        val s = scope ?: run {
-            postOngoingNotificationNow(CallManager.telecomName(call) ?: number)
+        // Look up the raw handle only — the localized "unknown" label is
+        // for display, never a phone number to query contacts with.
+        val number = call.details.handle?.schemeSpecificPart.orEmpty()
+        val fallback = CallManager.telecomName(call)
+            ?: number.ifBlank { getString(com.fancyshark.wpdialer.R.string.call_unknown) }
+        val s = scope
+        if (s == null || number.isBlank()) {
+            postOngoingNotificationNow(fallback, number)
             return
         }
         s.launch {
@@ -151,12 +155,16 @@ class WpInCallService : InCallService() {
                 .lookupCaller(this@WpInCallService, number)
             val state = CallManager.stateOf(call)
             if (state != Call.STATE_DISCONNECTED && state != Call.STATE_RINGING) {
-                postOngoingNotificationNow(name ?: CallManager.telecomName(call) ?: number)
+                postOngoingNotificationNow(name ?: fallback, number)
             }
         }
     }
 
-    private fun postOngoingNotificationNow(display: String) {
+    // Whether the ongoing notification is currently attached to a
+    // foreground-service start (must be stopped, not just cancelled).
+    private var foreground = false
+
+    private fun postOngoingNotificationNow(display: String, number: String = "") {
         val nm = getSystemService(NotificationManager::class.java)
         nm.createNotificationChannel(
             NotificationChannel(
@@ -176,7 +184,9 @@ class WpInCallService : InCallService() {
                 .setAction(CallActionReceiver.ACTION_HANGUP),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
-        val caller = Person.Builder().setName(display).setImportant(true).build()
+        val caller = Person.Builder().setName(display).setImportant(true)
+            .apply { if (number.isNotBlank()) setUri("tel:$number") }
+            .build()
         com.fancyshark.wpdialer.ui.AccentStore.init(this)
         val notification = Notification.Builder(this, ONGOING_CHANNEL_ID)
             .setSmallIcon(
@@ -190,10 +200,27 @@ class WpInCallService : InCallService() {
             .setOngoing(true)
             .setContentIntent(open)
             .build()
-        runCatching { nm.notify(ONGOING_NOTIFICATION_ID, notification) }
+        // CallStyle.forOngoingCall is only accepted from a foreground service
+        // (or with a full-screen intent) — a plain notify() is dropped by the
+        // system. Being foreground also keeps the process alive mid-call.
+        val started = runCatching {
+            startForeground(
+                ONGOING_NOTIFICATION_ID, notification,
+                android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_PHONE_CALL,
+            )
+        }.isSuccess
+        if (started) {
+            foreground = true
+        } else {
+            runCatching { nm.notify(ONGOING_NOTIFICATION_ID, notification) }
+        }
     }
 
     private fun cancelOngoingNotification() {
+        if (foreground) {
+            runCatching { stopForeground(STOP_FOREGROUND_REMOVE) }
+            foreground = false
+        }
         getSystemService(NotificationManager::class.java).cancel(ONGOING_NOTIFICATION_ID)
     }
 
@@ -202,19 +229,62 @@ class WpInCallService : InCallService() {
         CallManager.onCallAdded(call)
         call.registerCallback(notifyCallback)
 
-        if (CallManager.stateOf(call) == Call.STATE_RINGING) {
-            // Ringing: the notification's full-screen intent decides — full
-            // screen when the device is locked/idle, a heads-up banner while
-            // in another app (platform behavior). While our own in-call UI is
-            // in front it shows its inline waiting panel — no banner on top.
-            if (!inCallUiVisible) postIncomingNotification(call)
-        } else {
-            // Outgoing calls are user-initiated: open the in-call UI directly.
-            startActivity(
-                Intent(this, InCallActivity::class.java)
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-            )
+        when (CallManager.stateOf(call)) {
+            Call.STATE_RINGING -> {
+                // Ringing: the notification's full-screen intent decides — full
+                // screen when the device is locked/idle, a heads-up banner while
+                // in another app (platform behavior). While our own in-call UI is
+                // in front it shows its inline waiting panel — no banner on top.
+                if (!inCallUiVisible) postIncomingNotification(call)
+            }
+            Call.STATE_SELECT_PHONE_ACCOUNT -> {
+                // Placed without a SIM (another app's ACTION_CALL, a car kit…)
+                // on an "ask every time" device: Telecom waits for us. Honor
+                // the contact / global SIM preference silently, else ask.
+                if (!autoSelectAccount(call)) launchInCallUi()
+            }
+            else -> {
+                // Outgoing calls are user-initiated: open the in-call UI
+                // directly. Calls that arrive already live (an IMS merge's new
+                // conference, re-delivery after a process restart) also need
+                // their ongoing notification — no state change will post it.
+                launchInCallUi()
+                if (CallManager.stateOf(call) != Call.STATE_NEW) postOngoingNotification(call)
+            }
         }
+    }
+
+    private fun launchInCallUi(showDialpad: Boolean = false) {
+        startActivity(
+            Intent(this, InCallActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                .putExtra(InCallActivity.EXTRA_SHOW_DIALPAD, showDialpad),
+        )
+    }
+
+    /** System "return to call" entry points (TelecomManager.showInCallScreen,
+     *  OEM status-bar call chips). */
+    override fun onBringToForeground(showDialpad: Boolean) {
+        launchInCallUi(showDialpad)
+    }
+
+    private fun autoSelectAccount(call: Call): Boolean {
+        val choices = CallManager.accountChoices(call)
+        val number = call.details.handle?.schemeSpecificPart.orEmpty()
+        com.fancyshark.wpdialer.data.AppPrefs.init(this)
+        val sims = com.fancyshark.wpdialer.data.Sims.options(this)
+        val preferred = sequenceOf(
+            number.takeIf { it.isNotBlank() }
+                ?.let { com.fancyshark.wpdialer.data.SimPrefs.get(this, it) },
+            com.fancyshark.wpdialer.data.AppPrefs.globalSim.value,
+        ).filterNotNull().firstNotNullOfOrNull { flat -> sims.firstOrNull { it.flat == flat } }
+            ?.handle
+            ?.takeIf { choices.isEmpty() || it in choices }
+        // Only one usable account: nothing to ask.
+            ?: choices.singleOrNull()
+            ?: return false
+        call.phoneAccountSelected(preferred, false)
+        return true
     }
 
     override fun onCallRemoved(call: Call) {
@@ -235,7 +305,10 @@ class WpInCallService : InCallService() {
         if (call.details.disconnectCause?.code == android.telecom.DisconnectCause.MISSED) {
             postMissedNotification(call)
         }
-        if (CallManager.call.value == null) CallManager.service = null
+        // CallManager.service is deliberately kept until onDestroy: the
+        // in-call activity's onPause (after the ended screen) must still
+        // reach onInCallUiVisibility, or a stale "visible" flag would hide
+        // the banner of a call arriving before Telecom unbinds us.
     }
 
     private fun postMissedNotification(call: Call) {
@@ -271,12 +344,12 @@ class WpInCallService : InCallService() {
     }
 
     private fun postIncomingNotification(call: Call) {
-        val number = call.details.handle?.schemeSpecificPart
-            ?: getString(com.fancyshark.wpdialer.R.string.call_unknown)
-        val s = scope ?: run {
-            postIncomingNotificationNow(
-                number, CallManager.telecomName(call) ?: number, null,
-            )
+        val number = call.details.handle?.schemeSpecificPart.orEmpty()
+        val fallback = CallManager.telecomName(call)
+            ?: number.ifBlank { getString(com.fancyshark.wpdialer.R.string.call_unknown) }
+        val s = scope
+        if (s == null || number.isBlank()) {
+            postIncomingNotificationNow(number, fallback, null)
             return
         }
         s.launch {
@@ -312,9 +385,7 @@ class WpInCallService : InCallService() {
             // after our own in-call UI came to the foreground (fast
             // pause/resume) — don't stack a banner on top of it.
             if (CallManager.stateOf(call) == Call.STATE_RINGING && !inCallUiVisible) {
-                postIncomingNotificationNow(
-                    number, name ?: CallManager.telecomName(call) ?: number, photo,
-                )
+                postIncomingNotificationNow(number, name ?: fallback, photo)
             }
         }
     }
@@ -357,7 +428,7 @@ class WpInCallService : InCallService() {
         views.setTextViewText(com.fancyshark.wpdialer.R.id.caller_name, display)
         views.setTextViewText(
             com.fancyshark.wpdialer.R.id.caller_number,
-            if (display != number) {
+            if (display != number && number.isNotBlank()) {
                 number
             } else {
                 getString(com.fancyshark.wpdialer.R.string.notif_incoming_call)
@@ -383,6 +454,14 @@ class WpInCallService : InCallService() {
             .setCustomHeadsUpContentView(views)
             .setCustomBigContentView(views)
             .setCategory(Notification.CATEGORY_CALL)
+            // The caller as a Person: Do Not Disturb's "allow calls from
+            // contacts / starred" filter matches the notification by this
+            // tel: URI — without it an allowed caller rings with no UI.
+            .addPerson(
+                Person.Builder().setName(display)
+                    .apply { if (number.isNotBlank()) setUri("tel:$number") }
+                    .build(),
+            )
             .setOngoing(true)
             .setFullScreenIntent(fullScreen, true)
             .setContentIntent(fullScreen)

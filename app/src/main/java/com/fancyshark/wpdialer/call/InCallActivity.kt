@@ -9,6 +9,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -66,10 +71,15 @@ import kotlinx.coroutines.flow.MutableStateFlow
 // can append.
 private val dtmfTyped = MutableStateFlow("")
 
+// Set when the in-call UI is opened with "show dialpad" (Telecom's
+// onBringToForeground) — consumed by the active screen.
+private val dialpadRequest = MutableStateFlow(false)
+
 class InCallActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        consumeIntent(intent)
         setShowWhenLocked(true)
         setTurnScreenOn(true)
         onBackPressedDispatcher.addCallback(this) {
@@ -94,6 +104,21 @@ class InCallActivity : ComponentActivity() {
                 InCallRoot(onFinished = { finish() })
             }
         }
+    }
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        consumeIntent(intent)
+    }
+
+    private fun consumeIntent(intent: android.content.Intent?) {
+        if (intent?.getBooleanExtra(EXTRA_SHOW_DIALPAD, false) == true) {
+            dialpadRequest.value = true
+        }
+    }
+
+    companion object {
+        const val EXTRA_SHOW_DIALPAD = "show_dialpad"
     }
 
     override fun onResume() {
@@ -196,6 +221,9 @@ private fun InCallRoot(onFinished: () -> Unit) {
             call == null || state == Call.STATE_DISCONNECTED -> {
                 EndedScreen(if (call == null) lastKnownName else displayName, onFinished)
             }
+            state == Call.STATE_SELECT_PHONE_ACCOUNT -> {
+                SimChooserScreen(displayName, call)
+            }
             state == Call.STATE_RINGING -> {
                 IncomingScreen(
                     contactName = resolvedName,
@@ -217,8 +245,11 @@ private fun InCallRoot(onFinished: () -> Unit) {
 
 @Composable
 private fun EndedScreen(name: String, onFinished: () -> Unit) {
+    // Busy / no signal / blocked: the network's reason replaces the generic
+    // line and stays up long enough to read.
+    val reason by CallManager.endReason.collectAsState()
     LaunchedEffect(Unit) {
-        delay(1200)
+        delay(if (CallManager.endWasError) 3000 else 1200)
         onFinished()
     }
     Column(Modifier.fillMaxSize().padding(24.dp)) {
@@ -231,11 +262,59 @@ private fun EndedScreen(name: String, onFinished: () -> Unit) {
         Spacer(Modifier.height(24.dp))
         Text(name, color = Metro.Foreground, fontSize = 40.sp, fontWeight = FontWeight.Light)
         Text(
-            stringResource(com.fancyshark.wpdialer.R.string.call_ended),
+            reason ?: stringResource(com.fancyshark.wpdialer.R.string.call_ended),
             color = Metro.Subtle,
             fontSize = 18.sp,
             fontWeight = FontWeight.Light,
         )
+    }
+}
+
+/**
+ * A call Telecom parked waiting for a SIM (placed without one on an "ask
+ * every time" device and no saved preference applied). Back/cancel ends it.
+ */
+@Composable
+private fun SimChooserScreen(name: String, call: Call?) {
+    val context = LocalContext.current
+    val accent by AccentStore.accent.collectAsState()
+    val options = remember(call) {
+        val choices = CallManager.accountChoices(call)
+        val sims = com.fancyshark.wpdialer.data.Sims.options(context)
+        if (choices.isEmpty()) sims else sims.filter { it.handle in choices }
+    }
+    androidx.activity.compose.BackHandler { CallManager.hangup() }
+    Column(Modifier.fillMaxSize().padding(24.dp)) {
+        Text(
+            stringResource(com.fancyshark.wpdialer.R.string.main_choose_sim_title),
+            color = Metro.Foreground,
+            fontSize = 15.sp,
+            letterSpacing = 2.sp,
+        )
+        Spacer(Modifier.height(24.dp))
+        Text(name, color = Metro.Foreground, fontSize = 40.sp, fontWeight = FontWeight.Light)
+        Spacer(Modifier.height(24.dp))
+        options.forEach { sim ->
+            Text(
+                sim.label,
+                color = Metro.Foreground,
+                fontSize = 28.sp,
+                fontWeight = FontWeight.Light,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(role = androidx.compose.ui.semantics.Role.Button) {
+                        CallManager.selectAccount(sim.handle)
+                    }
+                    .padding(vertical = 12.dp),
+            )
+        }
+        Spacer(Modifier.weight(1f))
+        MetroButton(
+            stringResource(com.fancyshark.wpdialer.R.string.call_end_call),
+            fill = accent.color,
+            modifier = Modifier.fillMaxWidth().height(64.dp),
+        ) { CallManager.hangup() }
+        Spacer(Modifier.height(16.dp))
     }
 }
 
@@ -369,6 +448,21 @@ private fun ActiveScreen(
     val muted by CallManager.muted.collectAsState()
     val call by CallManager.call.collectAsState()
     var showKeypad by remember { mutableStateOf(false) }
+    val wantDialpad by dialpadRequest.collectAsState()
+    LaunchedEffect(wantDialpad) {
+        if (wantDialpad) {
+            showKeypad = true
+            dialpadRequest.value = false
+        }
+    }
+    // Capabilities change with the network's state (e.g. hold unavailable
+    // while dialing, merge once the second call connects) — keyed to ticks.
+    val capsTick by CallManager.detailsTick.collectAsState()
+    val secondForCaps by CallManager.secondCall.collectAsState()
+    val holdAllowed = remember(call, state, capsTick) {
+        state == Call.STATE_HOLDING || CallManager.canHold(call)
+    }
+    val mergeAllowed = remember(call, secondForCaps, state, capsTick) { CallManager.canMerge() }
 
     // The digit echo belongs to one call: reset when the primary call
     // changes (swap/new call), never on a keypad toggle — hardware-typed
@@ -543,18 +637,21 @@ private fun ActiveScreen(
                     Icons.AutoMirrored.Filled.VolumeUp,
                     stringResource(com.fancyshark.wpdialer.R.string.call_speaker),
                     speakerOn, accent,
+                    toggle = true,
                     modifier = Modifier.weight(1f),
                 ) { CallManager.setSpeaker(!speakerOn) }
                 IconTile(
                     Icons.Filled.MicOff,
                     stringResource(com.fancyshark.wpdialer.R.string.call_mute),
                     muted, accent,
+                    toggle = true,
                     modifier = Modifier.weight(1f),
                 ) { CallManager.setMuted(!muted) }
                 IconTile(
                     Icons.Filled.Bluetooth,
                     stringResource(com.fancyshark.wpdialer.R.string.call_bluetooth),
                     bluetoothOn, accent,
+                    toggle = true,
                     enabled = bluetoothAvailable,
                     modifier = Modifier.weight(1f),
                 ) {
@@ -573,6 +670,8 @@ private fun ActiveScreen(
                     Icons.Filled.Pause,
                     stringResource(com.fancyshark.wpdialer.R.string.call_hold),
                     held, accent,
+                    toggle = true,
+                    enabled = holdAllowed,
                     modifier = Modifier.weight(1f),
                 ) { CallManager.setHold(!held) }
                 if (secondCall != null && secondState == Call.STATE_HOLDING) {
@@ -586,6 +685,7 @@ private fun ActiveScreen(
                         Icons.Filled.CallMerge,
                         stringResource(com.fancyshark.wpdialer.R.string.call_merge),
                         false, accent,
+                        enabled = mergeAllowed,
                         modifier = Modifier.weight(1f),
                     ) { CallManager.merge() }
                 } else {
@@ -624,6 +724,7 @@ private fun ActiveScreen(
                 Icons.Filled.Dialpad,
                 stringResource(com.fancyshark.wpdialer.R.string.call_keypad),
                 showKeypad, accent,
+                toggle = true,
                 modifier = Modifier.weight(1f),
             ) { showKeypad = !showKeypad }
         }
@@ -697,6 +798,7 @@ private fun IconTile(
     active: Boolean,
     accent: Color,
     modifier: Modifier = Modifier,
+    toggle: Boolean = false,
     enabled: Boolean = true,
     onClick: () -> Unit,
 ) {
@@ -705,11 +807,26 @@ private fun IconTile(
         modifier
             .height(64.dp)
             .background(if (active) accent else Metro.Key)
-            .clickable(enabled = enabled) { onClick() },
+            .then(
+                // Toggles announce on/off to TalkBack; the label Text below
+                // is the accessible name (the icon stays silent — no echo).
+                if (toggle) {
+                    Modifier.toggleable(
+                        value = active,
+                        enabled = enabled,
+                        role = androidx.compose.ui.semantics.Role.Switch,
+                    ) { onClick() }
+                } else {
+                    Modifier.clickable(
+                        enabled = enabled,
+                        role = androidx.compose.ui.semantics.Role.Button,
+                    ) { onClick() }
+                },
+            ),
         contentAlignment = Alignment.Center,
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(icon, contentDescription = label, tint = fg, modifier = Modifier.size(20.dp))
+            Icon(icon, contentDescription = null, tint = fg, modifier = Modifier.size(20.dp))
             Text(label, color = fg, fontSize = 11.sp, modifier = Modifier.padding(top = 3.dp))
         }
     }
@@ -717,6 +834,7 @@ private fun IconTile(
 
 @Composable
 private fun DtmfPad() {
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
     val keys = listOf("1", "2", "3", "4", "5", "6", "7", "8", "9", "*", "0", "#")
     // Keypads never mirror in RTL locales.
     androidx.compose.runtime.CompositionLocalProvider(
@@ -732,6 +850,21 @@ private fun DtmfPad() {
                                 .weight(1f)
                                 .height(56.dp)
                                 .background(Metro.Key)
+                                // pointerInput carries no semantics — give
+                                // TalkBack a button whose activation sends a
+                                // short tone (IVR menus must stay usable).
+                                .semantics(mergeDescendants = true) {
+                                    role = androidx.compose.ui.semantics.Role.Button
+                                    onClick {
+                                        CallManager.startDtmf(key[0])
+                                        dtmfTyped.value += key
+                                        scope.launch {
+                                            delay(150)
+                                            CallManager.stopDtmf()
+                                        }
+                                        true
+                                    }
+                                }
                                 .pointerInput(key) {
                                     detectTapGestures(
                                         onPress = {

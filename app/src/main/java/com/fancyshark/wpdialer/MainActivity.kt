@@ -253,6 +253,10 @@ class MainActivity : ComponentActivity() {
         updatePermissionState()
         refreshDefaultState()
         refreshTick.value += 1
+        // Consumes tips that completed while the app was closed (killed
+        // mid-flow, pending payment settling later) — unconsumed purchases
+        // are auto-refunded by Play after 3 days. No-op once connected.
+        com.fancyshark.wpdialer.data.Tips.init(applicationContext)
         // Opening the app counts as seeing the call log (home IS history):
         // clear our missed-call notifications and reset Telecom's unread
         // counter so its restore broadcast doesn't re-post them later.
@@ -367,18 +371,23 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun placeCall(number: String) {
-        if (checkSelfPermission(Manifest.permission.CALL_PHONE) != PackageManager.PERMISSION_GRANTED) {
-            permissionLauncher.launch(corePermissions())
-            return
-        }
-        // Emergency numbers bypass SIM preferences and the SIM chooser —
-        // telecom routes them itself regardless of phone account.
+        // Emergency numbers go first — before the permission gate (a revoked
+        // phone permission must never turn 112 into a dialog) and bypassing
+        // SIM preferences: telecom routes them itself regardless of account.
         val emergency = runCatching {
             getSystemService(android.telephony.TelephonyManager::class.java)
                 ?.isEmergencyNumber(number) == true
         }.getOrDefault(false)
         if (emergency) {
-            placeCallWith(number, null)
+            val placed = runCatching {
+                getSystemService(TelecomManager::class.java)!!
+                    .placeCall(Uri.fromParts("tel", number, null), Bundle())
+            }.isSuccess
+            if (!placed) permissionLauncher.launch(corePermissions())
+            return
+        }
+        if (checkSelfPermission(Manifest.permission.CALL_PHONE) != PackageManager.PERMISSION_GRANTED) {
+            permissionLauncher.launch(corePermissions())
             return
         }
         val sims = Sims.options(this)
@@ -421,9 +430,13 @@ class MainActivity : ComponentActivity() {
             getSystemService(android.telephony.TelephonyManager::class.java)?.voiceMailNumber
         }.getOrNull()
         if (!number.isNullOrBlank()) {
-            // The voicemail number belongs to the default voice subscription —
-            // don't let a global SIM preference route it over the other SIM.
-            placeCallWith(number, null)
+            // voicemail: lets Telecom resolve the box of the right SIM (and
+            // ask via our in-call SIM chooser on "ask every time" devices) —
+            // a global SIM preference must not route it over the other SIM.
+            runCatching {
+                getSystemService(TelecomManager::class.java)!!
+                    .placeCall(Uri.fromParts("voicemail", "", null), Bundle())
+            }.onFailure { placeCallWith(number, null) }
         } else {
             android.widget.Toast.makeText(
                 this, getString(R.string.main_toast_no_voicemail), android.widget.Toast.LENGTH_SHORT,

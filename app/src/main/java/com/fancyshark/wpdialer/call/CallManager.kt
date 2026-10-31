@@ -6,6 +6,7 @@ import android.telecom.Call
 import android.telecom.CallAudioState
 import android.telecom.CallEndpoint
 import android.telecom.CallEndpointException
+import android.telecom.PhoneAccountHandle
 import android.telecom.VideoProfile
 import androidx.annotation.RequiresApi
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -60,8 +61,23 @@ object CallManager {
     private val _detailsTick = MutableStateFlow(0)
     val detailsTick: StateFlow<Int> = _detailsTick
 
+    // Why the last primary call ended (busy, no signal, blocked…) — shown on
+    // the ended screen. Cleared when the next call arrives.
+    private val _endReason = MutableStateFlow<String?>(null)
+    val endReason: StateFlow<String?> = _endReason
+
+    // True when the ending was an error worth reading (held on screen longer).
+    @Volatile
+    var endWasError = false
+        private set
+
     private val callback = object : Call.Callback() {
-        override fun onStateChanged(call: Call, newState: Int) = recompute()
+        override fun onStateChanged(call: Call, newState: Int) {
+            if (newState == Call.STATE_DISCONNECTED && call === _call.value) {
+                captureEndReason(call)
+            }
+            recompute()
+        }
         override fun onDetailsChanged(call: Call, details: Call.Details) {
             _detailsTick.value += 1
         }
@@ -69,6 +85,54 @@ object CallManager {
 
     fun stateOf(call: Call): Int = call.details.state
 
+    private fun captureEndReason(call: Call) {
+        val cause = call.details.disconnectCause
+        // LOCAL/REMOTE/MISSED/REJECTED are ordinary endings — "call ended"
+        // says it all; only surface what the network actually explains.
+        val ordinary = cause == null || cause.code in setOf(
+            android.telecom.DisconnectCause.LOCAL,
+            android.telecom.DisconnectCause.REMOTE,
+            android.telecom.DisconnectCause.MISSED,
+            android.telecom.DisconnectCause.REJECTED,
+            android.telecom.DisconnectCause.CANCELED,
+            android.telecom.DisconnectCause.ANSWERED_ELSEWHERE,
+        )
+        val text = if (ordinary) {
+            null
+        } else {
+            (cause?.label?.takeIf { it.isNotBlank() } ?: cause?.description)
+                ?.toString()?.takeIf { it.isNotBlank() }
+        }
+        _endReason.value = text
+        endWasError = text != null
+    }
+
+    /** Accounts Telecom offers for a call waiting on a SIM choice. */
+    fun accountChoices(call: Call?): List<PhoneAccountHandle> {
+        val extras = call?.details?.intentExtras ?: return emptyList()
+        return runCatching {
+            extras.getParcelableArrayList(
+                Call.AVAILABLE_PHONE_ACCOUNTS, PhoneAccountHandle::class.java,
+            ).orEmpty()
+        }.getOrDefault(emptyList())
+    }
+
+    /** Completes a call Telecom parked in STATE_SELECT_PHONE_ACCOUNT. */
+    fun selectAccount(handle: PhoneAccountHandle) {
+        calls.firstOrNull { stateOf(it) == Call.STATE_SELECT_PHONE_ACCOUNT }
+            ?.phoneAccountSelected(handle, false)
+    }
+
+    fun canHold(call: Call?): Boolean =
+        call?.details?.can(Call.Details.CAPABILITY_HOLD) == true
+
+    /** Whether the active and held calls can become a conference. */
+    fun canMerge(): Boolean {
+        val active = _call.value ?: return false
+        val held = _secondCall.value ?: return false
+        return active.details.can(Call.Details.CAPABILITY_MERGE_CONFERENCE) ||
+            held in active.conferenceableCalls || active in held.conferenceableCalls
+    }
     /**
      * Telecom's own name for a call, used when our contacts lookup finds
      * nothing: the system's contact match first (works even where our query
@@ -92,7 +156,8 @@ object CallManager {
     /** Ranks calls so the most "active" one is primary. */
     private fun rank(call: Call): Int = when (stateOf(call)) {
         Call.STATE_ACTIVE -> 0
-        Call.STATE_DIALING, Call.STATE_CONNECTING, Call.STATE_PULLING_CALL -> 1
+        Call.STATE_DIALING, Call.STATE_CONNECTING, Call.STATE_PULLING_CALL,
+        Call.STATE_SELECT_PHONE_ACCOUNT -> 1
         Call.STATE_HOLDING -> 2
         Call.STATE_RINGING -> 3
         else -> 4
@@ -131,12 +196,17 @@ object CallManager {
 
     fun onCallAdded(call: Call) {
         userDismissedUi = false
+        _endReason.value = null
+        endWasError = false
         if (calls.isEmpty()) {
             // A fresh call session: drop any per-call route state a late
             // callback repopulated after the previous session's reset (stale
-            // speaker would also disable the proximity lock). Available
-            // endpoints are device-level — kept (see recompute).
-            _route.value = null
+            // speaker would also disable the proximity lock), then seed the
+            // route from Telecom's current state — it only re-sends endpoint
+            // callbacks on change, so a headset that stays connected across
+            // back-to-back calls would otherwise read as "earpiece".
+            // Available endpoints are device-level — kept (see recompute).
+            _route.value = currentRouteFromService()
             _muted.value = false
         }
         if (call !in calls) {
@@ -189,15 +259,23 @@ object CallManager {
         _availableRoutes.value = list.mapTo(mutableSetOf()) { routeOf(it.endpointType) }
     }
 
+    private fun legacyRoute(route: Int): AudioRoute = when (route) {
+        CallAudioState.ROUTE_SPEAKER -> AudioRoute.SPEAKER
+        CallAudioState.ROUTE_BLUETOOTH -> AudioRoute.BLUETOOTH
+        CallAudioState.ROUTE_WIRED_HEADSET -> AudioRoute.WIRED_HEADSET
+        CallAudioState.ROUTE_EARPIECE -> AudioRoute.EARPIECE
+        else -> AudioRoute.UNKNOWN
+    }
+
+    // getCallAudioState is deprecated on 34+ but still reports the live
+    // route there — the endpoint API has no synchronous getter.
+    @Suppress("DEPRECATION")
+    private fun currentRouteFromService(): AudioRoute? =
+        runCatching { service?.callAudioState?.let { legacyRoute(it.route) } }.getOrNull()
+
     /** Android 13 path: route, supported routes, and mute all arrive here. */
     fun updateAudioState(state: CallAudioState) {
-        _route.value = when (state.route) {
-            CallAudioState.ROUTE_SPEAKER -> AudioRoute.SPEAKER
-            CallAudioState.ROUTE_BLUETOOTH -> AudioRoute.BLUETOOTH
-            CallAudioState.ROUTE_WIRED_HEADSET -> AudioRoute.WIRED_HEADSET
-            CallAudioState.ROUTE_EARPIECE -> AudioRoute.EARPIECE
-            else -> AudioRoute.UNKNOWN
-        }
+        _route.value = legacyRoute(state.route)
         val mask = state.supportedRouteMask
         _availableRoutes.value = buildSet {
             if (mask and CallAudioState.ROUTE_EARPIECE != 0) add(AudioRoute.EARPIECE)
@@ -234,7 +312,9 @@ object CallManager {
 
     /** Unholds the held call; Telecom holds the active one. */
     fun swap() {
-        calls.firstOrNull { stateOf(it) == Call.STATE_HOLDING }?.unhold()
+        // Top-level only: a held conference's children report HOLDING too,
+        // and unholding a child instead of the conference does nothing.
+        calls.firstOrNull { stateOf(it) == Call.STATE_HOLDING && it.parent == null }?.unhold()
     }
 
     fun hasHeldSecondCall(): Boolean =
@@ -320,11 +400,23 @@ object CallManager {
         if (on) c.hold() else c.unhold()
     }
 
-    /** Merge the active and held calls into a conference (if supported). */
+    /**
+     * Merge the active and held calls into a conference. Mirrors AOSP: IMS
+     * carriers expose MERGE_CONFERENCE (mergeConference), GSM-style calls list
+     * each other as conferenceable (conference(other)).
+     */
     fun merge() {
         val active = _call.value ?: return
         val held = _secondCall.value ?: return
-        runCatching { active.conference(held) }
+        runCatching {
+            when {
+                active.details.can(Call.Details.CAPABILITY_MERGE_CONFERENCE) ->
+                    active.mergeConference()
+                active in held.conferenceableCalls && held !in active.conferenceableCalls ->
+                    held.conference(active)
+                else -> active.conference(held)
+            }
+        }
     }
 
     // The stop must go to the same call the tone started on — resolving
