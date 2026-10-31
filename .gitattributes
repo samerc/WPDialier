@@ -1,0 +1,7 @@
+# The wrapper script runs on Linux CI — CRLF would break its shebang.
+gradlew text eol=lf
+*.bat text eol=crlf
+*.jar binary
+*.png binary
+*.ttf binary
+*.keystore binary

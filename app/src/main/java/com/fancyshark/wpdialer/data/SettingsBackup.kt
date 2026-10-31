@@ -54,7 +54,19 @@ object SettingsBackup {
         "reach_gesture" to "b",
     )
 
-    private fun tagOf(v: Any?): String? = when (v) {
+    /**
+     * Whether a backup entry may be restored: not bookkeeping/device-bound,
+     * a known value tag, and the type the app reads it with (or, for keys
+     * not in [KNOWN_TYPES], the type already stored under that key).
+     */
+    internal fun accepts(key: String, tag: String, currentTag: String?): Boolean {
+        if (key.isBlank() || skipped(key)) return false
+        if (tag !in setOf("b", "i", "l", "f", "s")) return false
+        val expected = KNOWN_TYPES[key] ?: currentTag
+        return expected == null || expected == tag
+    }
+
+    internal fun tagOf(v: Any?): String? = when (v) {
         is Boolean -> "b"
         is Int -> "i"
         is Long -> "l"
@@ -135,9 +147,7 @@ object SettingsBackup {
                     val e = payload.prefs.getJSONObject(i)
                     val k = e.getString("k")
                     val t = e.getString("t")
-                    if (k.isBlank() || skipped(k)) return@runCatching
-                    val expected = KNOWN_TYPES[k] ?: current[k]?.let(::tagOf)
-                    if (expected != null && expected != t) return@runCatching
+                    if (!accepts(k, t, current[k]?.let(::tagOf))) return@runCatching
                     when (t) {
                         "b" -> edit.putBoolean(k, e.getBoolean("v"))
                         "i" -> edit.putInt(k, e.getInt("v"))

@@ -815,8 +815,13 @@ object Repo {
         }.getOrNull() ?: number
         // LTR-isolate wrapping (LRI/PDI) keeps "+961 3 ..." from being
         // visually reordered inside RTL (Arabic) text runs.
-        return "⁦$formatted⁩"
+        return "$LRI$formatted$PDI"
     }
+
+    // Named, not literal: invisible bidi controls in source trip lint's
+    // BidiSpoofing check and are impossible to review.
+    private val LRI = Char(0x2066)
+    private val PDI = Char(0x2069)
 
     /**
      * Opening the app counts as seeing missed calls (home IS history) —

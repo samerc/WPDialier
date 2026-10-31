@@ -10,6 +10,11 @@ data class SimOption(val handle: PhoneAccountHandle, val label: String, val flat
 object Sims {
 
     fun options(context: Context): List<SimOption> = runCatching {
+        if (context.checkSelfPermission(android.Manifest.permission.READ_PHONE_STATE) !=
+            android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            return emptyList()
+        }
         val telecom = context.getSystemService(TelecomManager::class.java)
             ?: return emptyList()
         telecom.callCapablePhoneAccounts.mapIndexed { i, handle ->

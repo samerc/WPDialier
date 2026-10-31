@@ -77,6 +77,11 @@ android {
     buildFeatures {
         compose = true
     }
+    // JVM unit tests cover the pure logic (number identity, backup
+    // validation); android.jar stubs return defaults instead of throwing.
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+    }
     bundle {
         // The in-app language picker needs all locales installed — Play's
         // per-language splits would strip fr/ar from most installs. The
@@ -118,4 +123,6 @@ dependencies {
     // trips the ActivityResult lint check on release builds — pin current.
     implementation("androidx.fragment:fragment:1.9.1")
     implementation("org.osmdroid:osmdroid-android:6.1.20")
+
+    testImplementation("junit:junit:4.13.2")
 }

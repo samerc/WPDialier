@@ -46,7 +46,13 @@ object Geo {
 
     /** One-shot current location; null on missing permission or timeout. */
     suspend fun currentLocation(context: Context): Location? =
-        withTimeoutOrNull(10_000) {
+        if (context.checkSelfPermission(android.Manifest.permission.ACCESS_COARSE_LOCATION) !=
+            android.content.pm.PackageManager.PERMISSION_GRANTED &&
+            context.checkSelfPermission(android.Manifest.permission.ACCESS_FINE_LOCATION) !=
+            android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            null
+        } else withTimeoutOrNull(10_000) {
             suspendCancellableCoroutine { cont ->
                 val manager = context.getSystemService(LocationManager::class.java)
                 if (manager == null) {
