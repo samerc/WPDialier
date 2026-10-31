@@ -39,20 +39,18 @@ fun WhatsNewScreen(accent: Color, versionName: String, onDone: () -> Unit) {
         Text(
             stringResource(R.string.wizard_app_title),
             color = Metro.Foreground,
-            fontSize = 15.sp,
-            letterSpacing = 2.sp,
+            style = Metro.Type.AppTitle,
         )
         Text(
             stringResource(R.string.whatsnew_title),
             color = Metro.Foreground,
-            fontSize = 44.sp,
-            fontWeight = FontWeight.Light,
+            style = Metro.Type.PageTitle,
             modifier = Modifier.padding(top = 8.dp),
         )
         Text(
             stringResource(R.string.whatsnew_version, versionName),
             color = Metro.Subtle,
-            fontSize = 16.sp,
+            style = Metro.Type.Small,
             fontWeight = FontWeight.Light,
             modifier = Modifier.padding(bottom = 20.dp),
         )
@@ -69,13 +67,13 @@ fun WhatsNewScreen(accent: Color, versionName: String, onDone: () -> Unit) {
                     Text(
                         "■",
                         color = Metro.textAccent(accent),
-                        fontSize = 11.sp,
+                        style = Metro.Type.Tiny,
                         modifier = Modifier.padding(top = 7.dp, end = 12.dp),
                     )
                     Text(
                         stringResource(res),
                         color = Metro.Foreground,
-                        fontSize = 19.sp,
+                        style = Metro.Type.Body,
                         fontWeight = FontWeight.Light,
                         lineHeight = 25.sp,
                     )

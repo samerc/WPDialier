@@ -5,8 +5,22 @@ import android.telecom.Call
 import androidx.activity.ComponentActivity
 import androidx.activity.addCallback
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
+import com.fancyshark.wpdialer.screens.decodeSampled
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.selection.toggleable
@@ -263,15 +277,14 @@ private fun EndedScreen(name: String, onFinished: () -> Unit) {
         Text(
             stringResource(com.fancyshark.wpdialer.R.string.call_app_title),
             color = Metro.Foreground,
-            fontSize = 15.sp,
-            letterSpacing = 2.sp,
+            style = Metro.Type.AppTitle,
         )
         Spacer(Modifier.height(24.dp))
-        Text(name, color = Metro.Foreground, fontSize = 40.sp, fontWeight = FontWeight.Light)
+        Text(name, color = Metro.Foreground, style = Metro.Type.Header)
         Text(
             reason ?: stringResource(com.fancyshark.wpdialer.R.string.call_ended),
             color = Metro.Subtle,
-            fontSize = 18.sp,
+            style = Metro.Type.Body,
             fontWeight = FontWeight.Light,
         )
     }
@@ -295,18 +308,16 @@ private fun SimChooserScreen(name: String, call: Call?) {
         Text(
             stringResource(com.fancyshark.wpdialer.R.string.main_choose_sim_title),
             color = Metro.Foreground,
-            fontSize = 15.sp,
-            letterSpacing = 2.sp,
+            style = Metro.Type.AppTitle,
         )
         Spacer(Modifier.height(24.dp))
-        Text(name, color = Metro.Foreground, fontSize = 40.sp, fontWeight = FontWeight.Light)
+        Text(name, color = Metro.Foreground, style = Metro.Type.Header)
         Spacer(Modifier.height(24.dp))
         options.forEach { sim ->
             Text(
                 sim.label,
                 color = Metro.Foreground,
-                fontSize = 28.sp,
-                fontWeight = FontWeight.Light,
+                style = Metro.Type.SubHeader,
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable(role = androidx.compose.ui.semantics.Role.Button) {
@@ -325,6 +336,139 @@ private fun SimChooserScreen(name: String, call: Call?) {
     }
 }
 
+// Full-bleed caller photo (WP8 in-call): decoded off the main thread at
+// screen-ish resolution — a display photo is up to 1080px or more, and
+// inSampleSize keeps a huge one from costing a full-size bitmap.
+private const val HERO_PHOTO_PX = 1080
+
+// Below this height the photo band can't hold the caller lines; the
+// screen falls back to the classic layout instead of clipping them.
+private val HERO_MIN_HEIGHT = 220.dp
+
+// Under this height the hero name drops to one line.
+private val HERO_ROOMY_HEIGHT = 280.dp
+
+/** The caller's contact photo for the hero: loading, decoded, or none. */
+private sealed interface HeroPhoto {
+    data object None : HeroPhoto
+    data object Loading : HeroPhoto
+    class Ready(val bitmap: ImageBitmap) : HeroPhoto
+}
+
+@Composable
+private fun rememberHeroPhoto(photoUri: String?): HeroPhoto {
+    val context = LocalContext.current
+    val photo by produceState<HeroPhoto>(
+        if (photoUri == null) HeroPhoto.None else HeroPhoto.Loading,
+        photoUri,
+    ) {
+        value = if (photoUri == null) {
+            HeroPhoto.None
+        } else {
+            // A swap to another caller must not keep showing the old face.
+            value = HeroPhoto.Loading
+            withContext(Dispatchers.IO) {
+                decodeSampled(context, android.net.Uri.parse(photoUri), HERO_PHOTO_PX)
+            }?.asImageBitmap()?.let { HeroPhoto.Ready(it) } ?: HeroPhoto.None
+        }
+    }
+    return photo
+}
+
+/**
+ * WP8 caller hero: the photo fills the full width (center-cropped to
+ * [height]) with gradient scrims so white text stays readable on any
+ * photo. While the photo decodes it's a plain accent band (text in the
+ * accent's contrast color), so the layout doesn't jump when it lands.
+ * [content] gets the text and subtle-text colors to use on top.
+ */
+@Composable
+private fun CallerHero(
+    photo: ImageBitmap?,
+    accent: Color,
+    height: Dp,
+    content: @Composable BoxScope.(fg: Color, subtle: Color) -> Unit,
+) {
+    val fg = if (photo != null) Color.White else Metro.onAccent(accent)
+    val subtle = fg.copy(alpha = 0.8f)
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .height(height)
+            .clipToBounds()
+            .background(accent),
+    ) {
+        if (photo != null) {
+            Image(
+                photo,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.matchParentSize(),
+            )
+            // Bottom scrim under the caller lines, a lighter one under the
+            // app title at the top.
+            Box(
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .fillMaxHeight(0.6f)
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(Color.Transparent, Color.Black.copy(alpha = 0.72f)),
+                        ),
+                    ),
+            )
+            Box(
+                Modifier
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth()
+                    .height(96.dp)
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(Color.Black.copy(alpha = 0.45f), Color.Transparent),
+                        ),
+                    ),
+            )
+        }
+        content(fg, subtle)
+    }
+}
+
+/**
+ * STIR/SHAKEN: the network vouches for (or rejects) the number. Nothing is
+ * shown for unverified calls, which are most of them. [onHero] is the text
+ * color when drawn over the caller photo/band (accent text would vanish
+ * on an accent band).
+ */
+@Composable
+private fun VerifiedBadge(verified: Boolean, accent: Color, onHero: Color? = null) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(
+            if (verified) Icons.Filled.CheckCircle else Icons.Filled.Warning,
+            contentDescription = null,
+            tint = when {
+                !verified -> Metro.Red
+                onHero != null -> onHero
+                else -> Metro.textAccent(accent)
+            },
+            modifier = Modifier.size(18.dp),
+        )
+        Text(
+            stringResource(
+                if (verified) {
+                    com.fancyshark.wpdialer.R.string.call_verified
+                } else {
+                    com.fancyshark.wpdialer.R.string.call_spoof_warning
+                },
+            ),
+            color = if (verified) onHero?.copy(alpha = 0.8f) ?: Metro.Subtle else Metro.Red,
+            style = Metro.Type.Small,
+            fontWeight = FontWeight.Light,
+            modifier = Modifier.padding(start = 6.dp),
+        )
+    }
+}
+
 @Composable
 private fun IncomingScreen(
     contactName: String?,
@@ -338,19 +482,159 @@ private fun IncomingScreen(
     val country by produceState<String?>(null, number, isSavedContact) {
         if (!isSavedContact) value = Repo.callerCountry(context, number)
     }
+    // Only a real saved contact earns the photo (CNAP names never do).
+    val heroPhoto = rememberHeroPhoto(if (isSavedContact) photoUri else null)
+    val shownName = contactName
+        ?: number.ifBlank { stringResource(com.fancyshark.wpdialer.R.string.call_unknown) }
+    val nameStyle = if ((contactName ?: number).length > 14) Metro.Type.Header else Metro.Type.PageTitle
 
-    Column(Modifier.fillMaxSize().padding(24.dp)) {
+    Column(Modifier.fillMaxSize()) {
+        // Caller area takes whatever the buttons leave — the answer/ignore
+        // row can never be pushed off a short screen.
+        BoxWithConstraints(Modifier.fillMaxWidth().weight(1f)) {
+            val heroHeight = minOf(maxWidth, maxHeight)
+            if (heroPhoto != HeroPhoto.None && heroHeight >= HERO_MIN_HEIGHT) {
+                CallerHero(
+                    photo = (heroPhoto as? HeroPhoto.Ready)?.bitmap,
+                    accent = accent,
+                    height = heroHeight,
+                ) { fg, subtle ->
+                    Column(
+                        Modifier
+                            .align(Alignment.TopStart)
+                            .padding(start = 24.dp, end = 24.dp, top = 24.dp),
+                    ) {
+                        Text(
+                            stringResource(com.fancyshark.wpdialer.R.string.call_app_title),
+                            color = fg,
+                            style = Metro.Type.AppTitle,
+                        )
+                        Text(
+                            stringResource(com.fancyshark.wpdialer.R.string.call_incoming),
+                            color = subtle,
+                            style = Metro.Type.Body,
+                            fontWeight = FontWeight.Light,
+                            modifier = Modifier.padding(top = 6.dp),
+                        )
+                    }
+                    Column(
+                        Modifier
+                            .align(Alignment.BottomStart)
+                            .fillMaxWidth()
+                            .padding(horizontal = 24.dp, vertical = 18.dp),
+                    ) {
+                        Text(
+                            shownName,
+                            color = fg,
+                            style = nameStyle,
+                            lineHeight = 52.sp,
+                            maxLines = if (heroHeight >= HERO_ROOMY_HEIGHT) 2 else 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        if (contactName != null && number.isNotBlank()) {
+                            Text(
+                                number,
+                                color = subtle,
+                                style = Metro.Type.Large,
+                                fontWeight = FontWeight.Light,
+                                maxLines = 1,
+                            )
+                        }
+                        if (verified != null) {
+                            Spacer(Modifier.height(8.dp))
+                            VerifiedBadge(verified, accent, onHero = fg)
+                        }
+                    }
+                }
+            } else {
+                IncomingClassic(
+                    contactName = contactName,
+                    shownName = shownName,
+                    nameStyle = nameStyle,
+                    isSavedContact = isSavedContact,
+                    number = number,
+                    photoUri = photoUri,
+                    country = country,
+                    accent = accent,
+                    verified = verified,
+                )
+            }
+        }
+        Column(Modifier.padding(start = 24.dp, end = 24.dp, bottom = 24.dp)) {
+            Spacer(Modifier.height(16.dp))
+            var showReplies by remember { mutableStateOf(false) }
+            val replies by com.fancyshark.wpdialer.data.AppPrefs.rejectMessages.collectAsState()
+            if (showReplies) {
+                replies.forEach { message ->
+                    Text(
+                        message,
+                        color = Metro.textAccent(accent),
+                        style = Metro.Type.Body,
+                        fontWeight = FontWeight.Light,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { CallManager.rejectWithMessage(message) }
+                            .padding(vertical = 8.dp),
+                    )
+                }
+                Spacer(Modifier.height(10.dp))
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                MetroButton(
+                    stringResource(com.fancyshark.wpdialer.R.string.call_answer),
+                    fill = accent,
+                    modifier = Modifier.weight(1f),
+                ) { CallManager.answer() }
+                MetroButton(
+                    stringResource(com.fancyshark.wpdialer.R.string.call_ignore),
+                    modifier = Modifier.weight(1f),
+                ) { CallManager.reject() }
+            }
+            Spacer(Modifier.height(10.dp))
+            Text(
+                if (showReplies) {
+                    stringResource(com.fancyshark.wpdialer.R.string.call_hide_text_replies)
+                } else {
+                    stringResource(com.fancyshark.wpdialer.R.string.call_text_reply)
+                },
+                color = Metro.Subtle,
+                style = Metro.Type.Body,
+                fontWeight = FontWeight.Light,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { showReplies = !showReplies }
+                    .padding(vertical = 6.dp),
+            )
+            Spacer(Modifier.height(10.dp))
+        }
+    }
+}
+
+/** No photo (or no room for one): title top-left, caller block centered. */
+@Composable
+private fun IncomingClassic(
+    contactName: String?,
+    shownName: String,
+    nameStyle: androidx.compose.ui.text.TextStyle,
+    isSavedContact: Boolean,
+    number: String,
+    photoUri: String?,
+    country: String?,
+    accent: Color,
+    verified: Boolean?,
+) {
+    Column(Modifier.fillMaxSize().padding(start = 24.dp, end = 24.dp, top = 24.dp)) {
         Text(
             stringResource(com.fancyshark.wpdialer.R.string.call_app_title),
             color = Metro.Foreground,
-            fontSize = 15.sp,
-            letterSpacing = 2.sp,
+            style = Metro.Type.AppTitle,
         )
         Spacer(Modifier.height(6.dp))
         Text(
             stringResource(com.fancyshark.wpdialer.R.string.call_incoming),
             color = Metro.Subtle,
-            fontSize = 17.sp,
+            style = Metro.Type.Body,
             fontWeight = FontWeight.Light,
         )
         Spacer(Modifier.weight(1f))
@@ -363,13 +647,9 @@ private fun IncomingScreen(
                 Spacer(Modifier.height(24.dp))
             }
             Text(
-                contactName
-                    ?: number.ifBlank {
-                        stringResource(com.fancyshark.wpdialer.R.string.call_unknown)
-                    },
+                shownName,
                 color = Metro.Foreground,
-                fontSize = if ((contactName ?: number).length > 14) 38.sp else 48.sp,
-                fontWeight = FontWeight.Light,
+                style = nameStyle,
                 lineHeight = 52.sp,
                 textAlign = TextAlign.Center,
             )
@@ -378,7 +658,7 @@ private fun IncomingScreen(
                 Text(
                     number,
                     color = Metro.Subtle,
-                    fontSize = 21.sp,
+                    style = Metro.Type.Large,
                     fontWeight = FontWeight.Light,
                     textAlign = TextAlign.Center,
                 )
@@ -386,86 +666,103 @@ private fun IncomingScreen(
             if (!isSavedContact && country != null) {
                 Spacer(Modifier.height(6.dp))
                 Text(
-                    country ?: "",
+                    country,
                     color = Metro.Subtle,
-                    fontSize = 16.sp,
+                    style = Metro.Type.Small,
                     fontWeight = FontWeight.Light,
                     textAlign = TextAlign.Center,
                 )
             }
-            // STIR/SHAKEN: the network vouches for (or rejects) the number.
-            // Nothing is shown for unverified calls, which are most of them.
             if (verified != null) {
                 Spacer(Modifier.height(10.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        if (verified) Icons.Filled.CheckCircle else Icons.Filled.Warning,
-                        contentDescription = null,
-                        tint = if (verified) Metro.textAccent(accent) else Metro.Red,
-                        modifier = Modifier.size(18.dp),
-                    )
-                    Text(
-                        stringResource(
-                            if (verified) {
-                                com.fancyshark.wpdialer.R.string.call_verified
-                            } else {
-                                com.fancyshark.wpdialer.R.string.call_spoof_warning
-                            },
-                        ),
-                        color = if (verified) Metro.Subtle else Metro.Red,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Light,
-                        modifier = Modifier.padding(start = 6.dp),
-                    )
-                }
+                VerifiedBadge(verified, accent)
             }
         }
         Spacer(Modifier.weight(1f))
-        var showReplies by remember { mutableStateOf(false) }
-        val replies by com.fancyshark.wpdialer.data.AppPrefs.rejectMessages.collectAsState()
-        if (showReplies) {
-            replies.forEach { message ->
-                Text(
-                    message,
-                    color = accent,
-                    fontSize = 19.sp,
-                    fontWeight = FontWeight.Light,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { CallManager.rejectWithMessage(message) }
-                        .padding(vertical = 8.dp),
-                )
-            }
-            Spacer(Modifier.height(10.dp))
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            MetroButton(
-                stringResource(com.fancyshark.wpdialer.R.string.call_answer),
-                fill = accent,
-                modifier = Modifier.weight(1f),
-            ) { CallManager.answer() }
-            MetroButton(
-                stringResource(com.fancyshark.wpdialer.R.string.call_ignore),
-                modifier = Modifier.weight(1f),
-            ) { CallManager.reject() }
-        }
-        Spacer(Modifier.height(10.dp))
+    }
+}
+
+/**
+ * Classic WP 8.1 caller panel on chrome gray: used when there's no photo,
+ * no room for the hero, or during RTT. A photo that failed to decode still
+ * gets its small tile (initials fallback).
+ */
+@Composable
+private fun CallInfoPanel(
+    status: String,
+    name: String,
+    numberLine: String?,
+    simLabel: String?,
+    accent: Color,
+    photoUri: String?,
+) {
+    Column(Modifier.fillMaxWidth().background(Metro.Key).padding(24.dp)) {
         Text(
-            if (showReplies) {
-                stringResource(com.fancyshark.wpdialer.R.string.call_hide_text_replies)
-            } else {
-                stringResource(com.fancyshark.wpdialer.R.string.call_text_reply)
-            },
-            color = Metro.Subtle,
-            fontSize = 17.sp,
-            fontWeight = FontWeight.Light,
-            textAlign = TextAlign.Center,
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { showReplies = !showReplies }
-                .padding(vertical = 6.dp),
+            stringResource(com.fancyshark.wpdialer.R.string.call_app_title),
+            color = Metro.Foreground,
+            style = Metro.Type.AppTitle,
         )
-        Spacer(Modifier.height(10.dp))
+        Spacer(Modifier.height(28.dp))
+        CallInfoLines(
+            status = status,
+            statusColor = Metro.textAccent(accent),
+            name = name,
+            numberLine = numberLine,
+            simLabel = simLabel,
+            fg = Metro.Foreground,
+            subtle = Metro.Subtle,
+            leading = if (photoUri != null) {
+                { ContactTile(name, photoUri, accent, 72.dp) }
+            } else {
+                null
+            },
+        )
+    }
+}
+
+/** Status/timer, name, number and SIM lines, shared by panel and hero. */
+@Composable
+private fun CallInfoLines(
+    status: String,
+    statusColor: Color,
+    name: String,
+    numberLine: String?,
+    simLabel: String?,
+    fg: Color,
+    subtle: Color,
+    nameMaxLines: Int = 2,
+    leading: (@Composable () -> Unit)? = null,
+) {
+    Text(status, color = statusColor, style = Metro.Type.Body)
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        leading?.invoke()
+        Text(
+            name,
+            color = fg,
+            style = Metro.Type.Header,
+            lineHeight = 46.sp,
+            maxLines = nameMaxLines,
+            overflow = TextOverflow.Ellipsis,
+            modifier = if (leading != null) Modifier.padding(start = 14.dp) else Modifier,
+        )
+    }
+    if (numberLine != null) {
+        Text(
+            numberLine,
+            color = subtle,
+            style = Metro.Type.Body,
+            fontWeight = FontWeight.Light,
+            maxLines = 1,
+        )
+    }
+    if (simLabel != null) {
+        Text(
+            simLabel,
+            color = subtle,
+            style = Metro.Type.Small,
+            fontWeight = FontWeight.Light,
+            modifier = Modifier.padding(top = 2.dp),
+        )
     }
 }
 
@@ -543,66 +840,76 @@ private fun ActiveScreen(
     val postDialWait by CallManager.postDialWait.collectAsState()
     val rttRequest by CallManager.rttRequest.collectAsState()
 
+    // On dual-SIM devices, show which SIM carries this call.
+    val simLabel = remember(call) {
+        runCatching {
+            val sims = com.fancyshark.wpdialer.data.Sims.options(context2)
+            if (sims.size > 1) {
+                sims.firstOrNull { it.handle == call?.details?.accountHandle }?.label
+            } else {
+                null
+            }
+        }.getOrNull()
+    }
+    val numberLine = if (number.isNotBlank() && name != number) Repo.pretty(context2, number) else null
+    val heroPhoto = rememberHeroPhoto(photoUri)
+
     var showBtPicker by remember { mutableStateOf(false) }
     Box(Modifier.fillMaxSize().imePadding()) {
     Column(Modifier.fillMaxSize()) {
-        // WP 8.1 places the caller info on a chrome-gray panel.
-        Column(Modifier.fillMaxWidth().background(Metro.Key).padding(24.dp)) {
-        Text(
-            stringResource(com.fancyshark.wpdialer.R.string.call_app_title),
-            color = Metro.Foreground,
-            fontSize = 15.sp,
-            letterSpacing = 2.sp,
-        )
-        Spacer(Modifier.height(28.dp))
-        Text(statusLine, color = accent, fontSize = 19.sp, fontWeight = FontWeight.Normal)
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            if (photoUri != null) {
-                ContactTile(name, photoUri, accent, 72.dp)
-                Spacer(Modifier.height(0.dp))
-            }
-            Text(
-                name,
-                color = Metro.Foreground,
-                fontSize = 42.sp,
-                fontWeight = FontWeight.Light,
-                lineHeight = 46.sp,
-                modifier = if (photoUri != null) Modifier.padding(start = 14.dp) else Modifier,
-            )
-        }
-        if (number.isNotBlank() && name != number) {
-            Text(
-                Repo.pretty(context2, number),
-                color = Metro.Subtle,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Light,
-            )
-        }
-        // On dual-SIM devices, show which SIM carries this call.
-        val simLabel = remember(call) {
-            runCatching {
-                val sims = com.fancyshark.wpdialer.data.Sims.options(context2)
-                if (sims.size > 1) {
-                    sims.firstOrNull { it.handle == call?.details?.accountHandle }?.label
+        if (rttActive && !showKeypad) {
+            // The conversation needs the room: compact panel, no photo.
+            CallInfoPanel(statusLine, name, numberLine, simLabel, accent, photoUri)
+            RttPanel(accent, Modifier.weight(1f))
+        } else {
+            // Caller area takes whatever the controls leave: the photo is a
+            // full-width square when there's room, a center-cropped band
+            // when the keypad or a waiting call needs space, and the classic
+            // gray panel when even that won't hold the caller lines.
+            BoxWithConstraints(Modifier.fillMaxWidth().weight(1f)) {
+                val heroHeight = minOf(maxWidth, maxHeight)
+                if (heroPhoto != HeroPhoto.None && heroHeight >= HERO_MIN_HEIGHT) {
+                    CallerHero(
+                        photo = (heroPhoto as? HeroPhoto.Ready)?.bitmap,
+                        accent = accent,
+                        height = heroHeight,
+                    ) { fg, subtle ->
+                        Text(
+                            stringResource(com.fancyshark.wpdialer.R.string.call_app_title),
+                            color = fg,
+                            style = Metro.Type.AppTitle,
+                            modifier = Modifier
+                                .align(Alignment.TopStart)
+                                .padding(start = 24.dp, end = 24.dp, top = 24.dp),
+                        )
+                        Column(
+                            Modifier
+                                .align(Alignment.BottomStart)
+                                .fillMaxWidth()
+                                .padding(horizontal = 24.dp, vertical = 18.dp),
+                        ) {
+                            CallInfoLines(
+                                status = statusLine,
+                                statusColor = fg,
+                                name = name,
+                                numberLine = numberLine,
+                                simLabel = simLabel,
+                                fg = fg,
+                                subtle = subtle,
+                                nameMaxLines = if (heroHeight >= HERO_ROOMY_HEIGHT) 2 else 1,
+                            )
+                        }
+                    }
                 } else {
-                    null
+                    CallInfoPanel(statusLine, name, numberLine, simLabel, accent, photoUri)
                 }
-            }.getOrNull()
-        }
-        if (simLabel != null) {
-            Text(
-                simLabel,
-                color = Metro.Subtle,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Light,
-                modifier = Modifier.padding(top = 2.dp),
-            )
+            }
         }
 
         if (secondCall != null && secondState == Call.STATE_RINGING) {
-            Spacer(Modifier.height(20.dp))
             Column(
                 Modifier
+                    .padding(start = 24.dp, end = 24.dp, top = 12.dp)
                     .fillMaxWidth()
                     .border(2.dp, accent)
                     .padding(12.dp),
@@ -610,7 +917,7 @@ private fun ActiveScreen(
                 Text(
                     stringResource(com.fancyshark.wpdialer.R.string.call_incoming),
                     color = Metro.Subtle,
-                    fontSize = 14.sp,
+                    style = Metro.Type.Small,
                     fontWeight = FontWeight.Light,
                 )
                 // Keyed to detailsTick: Telecom's name may arrive mid-ring.
@@ -625,9 +932,9 @@ private fun ActiveScreen(
                             stringResource(com.fancyshark.wpdialer.R.string.call_unknown)
                         },
                     color = Metro.Foreground,
-                    fontSize = 26.sp,
-                    fontWeight = FontWeight.Light,
+                    style = Metro.Type.SubHeader,
                     maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
                 Spacer(Modifier.height(10.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -645,12 +952,7 @@ private fun ActiveScreen(
                 }
             }
         }
-        }
-        if (rttActive && !showKeypad) {
-            RttPanel(accent, Modifier.weight(1f))
-        } else {
-            Spacer(Modifier.weight(1f))
-        }
+        Spacer(Modifier.height(12.dp))
         Column(Modifier.padding(horizontal = 24.dp)) {
 
         if (showKeypad) {
@@ -660,7 +962,7 @@ private fun ActiveScreen(
                 Text(
                     stringResource(com.fancyshark.wpdialer.R.string.call_dtmf_after_answer),
                     color = Metro.Subtle,
-                    fontSize = 14.sp,
+                    style = Metro.Type.Small,
                     fontWeight = FontWeight.Light,
                     modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
                 )
@@ -671,8 +973,7 @@ private fun ActiveScreen(
             Text(
                 if (typed.isEmpty()) " " else typed.takeLast(18),
                 color = Metro.Foreground,
-                fontSize = 30.sp,
-                fontWeight = FontWeight.Light,
+                style = Metro.Type.SubHeader,
                 maxLines = 1,
                 modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
             )
@@ -805,16 +1106,14 @@ private fun ActiveScreen(
                 Text(
                     stringResource(com.fancyshark.wpdialer.R.string.call_choose_device),
                     color = Metro.Foreground,
-                    fontSize = 15.sp,
-                    letterSpacing = 2.sp,
+                    style = Metro.Type.AppTitle,
                     modifier = Modifier.padding(bottom = 16.dp),
                 )
                 // "phone" drops Bluetooth entirely (default route).
                 Text(
                     stringResource(com.fancyshark.wpdialer.R.string.call_device_phone),
                     color = Metro.Foreground,
-                    fontSize = 26.sp,
-                    fontWeight = FontWeight.Light,
+                    style = Metro.Type.SubHeader,
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable {
@@ -830,8 +1129,7 @@ private fun ActiveScreen(
                     Text(
                         deviceName,
                         color = Metro.Foreground,
-                        fontSize = 26.sp,
-                        fontWeight = FontWeight.Light,
+                        style = Metro.Type.SubHeader,
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable {
@@ -892,13 +1190,12 @@ private fun RttPanel(accent: Color, modifier: Modifier = Modifier) {
         Text(
             stringResource(com.fancyshark.wpdialer.R.string.call_rtt_title),
             color = Metro.Foreground,
-            fontSize = 15.sp,
-            letterSpacing = 2.sp,
+            style = Metro.Type.AppTitle,
         )
         Text(
             transcript,
             color = Metro.Foreground,
-            fontSize = 20.sp,
+            style = Metro.Type.Large,
             fontWeight = FontWeight.Light,
             modifier = Modifier
                 .weight(1f)
@@ -954,7 +1251,7 @@ private fun IconTile(
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Icon(icon, contentDescription = null, tint = fg, modifier = Modifier.size(20.dp))
-            Text(label, color = fg, fontSize = 11.sp, modifier = Modifier.padding(top = 3.dp))
+            Text(label, color = fg, style = Metro.Type.Tiny, modifier = Modifier.padding(top = 3.dp))
         }
     }
 }
@@ -1007,8 +1304,7 @@ private fun DtmfPad() {
                             Text(
                                 key,
                                 color = Metro.Foreground,
-                                fontSize = 26.sp,
-                                fontWeight = FontWeight.Light,
+                                style = Metro.Type.SubHeader,
                             )
                         }
                     }

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- ContactDetailScreen.kt pivot (profile | history | notes) -->
+    <string name="contact_pivot_notes">notes</string>
+    <string name="contact_pivot_history_empty">no calls yet</string>
+    <string name="contact_pivot_notes_empty">no call notes</string>
+    <string name="contact_pivot_notes_hint">notes you add to calls with this contact show up here</string>
+    <string name="contact_pivot_copy_number">copy number</string>
+    <!-- 1 = phone type label ("mobile"), 2 = formatted number -->
+    <string name="contact_pivot_number_line">%1$s  %2$s</string>
+</resources>

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- HomePages.kt empty states (design batch) -->
+    <string name="motion_history_empty">कोई हालिया कॉल नहीं</string>
+    <string name="motion_speed_dial_empty">स्पीड डायल खाली है</string>
+    <string name="motion_people_empty_hint">किसी को जोड़ने के लिए नीचे \"नया\" टैप करें।</string>
+</resources>

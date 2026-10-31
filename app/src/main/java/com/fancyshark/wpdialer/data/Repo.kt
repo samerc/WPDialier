@@ -1132,4 +1132,81 @@ object Repo {
                 ) > 0
             }.getOrDefault(false).also { if (it) CallNotes.remove(context, ids) }
         }
+
+    /**
+     * Every call-log row with any of [numbers] — one person's calls across
+     * all their lines — newest first, with the SIM each went through.
+     * Matching is in code via [numbersMatch] (SQL can't unify national and
+     * E.164 spellings), over the newest [scanLimit] rows; the platform
+     * caps the log near that size anyway. Empty when no number is usable
+     * or the log can't be read.
+     */
+    suspend fun callsWith(
+        context: Context,
+        numbers: Collection<String>,
+        scanLimit: Int = 5000,
+    ): List<ContactCall> = withContext(Dispatchers.IO) {
+        val wanted = numbers.filter { numberDigits(it).isNotEmpty() || isOpaque(networkPortion(it)) }
+            .distinctBy { exactNumberKey(context, it) }
+        if (wanted.isEmpty()) return@withContext emptyList()
+        val out = mutableListOf<ContactCall>()
+        runCatching {
+            val uri = CallLog.Calls.CONTENT_URI.buildUpon()
+                .appendQueryParameter(CallLog.Calls.LIMIT_PARAM_KEY, scanLimit.toString())
+                .build()
+            context.contentResolver.query(
+                uri,
+                arrayOf(
+                    CallLog.Calls._ID,
+                    CallLog.Calls.NUMBER,
+                    CallLog.Calls.CACHED_NAME,
+                    CallLog.Calls.TYPE,
+                    CallLog.Calls.DATE,
+                    CallLog.Calls.DURATION,
+                    CallLog.Calls.PHONE_ACCOUNT_COMPONENT_NAME,
+                    CallLog.Calls.PHONE_ACCOUNT_ID,
+                ),
+                null,
+                null,
+                "${CallLog.Calls.DATE} DESC",
+            )?.use { c ->
+                var scanned = 0
+                while (c.moveToNext() && scanned++ < scanLimit) {
+                    val number = c.getString(1) ?: continue
+                    if (number.isBlank()) continue
+                    val ours = wanted.firstOrNull { numbersMatch(it, number) } ?: continue
+                    val component = c.getString(6)
+                    val accountId = c.getString(7)
+                    out += ContactCall(
+                        item = HistoryItem(
+                            id = c.getLong(0),
+                            number = number,
+                            name = c.getString(2),
+                            type = c.getInt(3),
+                            date = c.getLong(4),
+                            duration = c.getLong(5),
+                        ),
+                        contactNumber = ours,
+                        phoneAccount = if (component != null && accountId != null) {
+                            "$component/$accountId"
+                        } else {
+                            null
+                        },
+                    )
+                }
+            }
+        }
+        out
+    }
 }
+
+/**
+ * One call with a contact, from [Repo.callsWith]: the log row, which of the
+ * contact's own numbers it matched (for the type label), and the phone
+ * account flattened like [Sims.flatten] (null when the log has none).
+ */
+data class ContactCall(
+    val item: HistoryItem,
+    val contactNumber: String,
+    val phoneAccount: String?,
+)

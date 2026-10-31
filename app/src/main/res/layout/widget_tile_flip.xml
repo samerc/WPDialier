@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Flipping app tile: front face, then every few seconds the back face
+     (missed-call count) peeks up. ViewFlipper is RemoteViews-safe and
+     pauses itself while the home screen is hidden or the screen is off. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#FF0050EF">
+
+    <ViewFlipper
+        android:id="@+id/widget_flipper"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:autoStart="true"
+        android:flipInterval="8000"
+        android:inAnimation="@anim/tile_peek_in"
+        android:outAnimation="@anim/tile_peek_out">
+
+        <include layout="@layout/widget_tile_front" />
+
+        <include layout="@layout/widget_tile_back" />
+    </ViewFlipper>
+</FrameLayout>

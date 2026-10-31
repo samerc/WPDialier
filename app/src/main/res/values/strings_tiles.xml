@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Live tile options (screens/SettingsScreen.kt, widget/) -->
+    <string name="settings_tiles_animate_title">Animate live tiles</string>
+    <string name="settings_tiles_animate_hint">home-screen tiles flip now and then to show a contact\'s name or your missed calls. Tiles stay still when animations are turned off on your phone.</string>
+    <string name="settings_tiles_transparent_title">Transparent live tiles</string>
+    <string name="settings_tiles_transparent_hint">tiles let your wallpaper show through the accent color.</string>
+    <!-- Back face of a flipping tile, under the big count. -->
+    <plurals name="tile_back_missed">
+        <item quantity="one">missed call</item>
+        <item quantity="other">missed calls</item>
+    </plurals>
+</resources>

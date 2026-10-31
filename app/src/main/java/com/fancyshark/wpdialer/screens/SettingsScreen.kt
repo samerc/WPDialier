@@ -103,7 +103,7 @@ private fun WpToggleRow(
     Text(
         title,
         color = Metro.textAccent(accent),
-        fontSize = 14.sp,
+        style = Metro.Type.Small,
         fontWeight = FontWeight.SemiBold,
         letterSpacing = 1.sp,
     )
@@ -118,7 +118,7 @@ private fun WpToggleRow(
                 stringResource(R.string.settings_toggle_off)
             },
             color = Metro.Foreground,
-            fontSize = 22.sp,
+            style = Metro.Type.Large,
             fontWeight = FontWeight.Light,
             maxLines = 1,
             modifier = Modifier
@@ -210,29 +210,27 @@ fun SettingsScreen(
         Text(
             stringResource(R.string.settings_header),
             color = Metro.Foreground,
-            fontSize = 15.sp,
-            letterSpacing = 2.sp,
+            style = Metro.Type.AppTitle,
             modifier = Modifier.padding(top = 18.dp),
         )
         Text(
             stringResource(R.string.settings_title),
             color = Metro.Foreground,
-            fontSize = 48.sp,
-            fontWeight = FontWeight.Light,
+            style = Metro.Type.PageTitle,
         )
         Spacer(Modifier.height(18.dp))
 
         Text(
             stringResource(R.string.settings_accent_title),
             color = accentText,
-            fontSize = 14.sp,
+            style = Metro.Type.Small,
             fontWeight = FontWeight.SemiBold,
             letterSpacing = 1.sp,
         )
         Text(
             accentDisplayName(accent.name),
             color = accentText,
-            fontSize = 22.sp,
+            style = Metro.Type.Large,
             fontWeight = FontWeight.Light,
             modifier = Modifier.padding(top = 2.dp, bottom = 10.dp),
         )
@@ -269,7 +267,7 @@ fun SettingsScreen(
         Text(
             stringResource(R.string.settings_haptic_hint),
             color = Metro.Subtle,
-            fontSize = 13.sp,
+            style = Metro.Type.Small,
             fontWeight = FontWeight.Light,
             modifier = Modifier.padding(top = 6.dp),
         )
@@ -289,7 +287,7 @@ fun SettingsScreen(
                             },
                         ),
                         color = if (level == i) accentText else Metro.Subtle,
-                        fontSize = 20.sp,
+                        style = Metro.Type.Large,
                         fontWeight = if (level == i) FontWeight.Normal else FontWeight.Light,
                         modifier = Modifier.clickable {
                             Haptics.setLevel(context, i)
@@ -305,7 +303,7 @@ fun SettingsScreen(
         Text(
             stringResource(R.string.settings_font_title),
             color = accentText,
-            fontSize = 14.sp,
+            style = Metro.Type.Small,
             fontWeight = FontWeight.SemiBold,
             letterSpacing = 1.sp,
         )
@@ -316,7 +314,7 @@ fun SettingsScreen(
             Text(
                 label,
                 color = if (selawik == value) accentText else Metro.Foreground,
-                fontSize = 22.sp,
+                style = Metro.Type.Large,
                 fontWeight = FontWeight.Light,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -329,7 +327,7 @@ fun SettingsScreen(
         Text(
             stringResource(R.string.settings_language_title),
             color = accentText,
-            fontSize = 14.sp,
+            style = Metro.Type.Small,
             fontWeight = FontWeight.SemiBold,
             letterSpacing = 1.sp,
         )
@@ -337,7 +335,7 @@ fun SettingsScreen(
             languageOptions.firstOrNull { langSelected(it.first) }?.second
                 ?: stringResource(R.string.settings_language_system),
             color = Metro.Foreground,
-            fontSize = 22.sp,
+            style = Metro.Type.Large,
             fontWeight = FontWeight.Light,
             modifier = Modifier
                 .fillMaxWidth()
@@ -349,7 +347,7 @@ fun SettingsScreen(
         Text(
             stringResource(R.string.settings_default_apps_title),
             color = accentText,
-            fontSize = 14.sp,
+            style = Metro.Type.Small,
             fontWeight = FontWeight.SemiBold,
             letterSpacing = 1.sp,
             modifier = Modifier.padding(bottom = 10.dp),
@@ -358,14 +356,14 @@ fun SettingsScreen(
             Text(
                 stringResource(R.string.settings_default_dialer_yes),
                 color = Metro.Foreground,
-                fontSize = 18.sp,
+                style = Metro.Type.Body,
                 fontWeight = FontWeight.Light,
             )
         } else {
             Text(
                 stringResource(R.string.settings_default_dialer_prompt),
                 color = Metro.Foreground,
-                fontSize = 16.sp,
+                style = Metro.Type.Small,
                 fontWeight = FontWeight.Light,
                 modifier = Modifier.padding(bottom = 12.dp),
             )
@@ -402,14 +400,14 @@ fun SettingsScreen(
             Text(
                 stringResource(R.string.settings_google_disabled_title),
                 color = accentText,
-                fontSize = 14.sp,
+                style = Metro.Type.Small,
                 fontWeight = FontWeight.SemiBold,
                 letterSpacing = 1.sp,
             )
             Text(
                 stringResource(R.string.settings_google_disabled_body),
                 color = Metro.Foreground,
-                fontSize = 15.sp,
+                style = Metro.Type.Small,
                 fontWeight = FontWeight.Light,
                 modifier = Modifier.padding(top = 6.dp, bottom = 10.dp),
             )
@@ -432,14 +430,14 @@ fun SettingsScreen(
             Text(
                 stringResource(R.string.settings_dup_notif_title),
                 color = accentText,
-                fontSize = 14.sp,
+                style = Metro.Type.Small,
                 fontWeight = FontWeight.SemiBold,
                 letterSpacing = 1.sp,
             )
             Text(
                 stringResource(R.string.settings_dup_notif_body),
                 color = Metro.Foreground,
-                fontSize = 15.sp,
+                style = Metro.Type.Small,
                 fontWeight = FontWeight.Light,
                 modifier = Modifier.padding(top = 6.dp, bottom = 10.dp),
             )
@@ -461,7 +459,7 @@ fun SettingsScreen(
             Text(
                 stringResource(R.string.settings_dup_notif_locked_hint),
                 color = Metro.Subtle,
-                fontSize = 14.sp,
+                style = Metro.Type.Small,
                 fontWeight = FontWeight.Light,
                 modifier = Modifier.padding(top = 12.dp, bottom = 10.dp),
             )
@@ -486,7 +484,7 @@ fun SettingsScreen(
         Text(
             stringResource(R.string.settings_theme_title),
             color = accentText,
-            fontSize = 14.sp,
+            style = Metro.Type.Small,
             fontWeight = FontWeight.SemiBold,
             letterSpacing = 1.sp,
         )
@@ -498,7 +496,7 @@ fun SettingsScreen(
             Text(
                 label,
                 color = if (themeMode == mode) accentText else Metro.Foreground,
-                fontSize = 22.sp,
+                style = Metro.Type.Large,
                 fontWeight = FontWeight.Light,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -519,7 +517,7 @@ fun SettingsScreen(
         Text(
             stringResource(R.string.settings_relative_times_hint),
             color = Metro.Subtle,
-            fontSize = 13.sp,
+            style = Metro.Type.Small,
             fontWeight = FontWeight.Light,
             modifier = Modifier.padding(top = 6.dp),
         )
@@ -530,7 +528,7 @@ fun SettingsScreen(
         Text(
             stringResource(R.string.settings_one_handed_lists_hint),
             color = Metro.Subtle,
-            fontSize = 13.sp,
+            style = Metro.Type.Small,
             fontWeight = FontWeight.Light,
             modifier = Modifier.padding(top = 6.dp),
         )
@@ -541,7 +539,30 @@ fun SettingsScreen(
         Text(
             stringResource(R.string.settings_reach_hint),
             color = Metro.Subtle,
-            fontSize = 13.sp,
+            style = Metro.Type.Small,
+            fontWeight = FontWeight.Light,
+            modifier = Modifier.padding(top = 6.dp),
+        )
+
+        // Home-screen live tiles (widget/): both setters repaint placed tiles.
+        Spacer(Modifier.height(30.dp))
+        val animateTiles by AppPrefs.animateTiles.collectAsState()
+        WpToggleRow(stringResource(R.string.settings_tiles_animate_title), animateTiles, accent.color) { AppPrefs.setAnimateTiles(context, it) }
+        Text(
+            stringResource(R.string.settings_tiles_animate_hint),
+            color = Metro.Subtle,
+            style = Metro.Type.Small,
+            fontWeight = FontWeight.Light,
+            modifier = Modifier.padding(top = 6.dp),
+        )
+
+        Spacer(Modifier.height(30.dp))
+        val transparentTiles by AppPrefs.transparentTiles.collectAsState()
+        WpToggleRow(stringResource(R.string.settings_tiles_transparent_title), transparentTiles, accent.color) { AppPrefs.setTransparentTiles(context, it) }
+        Text(
+            stringResource(R.string.settings_tiles_transparent_hint),
+            color = Metro.Subtle,
+            style = Metro.Type.Small,
             fontWeight = FontWeight.Light,
             modifier = Modifier.padding(top = 6.dp),
         )
@@ -550,14 +571,14 @@ fun SettingsScreen(
         Text(
             stringResource(R.string.settings_text_replies_title),
             color = accentText,
-            fontSize = 14.sp,
+            style = Metro.Type.Small,
             fontWeight = FontWeight.SemiBold,
             letterSpacing = 1.sp,
         )
         Text(
             stringResource(R.string.settings_replies_manage, replies.size),
             color = Metro.Foreground,
-            fontSize = 22.sp,
+            style = Metro.Type.Large,
             fontWeight = FontWeight.Light,
             modifier = Modifier
                 .fillMaxWidth()
@@ -572,7 +593,7 @@ fun SettingsScreen(
             Text(
                 stringResource(R.string.settings_default_sim_title),
                 color = accentText,
-                fontSize = 14.sp,
+                style = Metro.Type.Small,
                 fontWeight = FontWeight.SemiBold,
                 letterSpacing = 1.sp,
                 modifier = Modifier.padding(bottom = 4.dp),
@@ -585,7 +606,7 @@ fun SettingsScreen(
                 Text(
                     label,
                     color = if (globalSim == flat) accentText else Metro.Foreground,
-                    fontSize = 22.sp,
+                    style = Metro.Type.Large,
                     fontWeight = FontWeight.Light,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -599,7 +620,7 @@ fun SettingsScreen(
         Text(
             stringResource(R.string.settings_screening_title),
             color = accentText,
-            fontSize = 14.sp,
+            style = Metro.Type.Small,
             fontWeight = FontWeight.SemiBold,
             letterSpacing = 1.sp,
         )
@@ -609,7 +630,7 @@ fun SettingsScreen(
                 else R.string.settings_screening_needs_default,
             ),
             color = Metro.Subtle,
-            fontSize = 13.sp,
+            style = Metro.Type.Small,
             fontWeight = FontWeight.Light,
             modifier = Modifier.padding(top = 4.dp, bottom = 14.dp),
         )
@@ -625,7 +646,7 @@ fun SettingsScreen(
         Text(
             stringResource(R.string.settings_screen_unknown_hint),
             color = Metro.Subtle,
-            fontSize = 13.sp,
+            style = Metro.Type.Small,
             fontWeight = FontWeight.Light,
             modifier = Modifier.padding(top = 6.dp),
         )
@@ -637,7 +658,7 @@ fun SettingsScreen(
         Text(
             stringResource(R.string.settings_screen_spoofed_hint),
             color = Metro.Subtle,
-            fontSize = 13.sp,
+            style = Metro.Type.Small,
             fontWeight = FontWeight.Light,
             modifier = Modifier.padding(top = 6.dp),
         )
@@ -654,7 +675,7 @@ fun SettingsScreen(
         Text(
             stringResource(R.string.settings_blocked_title),
             color = accentText,
-            fontSize = 14.sp,
+            style = Metro.Type.Small,
             fontWeight = FontWeight.SemiBold,
             letterSpacing = 1.sp,
             modifier = Modifier.padding(bottom = 4.dp),
@@ -665,14 +686,14 @@ fun SettingsScreen(
             Text(
                 stringResource(R.string.settings_blocked_needs_default),
                 color = Metro.Subtle,
-                fontSize = 17.sp,
+                style = Metro.Type.Body,
                 fontWeight = FontWeight.Light,
             )
         } else if (blocked.isEmpty()) {
             Text(
                 stringResource(R.string.settings_blocked_none),
                 color = Metro.Foreground,
-                fontSize = 17.sp,
+                style = Metro.Type.Body,
                 fontWeight = FontWeight.Light,
             )
         }
@@ -684,14 +705,14 @@ fun SettingsScreen(
                 Text(
                     Repo.pretty(context, number),
                     color = Metro.Foreground,
-                    fontSize = 19.sp,
+                    style = Metro.Type.Body,
                     fontWeight = FontWeight.Light,
                     modifier = Modifier.weight(1f),
                 )
                 Text(
                     stringResource(R.string.settings_unblock),
                     color = accentText,
-                    fontSize = 16.sp,
+                    style = Metro.Type.Small,
                     modifier = Modifier
                         .clickable(role = Role.Button) { confirmUnblock = rowId to number }
                         .padding(vertical = 12.dp, horizontal = 4.dp),
@@ -703,7 +724,7 @@ fun SettingsScreen(
         Text(
             stringResource(R.string.settings_backup_title),
             color = accentText,
-            fontSize = 14.sp,
+            style = Metro.Type.Small,
             fontWeight = FontWeight.SemiBold,
         )
         val backupScope = androidx.compose.runtime.rememberCoroutineScope()
@@ -743,7 +764,7 @@ fun SettingsScreen(
         Text(
             stringResource(R.string.settings_backup_export),
             color = Metro.Foreground,
-            fontSize = 22.sp,
+            style = Metro.Type.Large,
             fontWeight = FontWeight.Light,
             modifier = Modifier
                 .fillMaxWidth()
@@ -755,7 +776,7 @@ fun SettingsScreen(
         Text(
             stringResource(R.string.settings_backup_restore),
             color = Metro.Foreground,
-            fontSize = 22.sp,
+            style = Metro.Type.Large,
             fontWeight = FontWeight.Light,
             modifier = Modifier
                 .fillMaxWidth()
@@ -769,13 +790,13 @@ fun SettingsScreen(
         Text(
             stringResource(R.string.settings_setup_title),
             color = accentText,
-            fontSize = 14.sp,
+            style = Metro.Type.Small,
             fontWeight = FontWeight.SemiBold,
         )
         Text(
             stringResource(R.string.settings_setup_rerun),
             color = Metro.Foreground,
-            fontSize = 22.sp,
+            style = Metro.Type.Large,
             fontWeight = FontWeight.Light,
             modifier = Modifier
                 .fillMaxWidth()
@@ -789,13 +810,13 @@ fun SettingsScreen(
         Text(
             stringResource(R.string.settings_about_title),
             color = accentText,
-            fontSize = 14.sp,
+            style = Metro.Type.Small,
             fontWeight = FontWeight.SemiBold,
         )
         Text(
             stringResource(R.string.settings_about_link),
             color = Metro.Foreground,
-            fontSize = 22.sp,
+            style = Metro.Type.Large,
             fontWeight = FontWeight.Light,
             modifier = Modifier
                 .fillMaxWidth()
@@ -833,14 +854,12 @@ fun SettingsScreen(
                         com.fancyshark.wpdialer.widget.TileWidget.updateAll(context)
                     }
                     pendingRestore = null
-                    android.widget.Toast.makeText(
-                        context,
+                    com.fancyshark.wpdialer.ui.MetroToast.show(
                         resources.getString(
                             if (ok) R.string.settings_restore_done
                             else R.string.settings_backup_failed,
                         ),
-                        android.widget.Toast.LENGTH_SHORT,
-                    ).show()
+                    )
                 }
             },
             onCancel = { pendingRestore = null },
@@ -852,7 +871,7 @@ fun SettingsScreen(
             Text(
                 stringResource(R.string.settings_language_title),
                 color = Metro.Foreground,
-                fontSize = 16.sp,
+                style = Metro.Type.Small,
                 fontWeight = FontWeight.SemiBold,
                 letterSpacing = 1.sp,
                 modifier = Modifier.padding(bottom = 14.dp),
@@ -861,7 +880,7 @@ fun SettingsScreen(
                 Text(
                     label,
                     color = if (langSelected(tag)) accentText else Metro.Foreground,
-                    fontSize = 24.sp,
+                    style = Metro.Type.Large,
                     fontWeight = FontWeight.Light,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -888,7 +907,7 @@ fun SettingsScreen(
             Text(
                 stringResource(R.string.settings_text_replies_title),
                 color = Metro.Foreground,
-                fontSize = 16.sp,
+                style = Metro.Type.Small,
                 fontWeight = FontWeight.SemiBold,
                 letterSpacing = 1.sp,
                 modifier = Modifier.padding(bottom = 12.dp),
@@ -906,7 +925,7 @@ fun SettingsScreen(
                         Text(
                             message,
                             color = Metro.Foreground,
-                            fontSize = 18.sp,
+                            style = Metro.Type.Body,
                             fontWeight = FontWeight.Light,
                             modifier = Modifier.weight(1f),
                         )

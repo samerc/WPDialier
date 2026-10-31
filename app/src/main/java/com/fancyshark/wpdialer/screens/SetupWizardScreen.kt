@@ -89,8 +89,7 @@ fun SetupWizardScreen(
         Text(
             stringResource(R.string.wizard_app_title),
             color = Metro.Foreground,
-            fontSize = 15.sp,
-            letterSpacing = 2.sp,
+            style = Metro.Type.AppTitle,
         )
         Text(
             when (step) {
@@ -101,8 +100,7 @@ fun SetupWizardScreen(
                 else -> stringResource(R.string.wizard_done_title)
             },
             color = Metro.Foreground,
-            fontSize = 44.sp,
-            fontWeight = FontWeight.Light,
+            style = Metro.Type.PageTitle,
             modifier = Modifier.padding(top = 8.dp, bottom = 22.dp),
         )
         Text(
@@ -114,7 +112,7 @@ fun SetupWizardScreen(
                 else -> stringResource(R.string.wizard_done_body)
             },
             color = Metro.Foreground,
-            fontSize = 18.sp,
+            style = Metro.Type.Body,
             fontWeight = FontWeight.Light,
             lineHeight = 26.sp,
         )
@@ -122,7 +120,7 @@ fun SetupWizardScreen(
             Text(
                 stringResource(R.string.wizard_perms_privacy),
                 color = Metro.Subtle,
-                fontSize = 15.sp,
+                style = Metro.Type.Small,
                 fontWeight = FontWeight.Light,
                 lineHeight = 22.sp,
                 modifier = Modifier.padding(top = 14.dp),

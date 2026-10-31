@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Live-tile flip: the current face slides up and out the top edge. -->
+<translate xmlns:android="http://schemas.android.com/apk/res/android"
+    android:fromYDelta="0"
+    android:toYDelta="-100%"
+    android:duration="650"
+    android:interpolator="@android:interpolator/decelerate_cubic" />

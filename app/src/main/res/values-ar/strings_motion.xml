@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- HomePages.kt empty states (design batch) -->
+    <string name="motion_history_empty">لا توجد مكالمات حديثة</string>
+    <string name="motion_speed_dial_empty">الاتصال السريع فارغ</string>
+    <string name="motion_people_empty_hint">انقر على «جديد» أدناه لإضافة شخص.</string>
+</resources>

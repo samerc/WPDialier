@@ -158,11 +158,9 @@ fun DialpadScreen(
         if (target != null) {
             onCall(target) {}
         } else {
-            android.widget.Toast.makeText(
-                context,
+            com.fancyshark.wpdialer.ui.MetroToast.show(
                 resources.getString(com.fancyshark.wpdialer.R.string.dialpad_speed_dial_empty, key),
-                android.widget.Toast.LENGTH_SHORT,
-            ).show()
+            )
         }
     }
 
@@ -306,14 +304,14 @@ fun DialpadScreen(
                     Text(
                         entry.name,
                         color = Metro.Foreground,
-                        fontSize = 21.sp,
+                        style = Metro.Type.Large,
                         fontWeight = FontWeight.Light,
                         maxLines = 1,
                     )
                     Text(
                         com.fancyshark.wpdialer.data.Repo.pretty(context, entry.number),
                         color = Metro.textAccent(accent),
-                        fontSize = 14.sp,
+                        style = Metro.Type.Small,
                     )
                 }
             }
@@ -429,7 +427,7 @@ private fun CallTile(
         Text(
             stringResource(com.fancyshark.wpdialer.R.string.dialpad_call),
             color = if (pressed) Metro.Background else Metro.onAccent(accent),
-            fontSize = 16.sp,
+            style = Metro.Type.Small,
             maxLines = 1,
         )
     }
@@ -471,7 +469,7 @@ private fun SaveTile(
                 Text(
                     stringResource(com.fancyshark.wpdialer.R.string.dialpad_save),
                     color = Metro.Foreground,
-                    fontSize = 11.sp,
+                    style = Metro.Type.Tiny,
                     maxLines = 1,
                     modifier = Modifier
                         .padding(top = 2.dp)

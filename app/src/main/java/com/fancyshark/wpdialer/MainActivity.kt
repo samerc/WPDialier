@@ -13,6 +13,16 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.ContentTransform
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -54,6 +64,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
@@ -82,6 +93,17 @@ import com.fancyshark.wpdialer.screens.SettingsScreen
 import com.fancyshark.wpdialer.screens.SpeedDialPage
 import com.fancyshark.wpdialer.ui.AccentStore
 import com.fancyshark.wpdialer.ui.AppBarAction
+import com.fancyshark.wpdialer.ui.Continuum
+import com.fancyshark.wpdialer.ui.ContinuumOverlay
+import com.fancyshark.wpdialer.ui.ContinuumTarget
+import com.fancyshark.wpdialer.ui.LocalOverlaySwivel
+import com.fancyshark.wpdialer.ui.LocalPivotFrame
+import com.fancyshark.wpdialer.ui.MetroEasing
+import com.fancyshark.wpdialer.ui.MetroToast
+import com.fancyshark.wpdialer.ui.MetroToastHost
+import com.fancyshark.wpdialer.ui.NavMotion
+import com.fancyshark.wpdialer.ui.PivotFrame
+import com.fancyshark.wpdialer.ui.navPageModifier
 import com.fancyshark.wpdialer.ui.FontStore
 import com.fancyshark.wpdialer.ui.Haptics
 import com.fancyshark.wpdialer.ui.Selawik
@@ -112,6 +134,45 @@ sealed interface Screen {
  * actually goes out (the dialpad clears its number only then).
  */
 data class SimRequest(val number: String, val contactId: Long?, val onPlaced: () -> Unit = {})
+
+/**
+ * The rendered back-stack top. [key] is its saved-state key; [animKey]
+ * decides when the page transition runs. A dialpad replacing a dialpad
+ * (dial request) swaps in place instead: two composed dialpads would race
+ * DialpadBus.open (the outgoing one's dispose would clear the new one's flag).
+ */
+private data class NavEntry(val screen: Screen, val key: String, val index: Int) {
+    val animKey: String get() = if (screen is Screen.Dialpad) "$index|dialpad" else key
+}
+
+/**
+ * Where a continuum flight lands on [screen]: the contact pivot's name
+ * title (AppTitle, top-left), the call-details name under its page title.
+ * Kept approximate (the flight fades into the real title as it lands) —
+ * re-measure if those layouts move.
+ */
+private fun continuumTarget(screen: Screen): ContinuumTarget? = when (screen) {
+    is Screen.Contact -> ContinuumTarget(startDp = 20f, topDp = 18f, fontSizeSp = 15f)
+    is Screen.CallDetails -> ContinuumTarget(startDp = 20f, topDp = 108f, fontSizeSp = 26f)
+    else -> null
+}
+
+/** Full-page modal entrance: a short slide up with a fade (none when motion is off). */
+private fun modalEnter(reduceMotion: Boolean): EnterTransition =
+    if (reduceMotion) {
+        EnterTransition.None
+    } else {
+        slideInVertically(tween(300, easing = MetroEasing.Decelerate)) { it / 4 } +
+            fadeIn(tween(250, easing = MetroEasing.Decelerate))
+    }
+
+private fun modalExit(reduceMotion: Boolean): ExitTransition =
+    if (reduceMotion) {
+        ExitTransition.None
+    } else {
+        slideOutVertically(tween(200, easing = MetroEasing.Accelerate)) { it / 4 } +
+            fadeOut(tween(200, easing = MetroEasing.Accelerate))
+    }
 
 // Serializes the navigation stack across activity recreation (locale change,
 // process death). Field delimiter is a control char that can't appear in
@@ -601,9 +662,7 @@ class MainActivity : ComponentActivity() {
                     .placeCall(Uri.fromParts("voicemail", "", null), Bundle())
             }.onFailure { placeCallWith(number, null) }
         } else {
-            android.widget.Toast.makeText(
-                this, getString(R.string.main_toast_no_voicemail), android.widget.Toast.LENGTH_SHORT,
-            ).show()
+            MetroToast.show(getString(R.string.main_toast_no_voicemail))
         }
     }
 
@@ -618,9 +677,7 @@ class MainActivity : ComponentActivity() {
                 .sendDialerSpecialCode(code)
         }.isSuccess
         if (!sent) {
-            android.widget.Toast.makeText(
-                this, getString(R.string.dialpad_code_needs_default), android.widget.Toast.LENGTH_SHORT,
-            ).show()
+            MetroToast.show(getString(R.string.dialpad_code_needs_default))
         }
     }
 
@@ -652,7 +709,7 @@ class MainActivity : ComponentActivity() {
             Text(
                 stringResource(R.string.main_return_to_call),
                 color = Metro.onAccent(accent),
-                fontSize = 14.sp,
+                style = Metro.Type.Small,
             )
         }
     }
@@ -698,10 +755,20 @@ class MainActivity : ComponentActivity() {
         val nonce by dialNonce.collectAsState()
         fun stateKeyOf(index: Int, screen: Screen): String =
             if (screen is Screen.Dialpad) "$index|$screen|$nonce" else "$index|$screen"
+        // How the next back-stack change animates: WP turnstile between
+        // pages, slide up/down for the modal-feeling dialpad and new contact.
+        val reduceMotion = Metro.reduceMotion
+        var navMotion by remember { mutableStateOf(NavMotion.None) }
+        fun isModal(screen: Screen) = screen is Screen.Dialpad || screen is Screen.NewContact
         // Popped entries drop their saved state — reopening Search (same
         // index + screen = same key) must start fresh, not show the old query.
         fun popTop() {
             val index = backStack.lastIndex
+            navMotion = when {
+                reduceMotion -> NavMotion.None
+                isModal(backStack[index]) -> NavMotion.SlideDown
+                else -> NavMotion.TurnstileBack
+            }
             val popped = backStack.removeAt(index)
             screenStateHolder.removeState(stateKeyOf(index, popped))
             if (popped is Screen.EditContact || popped is Screen.NewContact) {
@@ -711,7 +778,17 @@ class MainActivity : ComponentActivity() {
         // Dedupe: a double-tap must not push the same screen twice (back
         // would then appear to do nothing).
         fun push(screen: Screen) {
-            if (backStack.last() != screen) backStack.add(screen)
+            if (backStack.last() != screen) {
+                navMotion = when {
+                    reduceMotion -> NavMotion.None
+                    isModal(screen) -> NavMotion.SlideUp
+                    else -> NavMotion.TurnstileForward
+                }
+                // A row that armed the continuum flies its title along —
+                // only toward pages whose title it can land on.
+                Continuum.launch(continuumTarget(screen), enabled = !reduceMotion)
+                backStack.add(screen)
+            }
         }
         fun popAndRefresh() {
             if (backStack.size > 1) popTop()
@@ -723,9 +800,11 @@ class MainActivity : ComponentActivity() {
             popAndRefresh()
         }
 
-        val contacts by produceState(emptyList<ContactItem>(), granted, tick) {
-            if (granted) value = Repo.loadContacts(this@MainActivity)
+        // null = first load still running (the pages show progress dots).
+        val contactsOrNull by produceState<List<ContactItem>?>(null, granted, tick) {
+            value = if (granted) Repo.loadContacts(this@MainActivity) else emptyList()
         }
+        val contacts = contactsOrNull.orEmpty()
         // Load-more grows these by a page (HistoryPaging); the missed-only
         // filter pages its own MISSED-typed query so it reaches past the
         // newest page of all calls.
@@ -739,9 +818,10 @@ class MainActivity : ComponentActivity() {
         // menu (hoisted here so the missed query only runs while it's on).
         var missedOnly by androidx.compose.runtime.saveable
             .rememberSaveable { mutableStateOf(false) }
-        val history by produceState(emptyList<HistoryItem>(), granted, tick, historyLimit) {
-            if (granted) value = Repo.loadHistory(this@MainActivity, historyLimit)
+        val historyOrNull by produceState<List<HistoryItem>?>(null, granted, tick, historyLimit) {
+            value = if (granted) Repo.loadHistory(this@MainActivity, historyLimit) else emptyList()
         }
+        val history = historyOrNull.orEmpty()
         val missedHistory by produceState(
             emptyList<HistoryItem>(), granted, tick, missedLimit, missedOnly,
         ) {
@@ -841,12 +921,12 @@ class MainActivity : ComponentActivity() {
                     .navigationBarsPadding()
                     .imePadding(),
             ) {
-                val top = backStack.last()
+                val topScreen = backStack.last()
                 // Not under an overlay either: digits typed at the wizard or
                 // a confirm must not land in (or open) a hidden dialpad.
-                LaunchedEffect(top, overlayOpen) {
+                LaunchedEffect(topScreen, overlayOpen) {
                     hardwareDialSafe.value =
-                        (top is Screen.Home || top is Screen.Dialpad) && !overlayOpen
+                        (topScreen is Screen.Home || topScreen is Screen.Dialpad) && !overlayOpen
                 }
                 var contentHeightPx by remember { mutableStateOf(0) }
                 Box(
@@ -860,7 +940,30 @@ class MainActivity : ComponentActivity() {
                         .onSizeChanged { contentHeightPx = it.height }
                         .graphicsLayer { translationY = reach.value },
                 ) {
-                screenStateHolder.SaveableStateProvider(stateKeyOf(backStack.lastIndex, top)) {
+                val entry = NavEntry(
+                    topScreen, stateKeyOf(backStack.lastIndex, topScreen), backStack.lastIndex,
+                )
+                // The outgoing page stays composed (under its own saved-state
+                // key) while it turnstiles / slides away.
+                AnimatedContent(
+                    targetState = entry,
+                    modifier = Modifier.fillMaxSize(),
+                    transitionSpec = {
+                        // Back from a modal: the sliding-down page stays on top.
+                        ContentTransform(
+                            EnterTransition.None,
+                            ExitTransition.None,
+                            targetContentZIndex = if (navMotion == NavMotion.SlideDown) -1f else 0f,
+                            sizeTransform = null,
+                        )
+                    },
+                    contentAlignment = Alignment.TopStart,
+                    contentKey = { it.animKey },
+                    label = "nav",
+                ) { shown ->
+                val top = shown.screen
+                Box(Modifier.fillMaxSize().then(transition.navPageModifier(navMotion))) {
+                screenStateHolder.SaveableStateProvider(shown.key) {
                     when (top) {
                         Screen.Home -> Column(Modifier.fillMaxSize()) {
                             ReturnToCallBanner(accent.color)
@@ -877,7 +980,7 @@ class MainActivity : ComponentActivity() {
                                     Text(
                                         stringResource(R.string.main_make_default_banner),
                                         color = Metro.onAccent(accent.color),
-                                        fontSize = 14.sp,
+                                        style = Metro.Type.Small,
                                     )
                                 }
                             }
@@ -890,14 +993,19 @@ class MainActivity : ComponentActivity() {
                                     missedFilterRequest.value = false
                                 }
                             }
+                            // Lets each page see when the pager settles on it (feather).
+                            val pivotFrame = remember { PivotFrame() }
+                            CompositionLocalProvider(LocalPivotFrame provides pivotFrame) {
                             Pivot(
                                 title = stringResource(R.string.main_pivot_title),
-                                modifier = Modifier.weight(1f),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .onGloballyPositioned { pivotFrame.coordinates = it },
                                 pages = listOf<Pair<String, @Composable () -> Unit>>(
                                     stringResource(R.string.main_page_history) to {
                                         // The missed query lags one load behind
                                         // the toggle: filter the main page meanwhile.
-                                        val shown = if (missedOnly) {
+                                        val shownHistory = if (missedOnly) {
                                             missedHistory.ifEmpty {
                                                 history.filter {
                                                     it.type ==
@@ -909,7 +1017,8 @@ class MainActivity : ComponentActivity() {
                                         }
                                         val paging = com.fancyshark.wpdialer.data.HistoryPaging
                                         HistoryPage(
-                                            items = shown,
+                                            items = shownHistory,
+                                            loading = historyOrNull == null && !missedOnly,
                                             reminders = reminders,
                                             onRemind = { remindPickerFor = it },
                                             onCancelReminder = { confirmCancelReminder = it },
@@ -960,6 +1069,7 @@ class MainActivity : ComponentActivity() {
                                     stringResource(R.string.main_page_speed_dial) to {
                                         SpeedDialPage(
                                             contacts = contacts,
+                                            loading = contactsOrNull == null,
                                             accent = accent.color,
                                             onOpen = { push(Screen.Contact(it.id)) },
                                             onCallNumber = { placeCall(it) },
@@ -967,12 +1077,17 @@ class MainActivity : ComponentActivity() {
                                         )
                                     },
                                     stringResource(R.string.main_page_people) to {
-                                        PeoplePage(contacts, accent.color) {
+                                        PeoplePage(
+                                            contacts,
+                                            accent.color,
+                                            loading = contactsOrNull == null,
+                                        ) {
                                             push(Screen.Contact(it.id))
                                         }
                                     },
                                 ),
                             )
+                            }
                             MetroAppBar(
                                 actions = listOf(
                                     AppBarAction(Icons.Filled.Voicemail, stringResource(R.string.main_action_voicemail)) {
@@ -1084,6 +1199,11 @@ class MainActivity : ComponentActivity() {
                     }
                 }
                 }
+                }
+
+                // Continuum: the tapped row's title in flight to the new page.
+                ContinuumOverlay()
+                }
 
                 // Tapping the gap the content vacated snaps it back up.
                 if (reach.value > 0.5f) {
@@ -1175,14 +1295,14 @@ class MainActivity : ComponentActivity() {
                         Text(
                             stringResource(R.string.main_remind_title),
                             color = Metro.Foreground,
-                            fontSize = 16.sp,
+                            style = Metro.Type.Small,
                             fontWeight = FontWeight.SemiBold,
                             letterSpacing = 1.sp,
                         )
                         Text(
                             Repo.pretty(this@MainActivity, number),
                             color = Metro.Subtle,
-                            fontSize = 17.sp,
+                            style = Metro.Type.Body,
                             fontWeight = FontWeight.Light,
                             modifier = Modifier.padding(bottom = 12.dp),
                         )
@@ -1199,7 +1319,7 @@ class MainActivity : ComponentActivity() {
                             Text(
                                 stringResource(label),
                                 color = Metro.Foreground,
-                                fontSize = 24.sp,
+                                style = Metro.Type.Large,
                                 fontWeight = FontWeight.Light,
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -1271,10 +1391,17 @@ class MainActivity : ComponentActivity() {
                     )
                 }
 
-                // First-run setup covers the whole app until finished.
-                if (!setupDone) {
+                // First-run setup covers the whole app until finished. It
+                // slides up when re-run from Settings and down when done
+                // (already up on a cold start: no entrance there).
+                AnimatedVisibility(
+                    visible = !setupDone,
+                    enter = modalEnter(reduceMotion),
+                    exit = modalExit(reduceMotion),
+                ) {
                     val fsi by canUseFullScreen.collectAsState()
                     val allGranted by allCorePermissionsGranted.collectAsState()
+                    CompositionLocalProvider(LocalOverlaySwivel provides false) {
                     com.fancyshark.wpdialer.screens.SetupWizardScreen(
                         accent = accent.color,
                         isDefaultDialer = default,
@@ -1314,22 +1441,32 @@ class MainActivity : ComponentActivity() {
                             }
                         },
                     )
+                    }
                 }
 
                 // First open after an update: one-shot what's-new page.
                 // Fresh installs never see it (onCreate marks it seen when
                 // the wizard is still pending), and the wizard renders on
                 // top if both would somehow show.
-                if (setupDone && whatsNewVisible) {
-                    com.fancyshark.wpdialer.screens.WhatsNewScreen(
-                        accent = accent.color,
-                        versionName = appVersionName,
-                    ) {
-                        getSharedPreferences("wp", MODE_PRIVATE).edit()
-                            .putInt("whats_new_seen", appVersionCode).apply()
-                        showWhatsNew.value = false
+                AnimatedVisibility(
+                    visible = setupDone && whatsNewVisible,
+                    enter = modalEnter(reduceMotion),
+                    exit = modalExit(reduceMotion),
+                ) {
+                    CompositionLocalProvider(LocalOverlaySwivel provides false) {
+                        com.fancyshark.wpdialer.screens.WhatsNewScreen(
+                            accent = accent.color,
+                            versionName = appVersionName,
+                        ) {
+                            getSharedPreferences("wp", MODE_PRIVATE).edit()
+                                .putInt("whats_new_seen", appVersionCode).apply()
+                            showWhatsNew.value = false
+                        }
                     }
                 }
+
+                // Last: toasts draw above every screen and overlay.
+                MetroToastHost(Modifier.align(Alignment.TopCenter))
             }
             }
         }
@@ -1348,7 +1485,7 @@ class MainActivity : ComponentActivity() {
             Text(
                 stringResource(R.string.main_choose_sim_title),
                 color = Metro.Foreground,
-                fontSize = 16.sp,
+                style = Metro.Type.Small,
                 fontWeight = FontWeight.SemiBold,
                 letterSpacing = 1.sp,
             )
@@ -1356,7 +1493,7 @@ class MainActivity : ComponentActivity() {
                 // pretty() wraps the number in LRI/PDI for RTL locales.
                 Repo.pretty(this@MainActivity, request.number),
                 color = Metro.Subtle,
-                fontSize = 17.sp,
+                style = Metro.Type.Body,
                 fontWeight = FontWeight.Light,
                 modifier = Modifier.padding(bottom = 16.dp),
             )
@@ -1389,7 +1526,7 @@ class MainActivity : ComponentActivity() {
                     Text(
                         stringResource(R.string.main_choose_sim_remember),
                         color = Metro.Foreground,
-                        fontSize = 16.sp,
+                        style = Metro.Type.Small,
                         fontWeight = FontWeight.Light,
                         modifier = Modifier.padding(start = 10.dp),
                     )

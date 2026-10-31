@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <string name="settings_tiles_animate_title">लाइव टाइल एनिमेट करें</string>
+    <string name="settings_tiles_animate_hint">होम स्क्रीन की टाइलें समय-समय पर पलटकर संपर्क का नाम या आपकी छूटी हुई कॉल दिखाती हैं। फ़ोन में एनिमेशन बंद होने पर टाइलें स्थिर रहती हैं।</string>
+    <string name="settings_tiles_transparent_title">पारदर्शी लाइव टाइल</string>
+    <string name="settings_tiles_transparent_hint">टाइलों के एक्सेंट रंग के पीछे से आपका वॉलपेपर दिखता है।</string>
+    <!-- The count is drawn separately above this label. -->
+    <plurals name="tile_back_missed" tools:ignore="ImpliedQuantity">
+        <item quantity="one">छूटी हुई कॉल</item>
+        <item quantity="other">छूटी हुई कॉल</item>
+    </plurals>
+</resources>

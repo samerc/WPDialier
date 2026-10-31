@@ -18,6 +18,14 @@ class SettingsBackupTest {
     }
 
     @Test
+    fun liveTileTogglesAreBooleans() {
+        assertTrue(SettingsBackup.accepts(AppPrefs.KEY_TILES_ANIMATE, "b", null))
+        assertTrue(SettingsBackup.accepts(AppPrefs.KEY_TILES_TRANSPARENT, "b", null))
+        assertFalse(SettingsBackup.accepts(AppPrefs.KEY_TILES_ANIMATE, "s", null))
+        assertFalse(SettingsBackup.accepts(AppPrefs.KEY_TILES_TRANSPARENT, "i", "b"))
+    }
+
+    @Test
     fun knownTypeWinsOverACorruptStoredType() {
         assertTrue(SettingsBackup.accepts("tilt", "b", "s"))
     }

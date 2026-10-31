@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Flipping people tile: photo face, then the name / missed-count back
+     face peeks up every few seconds. The interval differs from the app
+     tile's so a home screen with both doesn't flip in lockstep. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/ct_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#FF0050EF">
+
+    <ViewFlipper
+        android:id="@+id/ct_flipper"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:autoStart="true"
+        android:flipInterval="6500"
+        android:inAnimation="@anim/tile_peek_in"
+        android:outAnimation="@anim/tile_peek_out">
+
+        <include layout="@layout/widget_contact_tile_front" />
+
+        <include layout="@layout/widget_contact_tile_back" />
+    </ViewFlipper>
+</FrameLayout>

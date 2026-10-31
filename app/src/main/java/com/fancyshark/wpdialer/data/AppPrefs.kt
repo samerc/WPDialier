@@ -64,6 +64,14 @@ object AppPrefs {
     private val _reachGesture = MutableStateFlow(false)
     val reachGesture: StateFlow<Boolean> = _reachGesture
 
+    /** Home-screen live tiles flip between faces (WP "peek"). */
+    private val _animateTiles = MutableStateFlow(true)
+    val animateTiles: StateFlow<Boolean> = _animateTiles
+
+    /** Live tiles paint the accent semi-transparent (WP8.1 see-through Start). */
+    private val _transparentTiles = MutableStateFlow(false)
+    val transparentTiles: StateFlow<Boolean> = _transparentTiles
+
     /** First-run wizard completed (or grandfathered by an existing install). */
     private val _setupDone = MutableStateFlow(false)
     val setupDone: StateFlow<Boolean> = _setupDone
@@ -105,6 +113,8 @@ object AppPrefs {
         _relativeTimes.value = p.bool("relative_times", false)
         _oneHandedLists.value = p.bool("one_handed_lists", false)
         _reachGesture.value = p.bool("reach_gesture", false)
+        _animateTiles.value = p.bool(KEY_TILES_ANIMATE, true)
+        _transparentTiles.value = p.bool(KEY_TILES_TRANSPARENT, false)
         _setupDone.value = p.bool("setup_done", false)
         wizardSeen = p.bool("wizard_seen", false)
         _speedDialNumbers.value = decodeList(p.str("speed_dial")) ?: emptyList()
@@ -123,6 +133,33 @@ object AppPrefs {
     fun setReachGesture(context: Context, on: Boolean) {
         _reachGesture.value = on
         prefs(context).edit().putBoolean("reach_gesture", on).apply()
+    }
+
+    const val KEY_TILES_ANIMATE = "tiles_animate"
+    const val KEY_TILES_TRANSPARENT = "tiles_transparent"
+
+    fun setAnimateTiles(context: Context, on: Boolean) {
+        _animateTiles.value = on
+        prefs(context).edit().putBoolean(KEY_TILES_ANIMATE, on).apply()
+        com.fancyshark.wpdialer.widget.TileWidget.updateAll(context)
+    }
+
+    fun setTransparentTiles(context: Context, on: Boolean) {
+        _transparentTiles.value = on
+        prefs(context).edit().putBoolean(KEY_TILES_TRANSPARENT, on).apply()
+        com.fancyshark.wpdialer.widget.TileWidget.updateAll(context)
+    }
+
+    /**
+     * Fresh read for the widget providers, which run in receiver processes
+     * where [init] may never have happened.
+     */
+    fun tileStyle(context: Context): TileStyle {
+        val p = prefs(context)
+        return TileStyle(
+            animate = p.bool(KEY_TILES_ANIMATE, true),
+            transparent = p.bool(KEY_TILES_TRANSPARENT, false),
+        )
     }
 
     fun setSetupDone(context: Context, done: Boolean) {
@@ -237,3 +274,6 @@ object AppPrefs {
         prefs(context).edit().putBoolean("tilt", on).apply()
     }
 }
+
+/** Live-tile look, read fresh by the widget providers. */
+data class TileStyle(val animate: Boolean, val transparent: Boolean)

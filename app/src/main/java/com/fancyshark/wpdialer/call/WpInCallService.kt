@@ -132,11 +132,16 @@ class WpInCallService : InCallService() {
     }
 
     private fun postOngoingNotification(call: Call) {
+        // Wall-clock connect time drives the notification / status-bar chip
+        // chronometer; 0 while still dialing.
+        val since = call.details.connectTimeMillis
+            .takeIf { CallManager.stateOf(call) == Call.STATE_ACTIVE && it > 0 } ?: 0L
         // Conference parents carry no handle — label them properly instead
         // of falling through to "unknown".
         if (call.details.hasProperty(Call.Details.PROPERTY_CONFERENCE)) {
             postOngoingNotificationNow(
                 getString(com.fancyshark.wpdialer.R.string.call_conference),
+                since = since,
             )
             return
         }
@@ -147,7 +152,7 @@ class WpInCallService : InCallService() {
             ?: number.ifBlank { getString(com.fancyshark.wpdialer.R.string.call_unknown) }
         val s = scope
         if (s == null || number.isBlank()) {
-            postOngoingNotificationNow(fallback, number)
+            postOngoingNotificationNow(fallback, number, since)
             return
         }
         s.launch {
@@ -155,7 +160,7 @@ class WpInCallService : InCallService() {
                 .lookupCaller(this@WpInCallService, number)
             val state = CallManager.stateOf(call)
             if (state != Call.STATE_DISCONNECTED && state != Call.STATE_RINGING) {
-                postOngoingNotificationNow(name ?: fallback, number)
+                postOngoingNotificationNow(name ?: fallback, number, since)
             }
         }
     }
@@ -164,7 +169,11 @@ class WpInCallService : InCallService() {
     // foreground-service start (must be stopped, not just cancelled).
     private var foreground = false
 
-    private fun postOngoingNotificationNow(display: String, number: String = "") {
+    private fun postOngoingNotificationNow(
+        display: String,
+        number: String = "",
+        since: Long = 0L,
+    ) {
         val nm = getSystemService(NotificationManager::class.java)
         nm.createNotificationChannel(
             NotificationChannel(
@@ -199,6 +208,9 @@ class WpInCallService : InCallService() {
             .setCategory(Notification.CATEGORY_CALL)
             .setOngoing(true)
             .setContentIntent(open)
+            .apply {
+                if (since > 0) setWhen(since).setShowWhen(true).setUsesChronometer(true)
+            }
             .build()
         // CallStyle.forOngoingCall is only accepted from a foreground service
         // (or with a full-screen intent) — a plain notify() is dropped by the
@@ -212,7 +224,27 @@ class WpInCallService : InCallService() {
         if (started) {
             foreground = true
         } else {
-            runCatching { nm.notify(ONGOING_NOTIFICATION_ID, notification) }
+            // CallStyle without a foreground service is rejected outright, so
+            // the fallback is a plain ongoing notification — the user must
+            // always have a way back to the call from the shade.
+            val plain = Notification.Builder(this, ONGOING_CHANNEL_ID)
+                .setSmallIcon(com.fancyshark.wpdialer.R.drawable.ic_notification)
+                .setColor(com.fancyshark.wpdialer.ui.AccentStore.accent.value.color.toArgb())
+                .setContentTitle(display)
+                .setContentText(getString(com.fancyshark.wpdialer.R.string.main_return_to_call))
+                .setCategory(Notification.CATEGORY_CALL)
+                .setOngoing(true)
+                .setContentIntent(open)
+                .addAction(
+                    Notification.Action.Builder(
+                        null, getString(com.fancyshark.wpdialer.R.string.call_end_call), hangup,
+                    ).build(),
+                )
+                .apply {
+                    if (since > 0) setWhen(since).setShowWhen(true).setUsesChronometer(true)
+                }
+                .build()
+            runCatching { nm.notify(ONGOING_NOTIFICATION_ID, plain) }
         }
     }
 

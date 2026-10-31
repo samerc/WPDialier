@@ -47,28 +47,25 @@ fun AboutScreen(accent: Accent) {
         Text(
             stringResource(R.string.about_header),
             color = Metro.Foreground,
-            fontSize = 15.sp,
-            letterSpacing = 2.sp,
+            style = Metro.Type.AppTitle,
             modifier = Modifier.padding(top = 18.dp),
         )
         Text(
             stringResource(R.string.about_title),
             color = Metro.Foreground,
-            fontSize = 48.sp,
-            fontWeight = FontWeight.Light,
+            style = Metro.Type.PageTitle,
         )
         Spacer(Modifier.height(30.dp))
 
         Text(
             stringResource(R.string.about_app_name),
             color = accentText,
-            fontSize = 40.sp,
-            fontWeight = FontWeight.Light,
+            style = Metro.Type.Header,
         )
         Text(
             stringResource(R.string.about_tagline),
             color = Metro.Subtle,
-            fontSize = 16.sp,
+            style = Metro.Type.Small,
             fontWeight = FontWeight.Light,
             modifier = Modifier.padding(top = 2.dp),
         )
@@ -77,10 +74,9 @@ fun AboutScreen(accent: Accent) {
         Text(
             stringResource(R.string.about_version),
             color = Metro.Foreground,
-            fontSize = 25.sp,
-            fontWeight = FontWeight.Light,
+            style = Metro.Type.SubHeader,
         )
-        Text(version, color = accentText, fontSize = 15.sp)
+        Text(version, color = accentText, style = Metro.Type.Small)
 
         // Tip jar — appears only when Play returns configured products
         // (hidden on devices without Play or until Console setup is done).
@@ -92,13 +88,12 @@ fun AboutScreen(accent: Accent) {
             Text(
                 stringResource(R.string.about_tip_title),
                 color = Metro.Foreground,
-                fontSize = 25.sp,
-                fontWeight = FontWeight.Light,
+                style = Metro.Type.SubHeader,
             )
             Text(
                 stringResource(R.string.about_tip_hint),
                 color = accentText,
-                fontSize = 15.sp,
+                style = Metro.Type.Small,
             )
             tipProducts.forEach { product ->
                 val label = when (product.productId) {
@@ -110,7 +105,7 @@ fun AboutScreen(accent: Accent) {
                 Text(
                     if (price.isEmpty()) label else "$label — $price",
                     color = Metro.Foreground,
-                    fontSize = 20.sp,
+                    style = Metro.Type.Large,
                     fontWeight = FontWeight.Light,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -126,7 +121,7 @@ fun AboutScreen(accent: Accent) {
                 Text(
                     stringResource(R.string.about_tip_thanks),
                     color = accentText,
-                    fontSize = 16.sp,
+                    style = Metro.Type.Small,
                     modifier = Modifier.padding(top = 4.dp),
                 )
             }
@@ -157,10 +152,9 @@ fun AboutScreen(accent: Accent) {
             Text(
                 stringResource(R.string.about_contact),
                 color = Metro.Foreground,
-                fontSize = 25.sp,
-                fontWeight = FontWeight.Light,
+                style = Metro.Type.SubHeader,
             )
-            Text(CONTACT_EMAIL, color = accentText, fontSize = 15.sp)
+            Text(CONTACT_EMAIL, color = accentText, style = Metro.Type.Small)
         }
 
         Spacer(Modifier.height(22.dp))
@@ -201,13 +195,12 @@ fun AboutScreen(accent: Accent) {
             Text(
                 stringResource(R.string.about_report),
                 color = Metro.Foreground,
-                fontSize = 25.sp,
-                fontWeight = FontWeight.Light,
+                style = Metro.Type.SubHeader,
             )
             Text(
                 stringResource(R.string.about_report_hint),
                 color = accentText,
-                fontSize = 15.sp,
+                style = Metro.Type.Small,
             )
         }
 
@@ -230,13 +223,12 @@ fun AboutScreen(accent: Accent) {
             Text(
                 stringResource(R.string.about_privacy),
                 color = Metro.Foreground,
-                fontSize = 25.sp,
-                fontWeight = FontWeight.Light,
+                style = Metro.Type.SubHeader,
             )
             Text(
                 stringResource(R.string.about_privacy_hint),
                 color = accentText,
-                fontSize = 15.sp,
+                style = Metro.Type.Small,
             )
         }
 

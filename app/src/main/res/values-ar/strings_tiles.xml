@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_tiles_animate_title">تحريك المربعات الحية</string>
+    <string name="settings_tiles_animate_hint">تنقلب مربعات الشاشة الرئيسية من حين لآخر لتعرض اسم جهة الاتصال أو مكالماتك الفائتة. تبقى ثابتة عند إيقاف الرسوم المتحركة في هاتفك.</string>
+    <string name="settings_tiles_transparent_title">مربعات شفافة</string>
+    <string name="settings_tiles_transparent_hint">تظهر خلفية الشاشة عبر لون التمييز في المربعات.</string>
+    <plurals name="tile_back_missed">
+        <item quantity="zero">مكالمة فائتة</item>
+        <item quantity="one">مكالمة فائتة</item>
+        <item quantity="two">مكالمتان فائتتان</item>
+        <item quantity="few">مكالمات فائتة</item>
+        <item quantity="many">مكالمة فائتة</item>
+        <item quantity="other">مكالمة فائتة</item>
+    </plurals>
+</resources>

@@ -250,7 +250,7 @@ internal fun parseEventDate(value: String): Triple<Int, Int, Int>? {
 @Composable
 internal fun FieldLabel(text: String, top: Dp = 14.dp) {
     Spacer(Modifier.height(top))
-    Text(text, color = Metro.Subtle, fontSize = 14.sp)
+    Text(text, color = Metro.Subtle, style = Metro.Type.Small)
     Spacer(Modifier.height(4.dp))
 }
 
@@ -260,7 +260,7 @@ internal fun AddLink(text: String, accent: Color, onClick: () -> Unit) {
     Text(
         "+ $text",
         color = Metro.textAccent(accent),
-        fontSize = 17.sp,
+        style = Metro.Type.Body,
         modifier = Modifier
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
@@ -305,7 +305,7 @@ internal fun DateField(
         Text(
             value.ifEmpty { placeholder },
             color = if (value.isEmpty()) Metro.Subtle else Metro.Foreground,
-            fontSize = 18.sp,
+            style = Metro.Type.Body,
         )
     }
 }
@@ -338,8 +338,7 @@ internal fun PhotoTile(
             Text(
                 "+",
                 color = Metro.onAccent(accent),
-                fontSize = 34.sp,
-                fontWeight = FontWeight.Light,
+                style = Metro.Type.Header,
             )
         }
     }
@@ -366,17 +365,17 @@ fun WpDropdown(
             Text(
                 current,
                 color = Metro.Foreground,
-                fontSize = 16.sp,
+                style = Metro.Type.Small,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
-            Text("▾", color = Metro.Foreground, fontSize = 14.sp)
+            Text("▾", color = Metro.Foreground, style = Metro.Type.Small)
         }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             options.forEachIndexed { i, option ->
                 DropdownMenuItem(
-                    text = { Text(option, fontSize = 16.sp) },
+                    text = { Text(option, style = Metro.Type.Small) },
                     onClick = {
                         expanded = false
                         onSelect(i)

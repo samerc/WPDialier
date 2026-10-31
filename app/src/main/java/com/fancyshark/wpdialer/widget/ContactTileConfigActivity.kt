@@ -41,7 +41,6 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.lifecycleScope
 import com.fancyshark.wpdialer.R
 import com.fancyshark.wpdialer.data.ContactItem
@@ -200,15 +199,13 @@ class ContactTileConfigActivity : ComponentActivity() {
                 Text(
                     stringResource(R.string.contact_tile_config_title),
                     color = Metro.Foreground,
-                    fontSize = 15.sp,
-                    letterSpacing = 2.sp,
+                    style = Metro.Type.AppTitle,
                     modifier = Modifier.padding(start = 20.dp, top = 18.dp),
                 )
                 Text(
                     stringResource(R.string.contact_tile_config_header),
                     color = Metro.Foreground,
-                    fontSize = 44.sp,
-                    fontWeight = FontWeight.Light,
+                    style = Metro.Type.PageTitle,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(start = 16.dp, end = 16.dp),
@@ -216,7 +213,7 @@ class ContactTileConfigActivity : ComponentActivity() {
                 Text(
                     stringResource(R.string.contact_tile_config_tap_label),
                     color = Metro.Subtle,
-                    fontSize = 15.sp,
+                    style = Metro.Type.Small,
                     modifier = Modifier.padding(start = 20.dp, top = 12.dp, bottom = 6.dp),
                 )
                 Row(
@@ -236,7 +233,7 @@ class ContactTileConfigActivity : ComponentActivity() {
                     Text(
                         stringResource(R.string.contact_tile_config_permission),
                         color = Metro.Foreground,
-                        fontSize = 17.sp,
+                        style = Metro.Type.Body,
                         fontWeight = FontWeight.Light,
                         modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 28.dp),
                     )
@@ -276,7 +273,7 @@ class ContactTileConfigActivity : ComponentActivity() {
                                 } else {
                                     Metro.Foreground
                                 },
-                                fontSize = 20.sp,
+                                style = Metro.Type.Large,
                                 fontWeight = FontWeight.Light,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,

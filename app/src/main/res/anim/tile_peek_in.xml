@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Live-tile flip, WP "peek" style: the next face slides up from the
+     bottom edge. A view (tween) animation: RemoteViews' ViewFlipper loads
+     these in the launcher's process; property animators can't be used. -->
+<translate xmlns:android="http://schemas.android.com/apk/res/android"
+    android:fromYDelta="100%"
+    android:toYDelta="0"
+    android:duration="650"
+    android:interpolator="@android:interpolator/decelerate_cubic" />

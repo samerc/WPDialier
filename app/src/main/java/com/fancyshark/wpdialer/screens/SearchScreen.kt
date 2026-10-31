@@ -79,14 +79,15 @@ fun SearchScreen(
                 Text(
                     stringResource(com.fancyshark.wpdialer.R.string.search_hint),
                     color = Metro.Subtle,
-                    fontSize = 18.sp,
+                    style = Metro.Type.Body,
                 )
             }
             BasicTextField(
                 value = query,
                 onValueChange = { query = it },
                 singleLine = true,
-                textStyle = TextStyle(color = Metro.Foreground, fontSize = 18.sp),
+                // Token (not a bare TextStyle) so the field gets the app font.
+                textStyle = Metro.Type.Body.copy(color = Metro.Foreground),
                 cursorBrush = SolidColor(accent),
                 modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
             )
@@ -114,7 +115,7 @@ fun SearchScreen(
                     Text(
                         contact.name,
                         color = Metro.Foreground,
-                        fontSize = 24.sp,
+                        style = Metro.Type.Large,
                         fontWeight = FontWeight.Light,
                         maxLines = 1,
                 overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
@@ -126,7 +127,7 @@ fun SearchScreen(
                     Text(
                         stringResource(com.fancyshark.wpdialer.R.string.search_history_header),
                         color = accentText,
-                        fontSize = 14.sp,
+                        style = Metro.Type.Small,
                         fontWeight = FontWeight.SemiBold,
                         letterSpacing = 1.sp,
                         modifier = Modifier.padding(top = 14.dp, bottom = 4.dp),
@@ -145,7 +146,7 @@ fun SearchScreen(
                         call.name?.takeIf { it.isNotBlank() }
                             ?: com.fancyshark.wpdialer.data.Repo.pretty(context, call.number),
                         color = Metro.Foreground,
-                        fontSize = 22.sp,
+                        style = Metro.Type.Large,
                         fontWeight = FontWeight.Light,
                         maxLines = 1,
                         overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
@@ -157,7 +158,7 @@ fun SearchScreen(
                             com.fancyshark.wpdialer.data.Repo.historyWhen(call.date),
                         ),
                         color = Metro.Subtle,
-                        fontSize = 14.sp,
+                        style = Metro.Type.Small,
                         fontWeight = FontWeight.Light,
                     )
                 }
@@ -169,8 +170,7 @@ fun SearchScreen(
         Text(
             stringResource(com.fancyshark.wpdialer.R.string.search_title),
             color = Metro.Foreground,
-            fontSize = 15.sp,
-            letterSpacing = 2.sp,
+            style = Metro.Type.AppTitle,
             modifier = Modifier.padding(top = 18.dp, bottom = 14.dp),
         )
         if (oneHanded) {

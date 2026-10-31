@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- HomePages.kt empty states (design batch) -->
+    <string name="motion_history_empty">aucun appel récent</string>
+    <string name="motion_speed_dial_empty">la numérotation rapide est vide</string>
+    <string name="motion_people_empty_hint">Touchez « nouveau » ci-dessous pour ajouter quelqu’un.</string>
+</resources>

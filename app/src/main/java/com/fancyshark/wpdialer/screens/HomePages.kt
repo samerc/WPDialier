@@ -42,6 +42,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -51,7 +52,16 @@ import com.fancyshark.wpdialer.data.HistoryItem
 import com.fancyshark.wpdialer.data.Repo
 import com.fancyshark.wpdialer.ui.ContactTile
 import com.fancyshark.wpdialer.ui.Metro
+import com.fancyshark.wpdialer.ui.Continuum
+import com.fancyshark.wpdialer.ui.ContinuumAnchor
 import com.fancyshark.wpdialer.ui.MetroCloseMark
+import com.fancyshark.wpdialer.ui.MetroEmptyState
+import com.fancyshark.wpdialer.ui.MetroProgressDots
+import com.fancyshark.wpdialer.ui.continuumAnchor
+import com.fancyshark.wpdialer.ui.jumpTileModifier
+import com.fancyshark.wpdialer.ui.rememberFeatherState
+import com.fancyshark.wpdialer.ui.rowModifier
+import com.fancyshark.wpdialer.ui.settleModifier
 import com.fancyshark.wpdialer.ui.hiddenFromAccessibility
 import kotlinx.coroutines.launch
 
@@ -74,22 +84,26 @@ fun HistoryPage(
     onCancelReminder: (com.fancyshark.wpdialer.data.Reminder) -> Unit = {},
     canLoadMore: Boolean = false,
     onLoadMore: () -> Unit = {},
+    loading: Boolean = false,
 ) {
     Column(Modifier.fillMaxSize()) {
         // Pending call-back reminders sit above the list, newest-due first.
         reminders.forEach { r ->
             ReminderStrip(r, items, onCancel = { onCancelReminder(r) })
         }
-        if (items.isEmpty()) {
-            Text(
-                // A filtered-empty list must not read like a wiped call log —
-                // the caller passes filter-specific text when a filter is on.
-                emptyText ?: stringResource(com.fancyshark.wpdialer.R.string.home_history_empty),
-                color = Metro.Subtle,
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Light,
-                modifier = Modifier.padding(20.dp),
-            )
+        if (loading) {
+            MetroProgressDots(Modifier.padding(top = 12.dp))
+        } else if (items.isEmpty()) {
+            // A filtered-empty list must not read like a wiped call log —
+            // the caller passes filter-specific text when a filter is on.
+            if (emptyText != null) {
+                MetroEmptyState(emptyText)
+            } else {
+                MetroEmptyState(
+                    stringResource(com.fancyshark.wpdialer.R.string.motion_history_empty),
+                    hint = stringResource(com.fancyshark.wpdialer.R.string.home_history_empty),
+                )
+            }
         } else {
             HistoryList(
                 items, accent, onCall, onText, onSave, onProfile, onDelete, onBlock,
@@ -130,7 +144,7 @@ private fun ReminderStrip(
                 Repo.wpTime(reminder.at),
             ),
             color = Metro.Foreground,
-            fontSize = 15.sp,
+            style = Metro.Type.Small,
             fontWeight = FontWeight.Light,
             maxLines = 1,
             overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
@@ -213,8 +227,16 @@ private fun HistoryList(
             }
         }
     }
+    // Rows feather in each time the pivot settles on this page.
+    val feather = rememberFeatherState()
+    androidx.compose.runtime.SideEffect {
+        feather.onContent(groups.isNotEmpty(), listState.firstVisibleItemIndex)
+    }
+    val titleSize = Metro.Type.SubHeader.fontSize.value
     LazyColumn(
-        Modifier.fillMaxSize(),
+        Modifier
+            .fillMaxSize()
+            .then(feather.settleModifier { listState.firstVisibleItemIndex }),
         state = listState,
         reverseLayout = oneHanded,
         contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 20.dp, end = 20.dp, top = 6.dp, bottom = 20.dp),
@@ -224,9 +246,18 @@ private fun HistoryList(
             val item = group.first()
             val missed = item.type == android.provider.CallLog.Calls.MISSED_TYPE
             val expanded = expandedId == item.id
+            // Continuum: the name lifts off toward the profile / details page.
+            val anchor = remember { ContinuumAnchor() }
+            val token = "history:${item.id}"
+            val label = item.name?.takeIf { it.isNotBlank() }
+                ?: item.number.takeIf { it.isNotBlank() }
+                    ?.let { Repo.pretty(context, it) }
+                ?: stringResource(com.fancyshark.wpdialer.R.string.home_unknown)
+            fun armContinuum() = Continuum.arm(token, label, anchor.bounds, titleSize)
             Column(
                 Modifier
                     .fillMaxWidth()
+                    .then(feather.rowModifier(i))
                     .combinedClickable(
                         onClick = { expandedId = if (expanded) null else item.id },
                         onLongClick = { menuForId = item.id },
@@ -235,17 +266,16 @@ private fun HistoryList(
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
-                        val label = item.name?.takeIf { it.isNotBlank() }
-                            ?: item.number.takeIf { it.isNotBlank() }
-                                ?.let { Repo.pretty(context, it) }
-                            ?: stringResource(com.fancyshark.wpdialer.R.string.home_unknown)
                         Text(
                             if (group.size > 1) "$label (${group.size})" else label,
                             color = if (missed) accentText else Metro.Foreground,
-                            fontSize = 27.sp,
-                            fontWeight = FontWeight.Light,
+                            style = Metro.Type.SubHeader,
                             maxLines = 1,
                             overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                            modifier = Modifier
+                                .continuumAnchor(anchor)
+                                // Hidden while its copy is in flight.
+                                .graphicsLayer { alpha = if (Continuum.isFlying(token)) 0f else 1f },
                         )
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             // A grouped row shows the mark if any of its calls has a note.
@@ -266,24 +296,27 @@ private fun HistoryList(
                                     Repo.historyWhen(item.date),
                                 ),
                                 color = Metro.Subtle,
-                                fontSize = 14.sp,
+                                style = Metro.Type.Small,
                                 fontWeight = FontWeight.Light,
                             )
                         }
                     }
                     if (item.number.isNotBlank()) {
+                        // WP 8.1: a missed call's circle wears the accent so
+                        // it stands out down the list; the rest stay neutral.
+                        val circle = if (missed) accentText else Metro.Foreground
                         Box(
                             Modifier
                                 .size(42.dp)
                                 .clip(CircleShape)
-                                .border(2.dp, Metro.Foreground, CircleShape)
+                                .border(2.dp, circle, CircleShape)
                                 .clickable { onCall(item.number) },
                             contentAlignment = Alignment.Center,
                         ) {
                             androidx.compose.material3.Icon(
                                 Icons.Filled.Phone,
                                 contentDescription = stringResource(com.fancyshark.wpdialer.R.string.home_call),
-                                tint = Metro.Foreground,
+                                tint = circle,
                                 modifier = Modifier.size(18.dp),
                             )
                         }
@@ -308,7 +341,10 @@ private fun HistoryList(
                                     )
                                 } else {
                                     listOf(
-                                        stringResource(com.fancyshark.wpdialer.R.string.home_details) to { onDetails(item) },
+                                        stringResource(com.fancyshark.wpdialer.R.string.home_details) to {
+                                            armContinuum()
+                                            onDetails(item)
+                                        },
                                         stringResource(com.fancyshark.wpdialer.R.string.home_delete) to { onDelete(group.toList()) },
                                         stringResource(com.fancyshark.wpdialer.R.string.home_remind_me) to { onRemind(item.number) },
                                         stringResource(com.fancyshark.wpdialer.R.string.home_add_to_speed_dial) to { onAddSpeedDial(item.number) },
@@ -321,7 +357,7 @@ private fun HistoryList(
                                         Text(
                                             label,
                                             color = Color.Black,
-                                            fontSize = 17.sp,
+                                            style = Metro.Type.Body,
                                             fontWeight = FontWeight.Light,
                                         )
                                     },
@@ -357,7 +393,10 @@ private fun HistoryList(
                                 HistoryAction(
                                     Icons.Filled.Person,
                                     stringResource(com.fancyshark.wpdialer.R.string.home_profile), accent,
-                                ) { onProfile(item.number) }
+                                ) {
+                                    armContinuum()
+                                    onProfile(item.number)
+                                }
                             }
                         }
                         HistoryAction(
@@ -414,7 +453,7 @@ private fun HistoryAction(
         Text(
             label,
             color = Metro.Foreground,
-            fontSize = 11.sp,
+            style = Metro.Type.Tiny,
             fontWeight = FontWeight.Light,
             modifier = Modifier.padding(top = 3.dp),
         )
@@ -451,26 +490,24 @@ fun CallDetailsScreen(
         Text(
             stringResource(com.fancyshark.wpdialer.R.string.home_details_app_header),
             color = Metro.Foreground,
-            fontSize = 15.sp,
+            style = Metro.Type.AppTitle,
             modifier = Modifier.padding(top = 18.dp),
         )
         Text(
             stringResource(com.fancyshark.wpdialer.R.string.home_details),
             color = Metro.Foreground,
-            fontSize = 48.sp,
-            fontWeight = FontWeight.Light,
+            style = Metro.Type.PageTitle,
         )
         Spacer(Modifier.height(10.dp))
         Text(
             name?.takeIf { it.isNotBlank() } ?: Repo.pretty(context, number),
             color = Metro.Foreground,
-            fontSize = 26.sp,
-            fontWeight = FontWeight.Light,
+            style = Metro.Type.SubHeader,
             maxLines = 1,
             overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
         )
         if (!name.isNullOrBlank()) {
-            Text(Repo.pretty(context, number), color = Metro.textAccent(accent), fontSize = 15.sp)
+            Text(Repo.pretty(context, number), color = Metro.textAccent(accent), style = Metro.Type.Small)
         }
         Spacer(Modifier.height(12.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
@@ -486,7 +523,7 @@ fun CallDetailsScreen(
         Text(
             stringResource(com.fancyshark.wpdialer.R.string.home_note_hint),
             color = Metro.Subtle,
-            fontSize = 13.sp,
+            style = Metro.Type.Small,
             fontWeight = FontWeight.Light,
             modifier = Modifier.padding(top = 12.dp),
         )
@@ -503,7 +540,7 @@ fun CallDetailsScreen(
                     Text(
                         Repo.wpTime(e.date),
                         color = Metro.Foreground,
-                        fontSize = 21.sp,
+                        style = Metro.Type.Large,
                         fontWeight = FontWeight.Light,
                     )
                     Text(
@@ -515,14 +552,14 @@ fun CallDetailsScreen(
                                 )
                             } else "",
                         color = Metro.Subtle,
-                        fontSize = 14.sp,
+                        style = Metro.Type.Small,
                         fontWeight = FontWeight.Light,
                     )
                     notes[e.id]?.let { note ->
                         Text(
                             note,
                             color = Metro.textAccent(accent),
-                            fontSize = 15.sp,
+                            style = Metro.Type.Small,
                             fontWeight = FontWeight.Light,
                             modifier = Modifier.padding(top = 2.dp),
                         )
@@ -546,7 +583,7 @@ fun CallDetailsScreen(
             Text(
                 stringResource(com.fancyshark.wpdialer.R.string.home_note_title),
                 color = Metro.Foreground,
-                fontSize = 16.sp,
+                style = Metro.Type.Small,
                 fontWeight = FontWeight.SemiBold,
                 letterSpacing = 1.sp,
                 modifier = Modifier.padding(bottom = 12.dp),
@@ -579,7 +616,7 @@ fun CallDetailsScreen(
                 Text(
                     stringResource(com.fancyshark.wpdialer.R.string.home_note_delete),
                     color = Metro.Foreground,
-                    fontSize = 18.sp,
+                    style = Metro.Type.Body,
                     fontWeight = FontWeight.Light,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -616,23 +653,36 @@ fun SpeedDialPage(
     onOpen: (ContactItem) -> Unit,
     onCallNumber: (String) -> Unit,
     onRemoveNumber: (String) -> Unit,
+    loading: Boolean = false,
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val numbers by com.fancyshark.wpdialer.data.AppPrefs.speedDialNumbers
         .collectAsState()
     val starred = contacts.filter { it.starred }
+    // Plain numbers don't wait on the contacts load; only an otherwise
+    // empty page shows the dots.
+    if (loading && numbers.isEmpty()) {
+        MetroProgressDots(Modifier.padding(top = 12.dp))
+        return
+    }
     if (starred.isEmpty() && numbers.isEmpty()) {
-        Text(
-            stringResource(com.fancyshark.wpdialer.R.string.home_speed_dial_empty),
-            color = Metro.Subtle,
-            fontSize = 20.sp,
-            fontWeight = FontWeight.Light,
-            modifier = Modifier.padding(20.dp),
+        MetroEmptyState(
+            stringResource(com.fancyshark.wpdialer.R.string.motion_speed_dial_empty),
+            hint = stringResource(com.fancyshark.wpdialer.R.string.home_speed_dial_empty),
         )
         return
     }
+    val listState = rememberLazyListState()
+    val feather = rememberFeatherState()
+    androidx.compose.runtime.SideEffect {
+        feather.onContent(true, listState.firstVisibleItemIndex)
+    }
+    val starredRows = starred.chunked(2)
     LazyColumn(
-        Modifier.fillMaxSize(),
+        Modifier
+            .fillMaxSize()
+            .then(feather.settleModifier { listState.firstVisibleItemIndex }),
+        state = listState,
         contentPadding = androidx.compose.foundation.layout.PaddingValues(
             start = 20.dp, end = 20.dp, top = 6.dp, bottom = 20.dp,
         ),
@@ -645,6 +695,7 @@ fun SpeedDialPage(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .fillMaxWidth()
+                    .then(feather.rowModifier(i))
                     .clickable { onCallNumber(number) },
             ) {
                 // Hold 2-9 on the dialpad dials the first eight entries —
@@ -661,7 +712,7 @@ fun SpeedDialPage(
                         Text(
                             key.toString(),
                             color = Metro.onAccent(accent),
-                            fontSize = 20.sp,
+                            style = Metro.Type.Large,
                             fontWeight = FontWeight.Light,
                             modifier = Modifier.semantics { contentDescription = keyDesc },
                         )
@@ -670,7 +721,7 @@ fun SpeedDialPage(
                 Text(
                     Repo.pretty(context, number),
                     color = Metro.Foreground,
-                    fontSize = 23.sp,
+                    style = Metro.Type.Large,
                     fontWeight = FontWeight.Light,
                     modifier = Modifier.weight(1f).padding(start = 12.dp),
                 )
@@ -680,9 +731,12 @@ fun SpeedDialPage(
                 ) { onRemoveNumber(number) }
             }
         }
-        items(starred.chunked(2).size) { rowIndex ->
-            val row = starred.chunked(2)[rowIndex]
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        items(starredRows.size) { rowIndex ->
+            val row = starredRows[rowIndex]
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.then(feather.rowModifier(numbers.size + rowIndex)),
+            ) {
                 row.forEach { contact ->
                     Box(
                         Modifier
@@ -700,8 +754,7 @@ fun SpeedDialPage(
                             Text(
                                 contact.name,
                                 color = Metro.onAccent(accent),
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Normal,
+                                style = Metro.Type.Small,
                                 maxLines = 1,
                                 overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                                 modifier = Modifier.padding(
@@ -753,15 +806,17 @@ private class JumpIndex(locale: java.util.Locale) {
 fun PeoplePage(
     contacts: List<ContactItem>,
     accent: Color,
+    loading: Boolean = false,
     onOpen: (ContactItem) -> Unit,
 ) {
+    if (loading) {
+        MetroProgressDots(Modifier.padding(top = 12.dp))
+        return
+    }
     if (contacts.isEmpty()) {
-        Text(
+        MetroEmptyState(
             stringResource(com.fancyshark.wpdialer.R.string.home_no_contacts),
-            color = Metro.Subtle,
-            fontSize = 18.sp,
-            fontWeight = FontWeight.Light,
-            modifier = Modifier.padding(20.dp),
+            hint = stringResource(com.fancyshark.wpdialer.R.string.motion_people_empty_hint),
         )
         return
     }
@@ -791,11 +846,18 @@ fun PeoplePage(
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
     var showJump by remember { mutableStateOf(false) }
+    val feather = rememberFeatherState()
+    androidx.compose.runtime.SideEffect {
+        feather.onContent(true, listState.firstVisibleItemIndex)
+    }
+    val nameSize = Metro.Type.Large.fontSize.value
 
     Box(Modifier.fillMaxSize()) {
         LazyColumn(
             state = listState,
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .then(feather.settleModifier { listState.firstVisibleItemIndex }),
             contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 20.dp, end = 20.dp, top = 6.dp, bottom = 20.dp),
         ) {
             items(list.size) { i ->
@@ -803,6 +865,7 @@ fun PeoplePage(
                     is String -> {
                         Box(
                             Modifier
+                                .then(feather.rowModifier(i))
                                 .padding(top = 10.dp, bottom = 6.dp)
                                 .size(40.dp)
                                 .background(accent)
@@ -812,17 +875,24 @@ fun PeoplePage(
                             Text(
                                 entry,
                                 color = Metro.onAccent(accent),
-                                fontSize = 20.sp,
+                                style = Metro.Type.Large,
                                 fontWeight = FontWeight.Bold,
                                 modifier = Modifier.padding(start = 5.dp),
                             )
                         }
                     }
                     is ContactItem -> {
+                        // Continuum: the name lifts off toward the profile.
+                        val anchor = remember { ContinuumAnchor() }
+                        val token = "people:${entry.id}"
                         Row(
                             Modifier
                                 .fillMaxWidth()
-                                .clickable { onOpen(entry) }
+                                .then(feather.rowModifier(i))
+                                .clickable {
+                                    Continuum.arm(token, entry.name, anchor.bounds, nameSize)
+                                    onOpen(entry)
+                                }
                                 .padding(vertical = 5.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
@@ -831,10 +901,15 @@ fun PeoplePage(
                             Text(
                                 entry.name,
                                 color = Metro.Foreground,
-                                fontSize = 24.sp,
+                                style = Metro.Type.Large,
                                 fontWeight = FontWeight.Normal,
                                 maxLines = 1,
-                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                modifier = Modifier
+                                    .continuumAnchor(anchor)
+                                    .graphicsLayer {
+                                        alpha = if (Continuum.isFlying(token)) 0f else 1f
+                                    },
                             )
                         }
                     }
@@ -856,17 +931,19 @@ fun PeoplePage(
             ) {
                 // Latin + a second script can top 50 tiles — go 5 wide.
                 val columns = if (jump.labels.size > 30) 5 else 4
-                jump.labels.chunked(columns).forEach { row ->
+                jump.labels.chunked(columns).forEachIndexed { rowIndex, row ->
                     Row(
                         Modifier.weight(1f).fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
-                        row.forEach { letter ->
+                        row.forEachIndexed { col, letter ->
                             val target = positions[letter]
                             Box(
                                 Modifier
                                     .weight(1f)
                                     .fillMaxHeight()
+                                    // Tiles pop in one by one, reading order.
+                                    .then(jumpTileModifier(rowIndex * columns + col))
                                     .background(if (target != null) accent else Metro.Chrome)
                                     .clickable(enabled = target != null) {
                                         showJump = false
@@ -877,7 +954,7 @@ fun PeoplePage(
                                 Text(
                                     letter,
                                     color = if (target != null) Metro.onAccent(accent) else Metro.Dim,
-                                    fontSize = if (columns > 4) 22.sp else 28.sp,
+                                    style = if (columns > 4) Metro.Type.Large else Metro.Type.SubHeader,
                                     fontWeight = FontWeight.Bold,
                                     modifier = Modifier.padding(start = 8.dp, bottom = 2.dp),
                                 )

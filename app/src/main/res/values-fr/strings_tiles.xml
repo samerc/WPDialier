@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <string name="settings_tiles_animate_title">Animer les vignettes dynamiques</string>
+    <string name="settings_tiles_animate_hint">les vignettes de l\'écran d\'accueil se retournent de temps en temps pour afficher le nom d\'un contact ou vos appels manqués. Elles restent immobiles si les animations sont désactivées sur votre téléphone.</string>
+    <string name="settings_tiles_transparent_title">Vignettes transparentes</string>
+    <string name="settings_tiles_transparent_hint">votre fond d\'écran transparaît à travers la couleur d\'accentuation.</string>
+    <!-- The count is drawn separately above this label. -->
+    <plurals name="tile_back_missed" tools:ignore="ImpliedQuantity">
+        <item quantity="one">appel manqué</item>
+        <item quantity="many">appels manqués</item>
+        <item quantity="other">appels manqués</item>
+    </plurals>
+</resources>

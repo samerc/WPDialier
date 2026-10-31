@@ -179,10 +179,22 @@ class ContactTileWidget : AppWidgetProvider() {
             val name = contact?.name?.takeIf { it.isNotEmpty() } ?: binding.name
             val accent = com.fancyshark.wpdialer.ui.AccentStore.accent.value.color
             val onAccent = com.fancyshark.wpdialer.ui.Metro.onAccent(accent).toArgb()
-            val views = RemoteViews(context.packageName, R.layout.widget_contact_tile)
-            views.setInt(R.id.ct_root, "setBackgroundColor", accent.toArgb())
+            val style = com.fancyshark.wpdialer.data.AppPrefs.tileStyle(context)
 
             val photo = contact?.let { ContactTiles.decodeSquare(context, it.photoUri, PHOTO_PX) }
+            val count = contact?.let { ContactTiles.missedFrom(missed, it.numbers) } ?: 0
+            // The back face (name / missed count) is only worth flipping to
+            // when the front hides the name behind a photo or there's news.
+            val flip = (photo != null || count > 0) && TileWidget.mayFlip(context, style)
+            val views = RemoteViews(
+                context.packageName,
+                if (flip) R.layout.widget_contact_tile_flip else R.layout.widget_contact_tile,
+            )
+            views.setInt(
+                R.id.ct_root, "setBackgroundColor",
+                TileWidget.tileBackground(accent, style.transparent),
+            )
+
             if (photo != null) {
                 views.setImageViewBitmap(R.id.ct_photo, photo)
                 views.setViewVisibility(R.id.ct_photo, View.VISIBLE)
@@ -201,10 +213,27 @@ class ContactTileWidget : AppWidgetProvider() {
             views.setTextViewText(R.id.ct_name, name)
             views.setTextColor(R.id.ct_name, textColor)
 
-            val count = contact?.let { ContactTiles.missedFrom(missed, it.numbers) } ?: 0
             views.setTextViewText(R.id.ct_count, count.toString())
             views.setTextColor(R.id.ct_count, textColor)
             views.setViewVisibility(R.id.ct_count, if (count > 0) View.VISIBLE else View.GONE)
+
+            if (flip) {
+                // Back face sits on the bare accent: contrast rule throughout.
+                views.setTextViewText(R.id.ct_back_name, name)
+                views.setTextColor(R.id.ct_back_name, onAccent)
+                views.setViewVisibility(
+                    R.id.ct_back_missed, if (count > 0) View.VISIBLE else View.GONE,
+                )
+                if (count > 0) {
+                    views.setTextViewText(R.id.ct_back_count, count.toString())
+                    views.setTextColor(R.id.ct_back_count, onAccent)
+                    views.setTextViewText(
+                        R.id.ct_back_label,
+                        context.resources.getQuantityString(R.plurals.tile_back_missed, count),
+                    )
+                    views.setTextColor(R.id.ct_back_label, onAccent)
+                }
+            }
             views.setContentDescription(
                 R.id.ct_root,
                 if (count > 0) {

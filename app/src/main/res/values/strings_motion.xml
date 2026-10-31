@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- HomePages.kt empty states (design batch) -->
+    <string name="motion_history_empty">no recent calls</string>
+    <string name="motion_speed_dial_empty">speed dial is empty</string>
+    <string name="motion_people_empty_hint">Tap \"new\" below to add someone.</string>
+</resources>

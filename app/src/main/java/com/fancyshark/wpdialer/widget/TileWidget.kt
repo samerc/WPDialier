@@ -71,19 +71,52 @@ class TileWidget : AppWidgetProvider() {
             ContactTileWidget.updateAllSync(app)
         }
 
+        /**
+         * The tile root's fill: the accent, or (transparent tiles) the
+         * accent at ~70% so the wallpaper shows through, WP8.1-style.
+         */
+        internal fun tileBackground(
+            accent: androidx.compose.ui.graphics.Color,
+            transparent: Boolean,
+        ): Int = (if (transparent) accent.copy(alpha = TRANSPARENT_ALPHA) else accent).toArgb()
+
+        /**
+         * Whether a tile with something on its back face may flip: the
+         * user's "animate tiles" toggle, and never when the user removed
+         * animations system-wide (reduce motion).
+         */
+        internal fun mayFlip(context: Context, style: com.fancyshark.wpdialer.data.TileStyle): Boolean =
+            style.animate && !com.fancyshark.wpdialer.ui.Metro.reduceMotion(context)
+
+        private const val TRANSPARENT_ALPHA = 0.7f
+
         private fun push(context: Context, mgr: AppWidgetManager, id: Int) {
-            val views = RemoteViews(context.packageName, R.layout.widget_tile)
             com.fancyshark.wpdialer.ui.AccentStore.init(context)
+            val style = com.fancyshark.wpdialer.data.AppPrefs.tileStyle(context)
+            val missed = missedCount(context)
+            // Only a tile with news on its back flips; otherwise the static
+            // layout (no flipper ticking on an idle home screen).
+            val flip = missed > 0 && mayFlip(context, style)
+            val views = RemoteViews(
+                context.packageName,
+                if (flip) R.layout.widget_tile_flip else R.layout.widget_tile,
+            )
             views.setInt(
                 R.id.widget_root, "setBackgroundColor",
-                com.fancyshark.wpdialer.ui.AccentStore.accent.value.color.toArgb(),
+                tileBackground(com.fancyshark.wpdialer.ui.AccentStore.accent.value.color, style.transparent),
             )
-            val missed = missedCount(context)
             views.setTextViewText(R.id.widget_count, missed.toString())
             views.setViewVisibility(
                 R.id.widget_count,
                 if (missed > 0) View.VISIBLE else View.GONE,
             )
+            if (flip) {
+                views.setTextViewText(R.id.widget_back_count, missed.toString())
+                views.setTextViewText(
+                    R.id.widget_back_label,
+                    context.resources.getQuantityString(R.plurals.tile_back_missed, missed),
+                )
+            }
             views.setOnClickPendingIntent(
                 R.id.widget_root,
                 PendingIntent.getActivity(

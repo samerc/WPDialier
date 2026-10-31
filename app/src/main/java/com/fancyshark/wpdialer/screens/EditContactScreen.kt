@@ -94,7 +94,7 @@ fun EditContactScreen(
         Text(
             stringResource(com.fancyshark.wpdialer.R.string.editcontact_load_failed),
             color = Metro.Subtle,
-            fontSize = 20.sp,
+            style = Metro.Type.Large,
             fontWeight = FontWeight.Light,
             modifier = Modifier.padding(20.dp),
         )
@@ -156,7 +156,7 @@ fun EditContactScreen(
         Text(
             title,
             color = Metro.Foreground,
-            fontSize = 16.sp,
+            style = Metro.Type.Small,
             fontWeight = FontWeight.SemiBold,
             letterSpacing = 1.sp,
             modifier = Modifier.padding(top = 18.dp, bottom = 6.dp),
@@ -175,15 +175,14 @@ fun EditContactScreen(
                             raw.account.fullLabel,
                         ),
                         color = Metro.textAccent(accent),
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Normal,
+                        style = Metro.Type.Small,
                     )
                     Spacer(Modifier.height(8.dp))
                 }
                 Text(
                     stringResource(com.fancyshark.wpdialer.R.string.editcontact_name),
                     color = Metro.Subtle,
-                    fontSize = 14.sp,
+                    style = Metro.Type.Small,
                 )
                 Spacer(Modifier.height(4.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -502,7 +501,7 @@ fun EditContactScreen(
             Text(
                 stringResource(com.fancyshark.wpdialer.R.string.editcontact_save_failed),
                 color = Metro.Red,
-                fontSize = 14.sp,
+                style = Metro.Type.Small,
                 fontWeight = FontWeight.Light,
                 modifier = Modifier.padding(top = 6.dp),
             )

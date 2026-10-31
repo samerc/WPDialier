@@ -28,11 +28,13 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.pager.HorizontalPager
@@ -44,6 +46,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -91,19 +94,104 @@ object Metro {
     val Red = Color(0xFFE51400)
 
     /**
-     * [accent] as a TEXT color: unchanged on the dark theme (WP-authentic),
-     * blended toward black on the light theme until it reaches 4.5:1 against
-     * the white background — lime/yellow/amber text on white is ~2:1.
+     * [accent] as a TEXT color, blended until it reaches 4.5:1 against the
+     * theme background: toward black on light (lime/yellow/amber on white is
+     * ~2:1), toward white on dark (cobalt/indigo/brown on black is ~3:1).
+     * Accents that already pass are returned untouched (WP-authentic).
      */
     fun textAccent(accent: Color): Color {
-        if (!light) return accent
         val bg = Background
+        val toward = if (light) Color.Black else Color.White
         var c = accent
         var step = 0
         while (contrast(c, bg) < 4.5f && step < 20) {
-            c = lerp(accent, Color.Black, (++step) * 0.05f)
+            c = lerp(accent, toward, (++step) * 0.05f)
         }
         return c
+    }
+
+    /** True when the user turned animations off (animator duration scale 0). */
+    fun reduceMotion(context: Context): Boolean =
+        android.provider.Settings.Global.getFloat(
+            context.contentResolver,
+            android.provider.Settings.Global.ANIMATOR_DURATION_SCALE,
+            1f,
+        ) == 0f
+
+    /** Composable form of [reduceMotion]; read once per context. Skip or shorten animations when true. */
+    val reduceMotion: Boolean
+        @Composable get() {
+            val context = androidx.compose.ui.platform.LocalContext.current
+            return remember(context) { reduceMotion(context) }
+        }
+
+    /**
+     * WP8.1 type ramp. Each token merges onto [LocalTextStyle], so the
+     * Selawik/system font toggle provided at the root still applies; pass as
+     * `Text(style = Metro.Type.Large)` and override color/weight per call.
+     * Sizes are scaled from WP's 480px-wide ramp to Android dp, kept close
+     * to what the screens already used. All weights are bundled Selawik
+     * cuts (Light = selawkl, Semilight = selawksl).
+     */
+    object Type {
+        /** WP "semilight" (350) — maps to the bundled selawksl cut. */
+        val Semilight = FontWeight(350)
+
+        /** Small uppercase app name above a page/pivot title (letter-spaced). */
+        val AppTitle: TextStyle
+            @Composable @ReadOnlyComposable
+            get() = LocalTextStyle.current.merge(
+                TextStyle(fontSize = 15.sp, fontWeight = FontWeight.Normal, letterSpacing = 2.sp),
+            )
+
+        /** Pivot/panorama and page titles — 48sp Light. */
+        val PageTitle: TextStyle
+            @Composable @ReadOnlyComposable
+            get() = LocalTextStyle.current.merge(
+                TextStyle(fontSize = 48.sp, fontWeight = FontWeight.Light),
+            )
+
+        /** Big in-page headers (app name on About, contact name) — 40sp Light. */
+        val Header: TextStyle
+            @Composable @ReadOnlyComposable
+            get() = LocalTextStyle.current.merge(
+                TextStyle(fontSize = 40.sp, fontWeight = FontWeight.Light),
+            )
+
+        /** Section headers, dialog titles, empty states — 26sp Light. */
+        val SubHeader: TextStyle
+            @Composable @ReadOnlyComposable
+            get() = LocalTextStyle.current.merge(
+                TextStyle(fontSize = 26.sp, fontWeight = FontWeight.Light),
+            )
+
+        /** List primary text (names, setting titles) — 22sp Semilight. */
+        val Large: TextStyle
+            @Composable @ReadOnlyComposable
+            get() = LocalTextStyle.current.merge(
+                TextStyle(fontSize = 22.sp, fontWeight = Semilight),
+            )
+
+        /** Body copy, inputs, buttons, menu items — 18sp Normal. */
+        val Body: TextStyle
+            @Composable @ReadOnlyComposable
+            get() = LocalTextStyle.current.merge(
+                TextStyle(fontSize = 18.sp, fontWeight = FontWeight.Normal),
+            )
+
+        /** Secondary/subtle text under a primary line — 15sp Normal. */
+        val Small: TextStyle
+            @Composable @ReadOnlyComposable
+            get() = LocalTextStyle.current.merge(
+                TextStyle(fontSize = 15.sp, fontWeight = FontWeight.Normal),
+            )
+
+        /** Labels (app-bar icon captions, key captions) — 11sp Normal. */
+        val Tiny: TextStyle
+            @Composable @ReadOnlyComposable
+            get() = LocalTextStyle.current.merge(
+                TextStyle(fontSize = 11.sp, fontWeight = FontWeight.Normal),
+            )
     }
 
     /** Text color on an accent-filled tile: white unless that drops below 3:1. */
@@ -376,13 +464,14 @@ fun MetroButton(
             .padding(horizontal = 18.dp, vertical = 10.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(text, color = fg, fontSize = 19.sp, fontWeight = FontWeight.Normal)
+        Text(text, color = fg, style = Metro.Type.Body)
     }
 }
 
 /**
  * WP pivot control: small uppercase app title, oversized lowercase page
- * headers, swipeable pages.
+ * headers (non-selected ones dimmed to 40%, tracking the swipe), swipeable
+ * pages.
  */
 @Composable
 fun Pivot(
@@ -396,9 +485,7 @@ fun Pivot(
         Text(
             title,
             color = Metro.Foreground,
-            fontSize = 15.sp,
-            fontWeight = FontWeight.Normal,
-            letterSpacing = 2.sp,
+            style = Metro.Type.AppTitle,
             modifier = Modifier.padding(start = 20.dp, top = 18.dp),
         )
         // Headers pan with the page swipe, like a real WP pivot: the current
@@ -429,14 +516,17 @@ fun Pivot(
                     name,
                     maxLines = 1,
                     softWrap = false,
-                    color = when {
-                        focused -> accent.color
-                        pagerState.currentPage == i -> Metro.Foreground
-                        else -> Metro.Dim
-                    },
-                    fontSize = 48.sp,
-                    fontWeight = FontWeight.Light,
+                    color = if (focused) Metro.textAccent(accent.color) else Metro.Foreground,
+                    style = Metro.Type.PageTitle,
                     modifier = Modifier
+                        // Non-selected headers sit at 40% of the foreground,
+                        // brightening as the swipe brings them in. Read in the
+                        // layer block so a swipe only redraws, never recomposes.
+                        .graphicsLayer {
+                            val progress = pagerState.currentPage + pagerState.currentPageOffsetFraction
+                            val distance = kotlin.math.abs(progress - i).coerceIn(0f, 1f)
+                            alpha = if (focused) 1f else 1f - 0.6f * distance
+                        }
                         .onSizeChanged {
                             if (titleWidths[i] != it.width) {
                                 titleWidths[i] = it.width
@@ -505,8 +595,11 @@ class AppBarAction(val icon: ImageVector, val label: String, val onClick: () -> 
 
 /**
  * WP application bar: chrome-colored strip along the bottom holding round
- * outlined icon buttons; tapping the "..." dots expands it to reveal icon
- * labels and text menu items.
+ * outlined icon buttons and the "•••" on the end edge. Tapping "•••" or
+ * swiping up slides the bar up to reveal a label under each icon plus the
+ * text menu items; swiping down (or back) closes it. [minimized] shows only
+ * the ~30dp "•••" strip until it is expanded. A downward flick on the closed
+ * bar triggers [onSwipeDown] (the reach gesture) — never while it is open.
  */
 @Composable
 fun MetroAppBar(
@@ -514,49 +607,73 @@ fun MetroAppBar(
     menu: List<Pair<String, () -> Unit>> = emptyList(),
     modifier: Modifier = Modifier,
     onSwipeDown: (() -> Unit)? = null,
+    minimized: Boolean = false,
 ) {
     var expanded by remember { mutableStateOf(false) }
     val accent by AccentStore.accent.collectAsState()
     val swipeDown by rememberUpdatedState(onSwipeDown)
     val menuExpanded by rememberUpdatedState(expanded)
+    val reduceMotion = Metro.reduceMotion
     // Back closes the expanded bar before it navigates anywhere.
     androidx.activity.compose.BackHandler(enabled = expanded) { expanded = false }
+    val moreLabel = androidx.compose.ui.res.stringResource(
+        com.fancyshark.wpdialer.R.string.ui_more_options,
+    )
     Column(
         modifier
             .fillMaxWidth()
             .background(Metro.Chrome)
-            .animateContentSize()
-            .then(
-                if (onSwipeDown != null) {
-                    Modifier.pointerInput(Unit) {
-                        // Reachability trigger: a downward flick on the bar.
-                        var total = 0f
-                        detectVerticalDragGestures(
-                            onDragStart = { total = 0f },
-                            onVerticalDrag = { _, dragAmount -> total += dragAmount },
-                            onDragEnd = {
-                                // Low bar on purpose: the strip is only ~60dp
-                                // tall and system edge gestures can steal long
-                                // swipes, so a short flick must be enough.
-                                // Not while the "..." menu is open — a flick
-                                // there is a dismiss, not a reach.
-                                if (total > 28.dp.toPx() && !menuExpanded) {
-                                    swipeDown?.invoke()
-                                }
-                            },
-                        )
-                    }
-                } else {
-                    Modifier
-                },
-            ),
+            .then(if (reduceMotion) Modifier else Modifier.animateContentSize())
+            .pointerInput(Unit) {
+                var total = 0f
+                detectVerticalDragGestures(
+                    onDragStart = { total = 0f },
+                    onVerticalDrag = { _, dragAmount -> total += dragAmount },
+                    onDragEnd = {
+                        // Low bar on purpose: the strip is only ~60dp tall
+                        // and system edge gestures can steal long swipes,
+                        // so a short flick must be enough.
+                        val threshold = 28.dp.toPx()
+                        when {
+                            total < -threshold -> expanded = true
+                            // Open bar: a downward flick is a dismiss, not a reach.
+                            total > threshold && menuExpanded -> expanded = false
+                            total > threshold -> swipeDown?.invoke()
+                        }
+                    },
+                )
+            },
     ) {
+        if (minimized && !expanded) {
+            // Collapsed minimized bar: just the dots; the whole strip expands.
+            val stripInteraction = remember { MutableInteractionSource() }
+            val stripFocused by stripInteraction.collectIsFocusedAsState()
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(30.dp)
+                    .clickable(
+                        interactionSource = stripInteraction,
+                        indication = null,
+                        role = Role.Button,
+                        onClickLabel = moreLabel,
+                    ) { expanded = true }
+                    .semantics { contentDescription = moreLabel },
+                contentAlignment = Alignment.CenterEnd,
+            ) {
+                Text(
+                    "•••",
+                    color = if (stripFocused) Metro.textAccent(accent.color) else Metro.Foreground,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(end = 20.dp),
+                )
+            }
+            return@Column
+        }
         Box(Modifier.fillMaxWidth()) {
             val dotsInteraction = remember { MutableInteractionSource() }
             val dotsFocused by dotsInteraction.collectIsFocusedAsState()
-            val moreLabel = androidx.compose.ui.res.stringResource(
-                com.fancyshark.wpdialer.R.string.ui_more_options,
-            )
             // 48dp target; the dots stay drawn at the strip's top edge.
             Box(
                 Modifier
@@ -573,7 +690,7 @@ fun MetroAppBar(
             ) {
                 Text(
                     "•••",
-                    color = if (dotsFocused) accent.color else Metro.Foreground,
+                    color = if (dotsFocused) Metro.textAccent(accent.color) else Metro.Foreground,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(top = 6.dp),
@@ -601,6 +718,7 @@ fun MetroAppBar(
                                 .clickable(
                                     interactionSource = interaction,
                                     indication = null,
+                                    role = Role.Button,
                                 ) {
                                     expanded = false
                                     action.onClick()
@@ -618,9 +736,12 @@ fun MetroAppBar(
                             Text(
                                 action.label,
                                 color = Metro.Foreground,
-                                fontSize = 11.sp,
+                                style = Metro.Type.Tiny,
                                 textAlign = TextAlign.Center,
-                                modifier = Modifier.padding(top = 4.dp),
+                                modifier = Modifier
+                                    .padding(top = 4.dp)
+                                    // The icon already carries the label for TalkBack.
+                                    .clearAndSetSemantics {},
                             )
                         }
                     }
@@ -634,8 +755,8 @@ fun MetroAppBar(
                     val focused by interaction.collectIsFocusedAsState()
                     Text(
                         label,
-                        color = if (focused) accent.color else Metro.Foreground,
-                        fontSize = 18.sp,
+                        color = if (focused) Metro.textAccent(accent.color) else Metro.Foreground,
+                        style = Metro.Type.Body,
                         fontWeight = FontWeight.Light,
                         modifier = Modifier
                             .fillMaxWidth()

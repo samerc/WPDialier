@@ -166,7 +166,7 @@ fun NewContactScreen(
                     accountKindLabel(chosen.kindLabel).uppercase(),
                 ),
                 color = Metro.Foreground,
-                fontSize = 16.sp,
+                style = Metro.Type.Small,
                 fontWeight = FontWeight.SemiBold,
                 letterSpacing = 1.sp,
                 modifier = Modifier.padding(top = 18.dp, bottom = 6.dp),
@@ -347,7 +347,7 @@ fun NewContactScreen(
                 Text(
                     stringResource(com.fancyshark.wpdialer.R.string.newcontact_save_failed),
                     color = Metro.Red,
-                    fontSize = 14.sp,
+                    style = Metro.Type.Small,
                     fontWeight = FontWeight.Light,
                     modifier = Modifier.padding(top = 6.dp),
                 )
@@ -434,14 +434,13 @@ fun NewContactScreen(
                         Text(
                             accountKindLabel(account.kindLabel),
                             color = if (selected) accentText else Metro.Foreground,
-                            fontSize = 26.sp,
-                            fontWeight = FontWeight.Light,
+                            style = Metro.Type.SubHeader,
                         )
                         if (!account.name.isNullOrBlank()) {
                             Text(
                                 account.name,
                                 color = Metro.Subtle,
-                                fontSize = 15.sp,
+                                style = Metro.Type.Small,
                                 fontWeight = FontWeight.Light,
                             )
                         }
@@ -487,7 +486,7 @@ fun NewContactScreen(
                         Text(
                             r.label,
                             color = if (r.code == regionCode) accentText else Metro.Foreground,
-                            fontSize = 21.sp,
+                            style = Metro.Type.Large,
                             fontWeight = FontWeight.Light,
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -565,7 +564,7 @@ private fun MapPinPicker(
             Text(
                 stringResource(com.fancyshark.wpdialer.R.string.newcontact_pick_a_location),
                 color = Metro.Foreground,
-                fontSize = 16.sp,
+                style = Metro.Type.Small,
                 fontWeight = FontWeight.SemiBold,
                 letterSpacing = 1.sp,
                 modifier = Modifier.weight(1f),
@@ -643,7 +642,7 @@ private fun FullScreenPicker(
                 Text(
                     title,
                     color = Metro.Foreground,
-                    fontSize = 16.sp,
+                    style = Metro.Type.Small,
                     fontWeight = FontWeight.SemiBold,
                     letterSpacing = 1.sp,
                     modifier = Modifier.weight(1f),
@@ -680,8 +679,7 @@ private fun MetroSelector(
             Text(
                 primary,
                 color = Metro.Foreground,
-                fontSize = 19.sp,
-                fontWeight = FontWeight.Normal,
+                style = Metro.Type.Body,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -689,14 +687,14 @@ private fun MetroSelector(
                 Text(
                     secondary,
                     color = Metro.Subtle,
-                    fontSize = 13.sp,
+                    style = Metro.Type.Small,
                     fontWeight = FontWeight.Light,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
             }
         }
-        Text("▾", color = Metro.textAccent(accent), fontSize = 18.sp)
+        Text("▾", color = Metro.textAccent(accent), style = Metro.Type.Body)
     }
 }
 
