@@ -350,5 +350,5 @@ STIR badge, voicemail notification, reminder firing under Doze, Android
 - ui/ContactTile.kt ContactThumbs = shared photo cache (bounds-only decode
   returns null BY DESIGN — don't treat it as failure).
 - Untested without real accounts: move/copy between Google/Outlook, label
-  sync, read-only (WhatsApp) parts. Design mockups: claude.ai artifact
-  "Dialer 8 contact page".
+  sync, read-only (WhatsApp) parts. (The design mockup artifact was
+  deleted at the user's request after the build.)
