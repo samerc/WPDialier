@@ -2,8 +2,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- A phone app: Play should only offer it to telephony devices. -->
-    <uses-feature android:name="android.hardware.telephony" android:required="true" />
+    <!-- Optional on purpose: required="true" made Play drop ~2,400 devices
+         (Wi-Fi tablets, some phones) that 1.1.1 reached. Declared so CALL_PHONE
+         doesn't imply a hard telephony requirement. -->
+    <uses-feature android:name="android.hardware.telephony" android:required="false" />
 
     <uses-permission android:name="android.permission.CALL_PHONE" />
     <uses-permission android:name="android.permission.READ_CONTACTS" />

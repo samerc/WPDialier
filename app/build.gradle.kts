@@ -28,7 +28,7 @@ android {
         // compat path for 33 (CallEndpoint is 34+).
         minSdk = 33
         targetSdk = 36
-        versionCode = 5
+        versionCode = 6
         versionName = "1.2.0"
     }
 
