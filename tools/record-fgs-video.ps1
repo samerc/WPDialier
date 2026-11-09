@@ -17,7 +17,9 @@ param(
     [switch]$SkipInstall
 )
 
-$ErrorActionPreference = "Stop"
+# Continue, not Stop: Windows PowerShell turns any adb stderr line into a
+# terminating error under Stop. Failures that matter throw explicitly.
+$ErrorActionPreference = "Continue"
 $pkg = "com.fancyshark.wpdialer"
 $sdk = "$env:LOCALAPPDATA\Android\Sdk"
 $adb = "$sdk\platform-tools\adb.exe"
@@ -55,9 +57,17 @@ Start-Sleep 15   # let the launcher and System UI settle
 
 # --- UI helpers (uiautomator) -----------------------------------------------
 function Get-Ui {
-    Adb shell uiautomator dump /sdcard/ui.xml 2>$null | Out-Null
-    return (Adb shell cat /sdcard/ui.xml) -join ""
+    # uiautomator needs an idle screen; a ticking call timer can keep it
+    # busy ("could not get idle state"), so a failed dump returns "".
+    Adb shell rm -f /sdcard/ui.xml 2>$null | Out-Null
+    $r = (Adb shell uiautomator dump /sdcard/ui.xml 2>&1) -join " "
+    if ($r -notmatch "dumped") { return "" }
+    return (Adb shell cat /sdcard/ui.xml 2>$null) -join ""
 }
+# Screen size, for fallback taps at fixed relative positions.
+$size = ((Adb shell wm size) -join " ") -replace '.*?(\d+)x(\d+).*', '$1 $2'
+$W = [int]($size -split " ")[0]; $H = [int]($size -split " ")[1]
+function Tap-At($fx, $fy) { Adb shell input tap ([int]($W * $fx)) ([int]($H * $fy)) }
 function Find-Center($pattern) {
     $ui = Get-Ui
     $rx = '(?:text|content-desc)="(' + $pattern + ')"[^>]*?bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"'
@@ -117,12 +127,21 @@ Start-Sleep 5
 
 Write-Host "  tapping the notification to return to the call"
 if (-not (Tap-Text "Ongoing call")) {
-    if (-not (Tap-Text "Dialer 8[^""]*")) { Write-Warning "Notification not found - tap it yourself now (10s)"; Start-Sleep 10 }
+    if (-not (Tap-Text "Dialer 8[^""]*")) {
+        # The call notification is pinned at the top of the expanded shade.
+        Tap-At 0.50 0.30
+    }
 }
 Start-Sleep 6
 
 Write-Host "  ending the call"
-if (-not (Tap-Text "end call")) { Write-Warning "End button not found - end the call yourself now (10s)"; Start-Sleep 10 }
+if (-not (Tap-Text "end call")) {
+    # Dialer 8's end-call tile: bottom-left of the in-call screen.
+    Tap-At 0.35 0.92
+}
+Start-Sleep 3
+# Safety net if the tap missed: hang up through Telecom.
+Adb shell input keyevent KEYCODE_ENDCALL 2>$null | Out-Null
 Start-Sleep 4
 
 # --- 4. Save -----------------------------------------------------------------
