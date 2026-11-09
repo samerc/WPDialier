@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="whatsnew_2_contact">صفحة جهة اتصال جديدة تعرض كل شيء عن الشخص، مع مربعات إجراءات سريعة</string>
+    <string name="whatsnew_2_accounts">انقل جهات الاتصال أو انسخها بين الحسابات، واربطها أو ادمج المكررة</string>
+    <string name="whatsnew_2_duplicates">اعثر على جهات الاتصال المكررة من الإعدادات</string>
+    <string name="whatsnew_2_edit">عدّل كل حقول جهة الاتصال: الاسم الكامل والعناوين والتواريخ والتصنيفات والمزيد</string>
+    <string name="whatsnew_2_motion">حركات Windows Phone: صفحات تنقلب ونوافذ تدور ومربعات تنقلب</string>
+    <string name="whatsnew_2_callchip">مدة المكالمة في شريط الحالة؛ اضغط على الإشعار للعودة إلى مكالمتك</string>
+    <string name="whatsnew_2_tools">ثبّت جهات الاتصال على الشاشة الرئيسية، وفلترة المكالمات، وتذكيرات معاودة الاتصال، وملاحظات المكالمات</string>
+    <string name="whatsnew_2_dialpad">اضغط مطولًا على 2–9 للاتصال السريع، والإيقاف المؤقت والانتظار، والرموز السرية</string>
+</resources>

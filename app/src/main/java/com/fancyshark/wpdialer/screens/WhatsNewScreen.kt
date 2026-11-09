@@ -56,12 +56,14 @@ fun WhatsNewScreen(accent: Color, versionName: String, onDone: () -> Unit) {
         )
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
             listOf(
-                R.string.whatsnew_1_tile,
-                R.string.whatsnew_1_backup,
-                R.string.whatsnew_1_filter,
-                R.string.whatsnew_1_voicemail,
-                R.string.whatsnew_1_bluetooth,
-                R.string.whatsnew_1_hindi,
+                R.string.whatsnew_2_contact,
+                R.string.whatsnew_2_accounts,
+                R.string.whatsnew_2_duplicates,
+                R.string.whatsnew_2_edit,
+                R.string.whatsnew_2_motion,
+                R.string.whatsnew_2_callchip,
+                R.string.whatsnew_2_tools,
+                R.string.whatsnew_2_dialpad,
             ).forEach { res ->
                 Row(Modifier.padding(vertical = 7.dp)) {
                     Text(

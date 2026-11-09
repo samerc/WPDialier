@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="whatsnew_2_contact">une nouvelle fiche contact avec tout sur la personne, et des vignettes d\'action rapide</string>
+    <string name="whatsnew_2_accounts">déplacez ou copiez des contacts entre comptes, liez-les ou fusionnez les doublons</string>
+    <string name="whatsnew_2_duplicates">trouvez les contacts en double depuis les paramètres</string>
+    <string name="whatsnew_2_edit">modifiez tous les champs d\'un contact : nom complet, adresses, dates, étiquettes et plus</string>
+    <string name="whatsnew_2_motion">les animations de Windows Phone : pages qui tournent, fenêtres qui pivotent et vignettes qui se retournent</string>
+    <string name="whatsnew_2_callchip">la durée de l\'appel dans la barre d\'état ; touchez la notification pour revenir à l\'appel</string>
+    <string name="whatsnew_2_tools">épinglez des contacts à l\'écran d\'accueil, filtrage des appels, rappels et notes d\'appel</string>
+    <string name="whatsnew_2_dialpad">appui long sur 2–9 pour la numérotation rapide, pause et attente, et codes secrets</string>
+</resources>

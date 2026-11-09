@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- What's new in 1.2 (screens/WhatsNewScreen.kt) -->
+    <string name="whatsnew_2_contact">a new contact page with everything about a person, plus quick action tiles</string>
+    <string name="whatsnew_2_accounts">move or copy contacts between accounts, link them, or merge duplicates</string>
+    <string name="whatsnew_2_duplicates">find duplicate contacts from Settings</string>
+    <string name="whatsnew_2_edit">edit every contact field: full name, addresses, dates, labels and more</string>
+    <string name="whatsnew_2_motion">Windows Phone motion: page turns, swivels and tiles that flip</string>
+    <string name="whatsnew_2_callchip">a call timer in the status bar; tap the notification to get back to your call</string>
+    <string name="whatsnew_2_tools">pin contacts to Start, call screening, call-back reminders and call notes</string>
+    <string name="whatsnew_2_dialpad">hold 2–9 for speed dial, pause and wait dialing, and secret codes</string>
+</resources>

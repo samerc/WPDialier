@@ -28,8 +28,8 @@ android {
         // compat path for 33 (CallEndpoint is 34+).
         minSdk = 33
         targetSdk = 36
-        versionCode = 4
-        versionName = "1.1.1"
+        versionCode = 5
+        versionName = "1.2.0"
     }
 
     signingConfigs {

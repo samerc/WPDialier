@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="whatsnew_2_contact">नया संपर्क पेज जिसमें व्यक्ति की पूरी जानकारी और त्वरित कार्य टाइलें हैं</string>
+    <string name="whatsnew_2_accounts">संपर्कों को खातों के बीच ले जाएँ या कॉपी करें, उन्हें लिंक करें या डुप्लिकेट मर्ज करें</string>
+    <string name="whatsnew_2_duplicates">सेटिंग्स से डुप्लिकेट संपर्क खोजें</string>
+    <string name="whatsnew_2_edit">संपर्क की हर जानकारी बदलें: पूरा नाम, पते, तारीखें, लेबल और बहुत कुछ</string>
+    <string name="whatsnew_2_motion">Windows Phone जैसी हलचल: पलटते पेज, घूमती विंडो और पलटती टाइलें</string>
+    <string name="whatsnew_2_callchip">स्टेटस बार में कॉल का समय; कॉल पर लौटने के लिए नोटिफ़िकेशन पर टैप करें</string>
+    <string name="whatsnew_2_tools">संपर्कों को होम स्क्रीन पर पिन करें, कॉल स्क्रीनिंग, वापस कॉल करने के रिमाइंडर और कॉल नोट्स</string>
+    <string name="whatsnew_2_dialpad">स्पीड डायल के लिए 2–9 दबाकर रखें, पॉज़ और वेट डायलिंग, और गुप्त कोड</string>
+</resources>
