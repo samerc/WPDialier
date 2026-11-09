@@ -17,7 +17,11 @@ purge it).
 - TWO dev machines exist. Current one (since 2026-10-31, user "Samer"):
   JDK = Android Studio's JBR (`C:\Program Files\Android\Android Studio\jbr`,
   JDK 25), SDK at `%LOCALAPPDATA%\Android\Sdk` (adb in platform-tools there),
-  standalone Gradle 9.7.1 also at `C:\gradle`. Old machine: `C:\jdk-21`,
+  standalone Gradle 9.7.1 also at `C:\gradle`. Third machine (2026-11-09,
+  user "samer", Windows Server, 24 GB, NO emulator): portable JDK 21 at
+  `C:\Users\samer\buildtools\jdk\jdk-21*`, SDK at `%LOCALAPPDATA%\Android\Sdk`
+  (cmdline-tools only; Gradle auto-installs platforms), release keystore
+  present. Old machine: `C:\jdk-21`,
   `C:\android-sdk`. `local.properties` (untracked) holds the machine's sdk.dir.
 - Build: `$env:JAVA_HOME='C:\Program Files\Android\Android Studio\jbr'; .\gradlew.bat assembleDebug`
 - Toolchain (refreshed 2026-10-31): Gradle 9.8.2 (wrapper) / AGP 9.5.0
