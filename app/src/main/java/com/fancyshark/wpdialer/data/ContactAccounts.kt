@@ -575,6 +575,36 @@ object ContactAccounts {
     }
 
     /**
+     * [raw] re-read from the provider right before a write (screens hold a
+     * snapshot from when they opened; the part may have been edited or
+     * synced since). Null when the part is gone, moved account, or the read
+     * failed — the caller must then write nothing.
+     */
+    private fun reloadRaw(context: Context, raw: RawSource): RawSource? = runCatching {
+        var head: RawSource? = null
+        context.contentResolver.query(
+            RawContacts.CONTENT_URI,
+            arrayOf(
+                RawContacts.ACCOUNT_NAME, RawContacts.ACCOUNT_TYPE,
+                RawContacts.STARRED, RawContacts.CUSTOM_RINGTONE, RawContacts.SEND_TO_VOICEMAIL,
+            ),
+            "${RawContacts._ID} = ? AND ${RawContacts.DELETED} = 0",
+            arrayOf(raw.rawId.toString()),
+            null,
+        )?.use { c ->
+            if (c.moveToFirst() && AccountRef(c.getString(0), c.getString(1)) == raw.account) {
+                head = raw.copy(starred = c.getInt(2) == 1, ringtone = c.getString(3), sendToVoicemail = c.getInt(4) == 1)
+            }
+        } ?: throw IllegalStateException("raw contact query failed")
+        val fresh = head ?: return@runCatching null
+        fresh.copy(rows = loadRows(context, listOf(raw.rawId))[raw.rawId].orEmpty())
+    }.getOrNull()
+
+    /** Group infos for [rows]' memberships, on top of [known] (a snapshot's map). */
+    private fun withFreshGroups(context: Context, known: Map<Long, GroupInfo>, rows: Collection<DataRow>): Map<Long, GroupInfo> =
+        known + loadGroups(context, groupIdsOf(rows) - known.keys)
+
+    /**
      * Accounts a contact can be moved/copied/merged into: every writable
      * contacts account on the device (visible to a READ_CONTACTS holder
      * without GET_ACCOUNTS), writable types already seen in raw contacts,
@@ -767,6 +797,24 @@ object ContactAccounts {
         return out
     }
 
+    /**
+     * [account]'s auto-add groups (Google's "My Contacts"). A new part in
+     * that account must join them, or it ends up a hidden "other contact".
+     */
+    private fun autoAddGroups(context: Context, account: AccountRef): Set<Long> {
+        val (sel, args) = selectAccount(account)
+        val out = mutableSetOf<Long>()
+        runCatching {
+            context.contentResolver.query(
+                Groups.CONTENT_URI,
+                arrayOf(Groups._ID),
+                "$sel AND ${Groups.AUTO_ADD} = 1 AND ${Groups.DELETED} = 0",
+                args, null,
+            )?.use { c -> while (c.moveToNext()) out += c.getLong(0) }
+        }
+        return out
+    }
+
     private fun sourceGroupRefs(raws: List<RawSource>, groups: Map<Long, GroupInfo>): Pair<List<String>, List<String>> {
         val infos = groupIdsOf(raws.flatMap { it.rows }).mapNotNull { groups[it] }
         val titles = infos.filter { it.systemId == null }.mapNotNull { it.title?.trim()?.takeIf { t -> t.isNotEmpty() } }
@@ -779,7 +827,8 @@ object ContactAccounts {
 
     /** Full-size display photo of a part, else its thumbnail; null without one. */
     private fun readPhotoBytes(context: Context, raw: RawSource): ByteArray? {
-        val row = raw.rows.firstOrNull { it.mimetype == Mime.PHOTO } ?: return null
+        // A photo row without an image (no blob, no display-photo file) is no photo.
+        val row = raw.rows.firstOrNull { ContactMerge.hasPhoto(it) } ?: return null
         val uri = Uri.withAppendedPath(
             ContentUris.withAppendedId(RawContacts.CONTENT_URI, raw.rawId),
             RawContacts.DisplayPhoto.CONTENT_DIRECTORY,
@@ -960,16 +1009,19 @@ object ContactAccounts {
      */
     private fun copySync(
         context: Context,
-        src: RawSource,
-        groups: Map<Long, GroupInfo>,
+        snapshot: RawSource,
+        snapshotGroups: Map<Long, GroupInfo>,
         target: AccountRef,
         keepWith: List<Long>,
     ): AccountOp {
-        if (src.readOnly) return AccountOp.Failed(AccountOp.Stage.READ)
+        if (snapshot.readOnly) return AccountOp.Failed(AccountOp.Stage.READ)
+        // Copy what the part holds NOW, not the screen's snapshot.
+        val src = reloadRaw(context, snapshot) ?: return AccountOp.Failed(AccountOp.Stage.READ)
+        val groups = withFreshGroups(context, snapshotGroups, src.rows)
         val rows = src.rows.filter { it.mimetype in Mime.COPYABLE }
         val photo = readPhotoBytes(context, src)
         val (titles, systemIds) = sourceGroupRefs(listOf(src), groups)
-        val groupIds = ensureGroups(context, target, titles, systemIds)
+        val groupIds = ensureGroups(context, target, titles, systemIds) + autoAddGroups(context, target)
         val ops = arrayListOf(newRawOp(target, src.starred, src.ringtone, src.sendToVoicemail))
         rows.forEach { ops += insertRowOp(it, null, 0) }
         groupIds.forEach { ops += groupOp(it, null, 0) }
@@ -1034,8 +1086,21 @@ object ContactAccounts {
         target: AccountRef,
         choices: MergeChoices,
     ): AccountOp = withContext(Dispatchers.IO) {
-        val groups = contacts.flatMap { it.groups.entries }.associate { it.key to it.value }
-        val all = contacts.flatMap { it.raws }.distinctBy { it.rawId }
+        val snapshot = contacts.flatMap { it.raws }.distinctBy { it.rawId }
+        // Merge what the parts hold NOW, not the preview's snapshot. A
+        // writable part that vanished means the preview is stale: write
+        // nothing. A vanished read-only part is just no longer linked.
+        val fresh = snapshot.map { it to reloadRaw(context, it) }
+        if (fresh.any { (old, now) -> now == null && !old.readOnly }) {
+            return@withContext AccountOp.Failed(AccountOp.Stage.READ)
+        }
+        val all = fresh.mapNotNull { it.second }
+        if (all.isEmpty()) return@withContext AccountOp.Failed(AccountOp.Stage.READ)
+        val groups = withFreshGroups(
+            context,
+            contacts.flatMap { it.groups.entries }.associate { it.key to it.value },
+            all.flatMap { it.rows },
+        )
         val readOnly = all.filter { it.readOnly }
         // The kept part (if any) goes first, so ties keep its rows.
         val writableAll = all.filter { !it.readOnly }
@@ -1054,8 +1119,11 @@ object ContactAccounts {
         val combined = ContactMerge.combine(writable.map { mergeInput(it, groups) }, choices)
         val finalRows = combined.rows()
         val (_, systemIds) = sourceGroupRefs(writable, groups)
+        // Groups live in the kept part's own account (which may be the OEM's
+        // typed spelling of the target's local storage).
+        val groupAccount = kept?.account ?: target
         val groupIds = runCatching {
-            ensureGroups(context, target, combined.labels, systemIds)
+            ensureGroups(context, groupAccount, combined.labels, systemIds) + autoAddGroups(context, groupAccount)
         }.getOrDefault(emptySet())
         val photoRaw = combined.photo?.rawId
         val photoBytes = if (photoRaw != null && photoRaw != kept?.rawId) {
@@ -1063,9 +1131,12 @@ object ContactAccounts {
         } else {
             null
         }
-        val starred = writable.any { it.starred }
-        val ringtone = kept?.ringtone ?: writable.firstNotNullOfOrNull { it.ringtone }
-        val toVoicemail = kept?.sendToVoicemail ?: false
+        val flags = ContactMerge.combineFlags(
+            writable.map { PartFlags(it.starred, it.ringtone, it.sendToVoicemail) },
+        )
+        val starred = flags.starred
+        val ringtone = flags.ringtone
+        val toVoicemail = flags.sendToVoicemail
 
         val ops = arrayListOf<ContentProviderOperation>()
         val rawRef: Long?
@@ -1075,9 +1146,24 @@ object ContactAccounts {
             backRef = null
             val keepIds = finalRows.filter { it.rawId == kept.rawId }.map { it.dataId }.toSet()
             // Kept rows superseded by the combined set (deduped duplicates,
-            // a name/organization the user chose from another part).
+            // a name the user chose from another part).
             kept.rows.filter { it.mimetype in Mime.COPYABLE && it.mimetype != Mime.NOTE && it.dataId !in keepIds }
                 .forEach { ops += deleteRowOp(it.dataId) }
+            // Kept rows whose primary flag the combine changed (the chosen
+            // organization becomes primary, the others secondary).
+            val keptById = kept.rows.associateBy { it.dataId }
+            finalRows.filter { it.rawId == kept.rawId }.forEach { row ->
+                val old = keptById[row.dataId] ?: return@forEach
+                val primary = row.int(Cols.IS_PRIMARY) ?: 0
+                val superPrimary = row.int(Cols.IS_SUPER_PRIMARY) ?: 0
+                if (primary != (old.int(Cols.IS_PRIMARY) ?: 0) || superPrimary != (old.int(Cols.IS_SUPER_PRIMARY) ?: 0)) {
+                    ops += ContentProviderOperation
+                        .newUpdate(ContentUris.withAppendedId(ContactsContract.Data.CONTENT_URI, row.dataId))
+                        .withValue(Cols.IS_PRIMARY, primary)
+                        .withValue(Cols.IS_SUPER_PRIMARY, superPrimary)
+                        .build()
+                }
+            }
             finalRows.filter { it.rawId != kept.rawId }.forEach { ops += insertRowOp(it, kept.rawId, null) }
             val keptNotes = kept.rows.filter { it.mimetype == Mime.NOTE }
             val noteUnchanged = keptNotes.size == 1 && keptNotes[0].data1 == combined.note
@@ -1085,9 +1171,8 @@ object ContactAccounts {
                 keptNotes.forEach { ops += deleteRowOp(it.dataId) }
                 combined.note?.let { ops += noteOp(it, kept.rawId, null) }
             }
-            if (photoBytes != null) {
-                kept.rows.filter { it.mimetype == Mime.PHOTO }.forEach { ops += deleteRowOp(it.dataId) }
-            }
+            // The kept photo is replaced only after the new one is written
+            // (below) — never deleted on the strength of a read alone.
             val existingGroups = groupIdsOf(kept.rows)
             groupIds.filter { it !in existingGroups }.forEach { ops += groupOp(it, kept.rawId, null) }
             ops += ContentProviderOperation
@@ -1115,10 +1200,23 @@ object ContactAccounts {
             Repo.invalidateCaches()
             return@withContext AccountOp.Failed(AccountOp.Stage.WRITE)
         }
-        if (photoBytes != null) insertPhoto(context, keptId, photoBytes)
+        val photoWritten = photoBytes != null && insertPhoto(context, keptId, photoBytes)
+        if (photoWritten && kept != null) {
+            // The chosen photo is saved: now the kept part's old one can go.
+            kept.rows.filter { it.mimetype == Mime.PHOTO }.forEach { old ->
+                runCatching {
+                    context.contentResolver.delete(
+                        ContentUris.withAppendedId(ContactsContract.Data.CONTENT_URI, old.dataId), null, null,
+                    )
+                }
+            }
+        }
+        // A chosen photo that couldn't be read/written degrades to the kept
+        // part's own photo (still there) rather than failing the merge.
+        val keptHasPhoto = kept?.rows?.any { ContactMerge.hasPhoto(it) } == true
         val expected = expectationFor(
-            target, finalRows, combined.note,
-            photo = combined.photo != null,
+            groupAccount, finalRows, combined.note,
+            photo = photoWritten || keptHasPhoto,
             groups = (groupIds + if (kept != null) groupIdsOf(kept.rows) else emptySet()).size,
         )
         if (!verify(context, keptId, expected)) {

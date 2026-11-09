@@ -104,6 +104,104 @@ class ContactMergeTest {
     }
 
     @Test
+    fun everyDistinctOrganizationIsKeptChosenFirstAndPrimary() {
+        val inputs = listOf(
+            MergeInput(1, listOf(name(1, "Alice Martin"), org(1, "Acme Corp", "Lead"), org(1, "Night School")), emptyList()),
+            MergeInput(2, listOf(name(2, "A. Martin"), org(2, "Globex"), org(2, "acme corp", "lead")), emptyList()),
+        )
+        val chosen = ContactMerge.combine(inputs, MergeChoices(orgRaw = 2))
+        assertEquals(listOf("Globex", "Acme Corp", "Night School"), chosen.organizations.map { it.data1 })
+        assertEquals(1, chosen.organizations[0].int(Cols.IS_PRIMARY))
+        assertTrue(chosen.organizations.drop(1).all { it.int(Cols.IS_PRIMARY) == 0 })
+        // One name row, but every organization row, in the written set.
+        val rows = chosen.rows()
+        assertEquals(1, rows.count { it.mimetype == Mime.NAME })
+        assertEquals(3, rows.count { it.mimetype == Mime.ORGANIZATION })
+        // Default: the first part's organization leads.
+        assertEquals("Acme Corp", ContactMerge.combine(inputs).organization?.data1)
+    }
+
+    @Test
+    fun singleOrganizationKeepsItsFlags() {
+        val o = org(1, "Acme")
+        val combined = ContactMerge.combine(listOf(MergeInput(1, listOf(o), emptyList())))
+        assertTrue(combined.organizations.single() === o)
+    }
+
+    @Test
+    fun extensionsAreDifferentNumbers() {
+        val a = MergeInput(1, listOf(phone(1, "+1 212 555 1234"), phone(1, "+1 212 555 1234,22")), emptyList())
+        val b = MergeInput(2, listOf(phone(2, "(212) 555-1234, 22"), phone(2, "+1 212 555 1234;33")), emptyList())
+        val numbers = ContactMerge.combine(listOf(a, b)).phones.map { it.row.data1 }
+        assertEquals(listOf("+1 212 555 1234", "+1 212 555 1234,22", "+1 212 555 1234;33"), numbers)
+        assertEquals("p22", ContactMerge.postDial("+1 212 555 1234 P 22"))
+        assertEquals("", ContactMerge.postDial("+1 212 555 1234"))
+        assertTrue(ContactMerge.sameStoredNumber("03 039 056 p22", "+961 3 039 056P22"))
+        assertFalse(ContactMerge.sameStoredNumber("+961 3 039 056", "+961 3 039 056w1"))
+    }
+
+    @Test
+    fun emptyPhotoRowsAreNotPhotos() {
+        val empty = row(1, Mime.PHOTO, "data15" to null, "data14" to null)
+        val real = row(2, Mime.PHOTO, "data15" to byteArrayOf(7))
+        val file = row(3, Mime.PHOTO, "data14" to 42L)
+        assertFalse(ContactMerge.hasPhoto(empty))
+        assertTrue(ContactMerge.hasPhoto(real))
+        assertTrue(ContactMerge.hasPhoto(file))
+        val inputs = listOf(
+            MergeInput(1, listOf(empty), emptyList()),
+            MergeInput(2, listOf(real), emptyList()),
+        )
+        // The kept part's empty row neither wins nor causes a conflict.
+        assertEquals(2L, ContactMerge.combine(inputs).photo?.rawId)
+        assertTrue(ContactMerge.conflicts(inputs).photos.isEmpty())
+        // Even when the user's choice points at a part without an image.
+        assertEquals(2L, ContactMerge.combine(inputs, MergeChoices(photoRaw = 1)).photo?.rawId)
+    }
+
+    @Test
+    fun sendToVoicemailAndFavoriteSurviveFromAnyPart() {
+        val flags = ContactMerge.combineFlags(
+            listOf(
+                PartFlags(starred = false, ringtone = null, sendToVoicemail = false),
+                PartFlags(starred = true, ringtone = "content://tone/2", sendToVoicemail = true),
+                PartFlags(starred = false, ringtone = "content://tone/3", sendToVoicemail = false),
+            ),
+        )
+        assertTrue(flags.sendToVoicemail)
+        assertTrue(flags.starred)
+        assertEquals("content://tone/2", flags.ringtone)
+        val kept = ContactMerge.combineFlags(
+            listOf(
+                PartFlags(starred = false, ringtone = "content://tone/1", sendToVoicemail = false),
+                PartFlags(starred = false, ringtone = "content://tone/2", sendToVoicemail = false),
+            ),
+        )
+        assertFalse(kept.sendToVoicemail)
+        assertEquals("content://tone/1", kept.ringtone)
+    }
+
+    @Test
+    fun uncopiedRowsCountOnlyDeletedPartsPrivateRows() {
+        val inputs = listOf(
+            MergeInput(1, listOf(name(1, "A"), row(1, "vnd.com.google.cursor.item/contact_user_defined_field")), emptyList()),
+            MergeInput(
+                2,
+                listOf(
+                    name(2, "B"),
+                    row(2, "vnd.android.cursor.item/vnd.com.whatsapp.voip.call"),
+                    row(2, "vnd.com.google.cursor.item/contact_user_defined_field"),
+                    row(2, Mime.GROUP, "data1" to 6L),
+                ),
+                emptyList(),
+            ),
+        )
+        assertEquals(2, ContactMerge.uncopiedRows(inputs, keptRaw = 1))
+        // No kept part: every part is deleted.
+        assertEquals(3, ContactMerge.uncopiedRows(inputs, keptRaw = null))
+    }
+
+    @Test
     fun notesConcatenateWithBlankLineAndSkipRepeats() {
         assertEquals("one\n\ntwo", ContactMerge.combineNotes(listOf(" one ", null, "two", "one", "")))
         assertNull(ContactMerge.combineNotes(listOf(null, " ")))

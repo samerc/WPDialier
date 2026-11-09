@@ -22,13 +22,61 @@ class DuplicateFinderTest {
         assertTrue(DuplicateFinder.similarNames("Martin Alice", "Alice Martin"))
         assertTrue(DuplicateFinder.similarNames("Alice M", "Alice Martin"))
         assertTrue(DuplicateFinder.similarNames("A. Martin", "Alice Martin"))
-        assertTrue(DuplicateFinder.similarNames("Jon Smith", "John Smith"))
+        assertTrue(DuplicateFinder.similarNames("Jonathan Smith", "Jonathon Smith"))
         assertTrue(DuplicateFinder.similarNames("Hélène", "Helene"))
         assertFalse(DuplicateFinder.similarNames("Alice Martin", "Bob Stone"))
         assertFalse(DuplicateFinder.similarNames("Al", "Al"))
         assertFalse(DuplicateFinder.similarNames("Mom", "Tom"))
         assertFalse(DuplicateFinder.similarNames("Office 1", "Office 2"))
         assertFalse(DuplicateFinder.similarNames("+961 3 039 056", "+961 3 039 056"))
+    }
+
+    @Test
+    fun nameOnlyMatchesAreStrict() {
+        assertTrue(DuplicateFinder.similarNames("Smith John", "John Smith"))
+        assertTrue(DuplicateFinder.similarNames("A. Test", "Alice Test"))
+        assertTrue(DuplicateFinder.similarNames("Test Alice", "A Test"))
+        assertTrue(DuplicateFinder.similarNames("Michelle", "Michele"))
+        // Short tokens get no typo allowance: different people.
+        assertFalse(DuplicateFinder.similarNames("Mark Smith", "Mary Smith"))
+        assertFalse(DuplicateFinder.similarNames("Jon Smith", "John Smith"))
+        // At most one typo in total.
+        assertFalse(DuplicateFinder.similarNames("Jonathan Smyth", "Jonathon Smith"))
+        // Extra or missing tokens are not the same name.
+        assertFalse(DuplicateFinder.similarNames("Alice Martin", "Alice B Martin"))
+        // Initials alone never match.
+        assertFalse(DuplicateFinder.similarNames("A B", "Alice Bob"))
+        assertNull(DuplicateFinder.match(c(1, "Mark Smith"), c(2, "Mary Smith")))
+    }
+
+    @Test
+    fun nameOnlyPairsDoNotChain() {
+        // "Alice M" looks like both, but the two Alices aren't alike: two
+        // separate pairs, never one group of three.
+        val all = listOf(c(1, "Alice Martin"), c(2, "Alice M"), c(3, "Alice Moreau"))
+        val groups = DuplicateFinder.findGroups(all)
+        assertEquals(2, groups.size)
+        assertTrue(groups.all { it.members.size == 2 && it.reason == DupReason.NAME })
+        assertEquals(
+            setOf(listOf(1L, 2L), listOf(2L, 3L)),
+            groups.map { g -> g.members.map { it.contactId }.sorted() }.toSet(),
+        )
+    }
+
+    @Test
+    fun nameOnlyMatchDoesNotJoinAStrongGroup() {
+        val all = listOf(
+            c(1, "Alice Martin", listOf("+961 3 039 056")),
+            c(2, "Alice Martin", listOf("03 039 056")),
+            c(3, "Alice Martin"),
+        )
+        val groups = DuplicateFinder.findGroups(all)
+        assertEquals(2, groups.size)
+        assertEquals(listOf(1L, 2L), groups[0].members.map { it.contactId })
+        assertEquals(DupReason.NUMBER, groups[0].reason)
+        assertEquals(2, groups[1].members.size)
+        assertEquals(DupReason.NAME, groups[1].reason)
+        assertTrue(groups[1].members.any { it.contactId == 3L })
     }
 
     @Test

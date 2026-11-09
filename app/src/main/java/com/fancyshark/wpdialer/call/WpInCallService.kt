@@ -70,6 +70,9 @@ class WpInCallService : InCallService() {
     }
 
     override fun onDestroy() {
+        // The plain-notify fallback is not tied to the service lifecycle —
+        // it would otherwise outlive the unbind.
+        cancelOngoingNotification()
         scope?.cancel()
         scope = null
         proximityLock?.let { runCatching { if (it.isHeld) it.release() } }
@@ -112,8 +115,12 @@ class WpInCallService : InCallService() {
                 cancelIncomingNotification()
             }
             when (newState) {
-                Call.STATE_ACTIVE, Call.STATE_DIALING, Call.STATE_CONNECTING ->
-                    postOngoingNotification(call)
+                // The notification follows the primary call: on a swap the
+                // newly active call may still rank behind the other until
+                // that one reports HOLDING, so post whichever is primary.
+                Call.STATE_ACTIVE, Call.STATE_DIALING, Call.STATE_CONNECTING,
+                Call.STATE_HOLDING ->
+                    postOngoingNotification(CallManager.call.value ?: call)
                 Call.STATE_DISCONNECTED -> {
                     // If another call survives (e.g. the held one dropped),
                     // its ongoing notification must come back.
@@ -131,17 +138,39 @@ class WpInCallService : InCallService() {
         }
     }
 
+    // Every post request bumps this; a contact lookup that finishes after a
+    // newer request (swap, ACTIVE after DIALING) must not overwrite it.
+    private var ongoingGen = 0
+    private var ongoingLookup: kotlinx.coroutines.Job? = null
+
+    // Only the primary, still-live call owns the ongoing notification.
+    private fun showsOngoing(call: Call): Boolean {
+        val state = CallManager.stateOf(call)
+        return CallManager.call.value === call &&
+            state != Call.STATE_DISCONNECTED && state != Call.STATE_RINGING
+    }
+
+    // Wall-clock connect time drives the notification / status-bar chip
+    // chronometer; 0 while still dialing. Read at post time, not request time.
+    private fun sinceOf(call: Call): Long {
+        val state = CallManager.stateOf(call)
+        return call.details.connectTimeMillis.takeIf {
+            (state == Call.STATE_ACTIVE || state == Call.STATE_HOLDING) && it > 0
+        } ?: 0L
+    }
+
     private fun postOngoingNotification(call: Call) {
-        // Wall-clock connect time drives the notification / status-bar chip
-        // chronometer; 0 while still dialing.
-        val since = call.details.connectTimeMillis
-            .takeIf { CallManager.stateOf(call) == Call.STATE_ACTIVE && it > 0 } ?: 0L
+        // A non-primary call's update must not cancel the primary's lookup.
+        if (!showsOngoing(call)) return
+        val gen = ++ongoingGen
+        ongoingLookup?.cancel()
+        ongoingLookup = null
         // Conference parents carry no handle — label them properly instead
         // of falling through to "unknown".
         if (call.details.hasProperty(Call.Details.PROPERTY_CONFERENCE)) {
             postOngoingNotificationNow(
                 getString(com.fancyshark.wpdialer.R.string.call_conference),
-                since = since,
+                since = sinceOf(call),
             )
             return
         }
@@ -152,15 +181,14 @@ class WpInCallService : InCallService() {
             ?: number.ifBlank { getString(com.fancyshark.wpdialer.R.string.call_unknown) }
         val s = scope
         if (s == null || number.isBlank()) {
-            postOngoingNotificationNow(fallback, number, since)
+            postOngoingNotificationNow(fallback, number, sinceOf(call))
             return
         }
-        s.launch {
+        ongoingLookup = s.launch {
             val (name, _) = com.fancyshark.wpdialer.data.Repo
                 .lookupCaller(this@WpInCallService, number)
-            val state = CallManager.stateOf(call)
-            if (state != Call.STATE_DISCONNECTED && state != Call.STATE_RINGING) {
-                postOngoingNotificationNow(name ?: fallback, number, since)
+            if (gen == ongoingGen && showsOngoing(call)) {
+                postOngoingNotificationNow(name ?: fallback, number, sinceOf(call))
             }
         }
     }
@@ -249,6 +277,10 @@ class WpInCallService : InCallService() {
     }
 
     private fun cancelOngoingNotification() {
+        // A lookup still in flight must not re-post after the cancel.
+        ongoingGen++
+        ongoingLookup?.cancel()
+        ongoingLookup = null
         if (foreground) {
             runCatching { stopForeground(STOP_FOREGROUND_REMOVE) }
             foreground = false

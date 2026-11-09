@@ -102,8 +102,23 @@ private fun dialRank(p: PreparedDialEntry, input: String): Int? = when {
  * digits/star/pound append, "del" backspaces, "call" dials.
  */
 object DialpadBus {
+    // Owner token, not a flag: when one dialpad replaces another, the
+    // outgoing one's dispose can run after the new one claimed the bus —
+    // it must only release the bus if it still owns it.
     @Volatile
-    var open = false
+    private var owner: Any? = null
+    val open: Boolean get() = owner != null
+
+    @Synchronized
+    fun claim(token: Any) {
+        owner = token
+    }
+
+    @Synchronized
+    fun release(token: Any) {
+        if (owner === token) owner = null
+    }
+
     val events = kotlinx.coroutines.flow.MutableSharedFlow<String>(extraBufferCapacity = 16)
 }
 
@@ -130,9 +145,10 @@ fun DialpadScreen(
         runCatching { ToneGenerator(AudioManager.STREAM_DTMF, 70) }.getOrNull()
     }
     DisposableEffect(Unit) {
-        DialpadBus.open = true
+        val busToken = Any()
+        DialpadBus.claim(busToken)
         onDispose {
-            DialpadBus.open = false
+            DialpadBus.release(busToken)
             tones?.release()
         }
     }

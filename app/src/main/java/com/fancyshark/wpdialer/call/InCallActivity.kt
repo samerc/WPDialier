@@ -204,8 +204,13 @@ private fun InCallRoot(onFinished: () -> Unit) {
     val context = LocalContext.current
 
     val number = call?.details?.handle?.schemeSpecificPart ?: ""
-    val caller by produceState<Pair<String?, String?>>(null to null, number) {
-        value = Repo.lookupCaller(context, number)
+    // Keyed on the number: after a swap the previous caller's name/photo
+    // must not linger until the new lookup returns (the Telecom name or the
+    // number shows meanwhile).
+    val caller by androidx.compose.runtime.key(number) {
+        produceState<Pair<String?, String?>>(null to null, number) {
+            value = Repo.lookupCaller(context, number)
+        }
     }
     // Saved contact first; else Telecom's name (its own contact match, then
     // the network-provided CNAP name) — keeps a name on screen where our

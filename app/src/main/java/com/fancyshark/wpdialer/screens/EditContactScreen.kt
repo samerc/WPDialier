@@ -1,5 +1,6 @@
 package com.fancyshark.wpdialer.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -20,7 +21,9 @@ import androidx.compose.ui.unit.dp
 import com.fancyshark.wpdialer.R
 import com.fancyshark.wpdialer.data.ContactEditor
 import com.fancyshark.wpdialer.data.EditableContact
+import com.fancyshark.wpdialer.data.SaveResult
 import com.fancyshark.wpdialer.ui.Metro
+import com.fancyshark.wpdialer.ui.MetroToast
 import kotlinx.coroutines.launch
 
 /**
@@ -51,14 +54,23 @@ fun EditContactScreen(
     }
     var saving by remember { mutableStateOf(false) }
     var saveFailed by remember { mutableStateOf(false) }
+    val photoFailed = stringResource(R.string.cform_photo_failed)
 
     if (loadFailed) {
         // Deleted or unreadable contact: say so, then leave instead of
-        // stranding the user on a blank page. Leaving composition (back
-        // pressed first) cancels the pop, so it never pops twice.
+        // stranding the user on a blank page. The page stays composed for
+        // the nav animation after a back press, so a [left] flag makes sure
+        // only one of back / the timer ever leaves (never popping twice).
+        var left by remember { mutableStateOf(false) }
+        fun leave() {
+            if (left) return
+            left = true
+            onDone()
+        }
+        BackHandler(enabled = !left) { leave() }
         LaunchedEffect(Unit) {
             kotlinx.coroutines.delay(1500)
-            onDone()
+            leave()
         }
         Text(
             stringResource(R.string.editcontact_load_failed),
@@ -97,8 +109,10 @@ fun EditContactScreen(
             saving = true
             saveFailed = false
             scope.launch {
-                val ok = ContactEditor.save(context, loaded, editedState ?: loaded)
-                if (ok) {
+                val result = ContactEditor.save(context, loaded, editedState ?: loaded)
+                if (result != SaveResult.FAILED) {
+                    // The other edits are in; only the photo batch failed.
+                    if (result == SaveResult.PHOTO_FAILED) MetroToast.show(photoFailed)
                     onDone()
                 } else {
                     saving = false

@@ -28,9 +28,13 @@ data class MergeConflicts(val names: List<DataRow>, val photos: List<DataRow>, v
 /** A combined phone and how many parts carried it. */
 data class CombinedPhone(val row: DataRow, val parts: Int)
 
+/** Raw-contact flags of one merge part (kept part first). */
+data class PartFlags(val starred: Boolean, val ringtone: String?, val sendToVoicemail: Boolean)
+
 data class CombinedContact(
     val name: DataRow?,
-    val organization: DataRow?,
+    /** Every distinct organization row; the chosen (primary) one first. */
+    val organizations: List<DataRow>,
     val photo: DataRow?,
     val phones: List<CombinedPhone>,
     val emails: List<DataRow>,
@@ -42,9 +46,12 @@ data class CombinedContact(
     val note: String?,
     val labels: List<String>,
 ) {
+    /** The primary organization (the user's choice on a conflict). */
+    val organization: DataRow? get() = organizations.firstOrNull()
+
     /** Every combined data row except the note and photo (written separately). */
     fun rows(): List<DataRow> =
-        listOfNotNull(name, organization) + phones.map { it.row } + emails + events +
+        listOfNotNull(name) + organizations + phones.map { it.row } + emails + events +
             addresses + websites + others
 }
 
@@ -63,11 +70,21 @@ object ContactMerge {
 
     private fun hasOrg(row: DataRow) = row.data1 != null || row.text("data4") != null
 
+    /** Company, title or department — anything worth keeping in an organization row. */
+    private fun hasAnyOrg(row: DataRow) = hasOrg(row) || row.text("data5") != null
+
+    private fun orgFullKey(row: DataRow): String = orgKey(row) + "|" + norm(row.text("data5"))
+
+    /** A photo row that actually holds an image (thumbnail blob or display-photo file). */
+    fun hasPhoto(row: DataRow): Boolean =
+        row.mimetype == Mime.PHOTO &&
+            (row.blob(Cols.data(15))?.isNotEmpty() == true || row.values[Cols.data(14)] != null)
+
     /** Conflicts appear only when 2+ distinct values exist across the parts. */
     fun conflicts(inputs: List<MergeInput>): MergeConflicts {
         val names = inputs.mapNotNull { firstOf(it, Mime.NAME) { r -> r.data1 != null } }
             .distinctBy { norm(it.data1) }
-        val photos = inputs.mapNotNull { firstOf(it, Mime.PHOTO) }
+        val photos = inputs.mapNotNull { firstOf(it, Mime.PHOTO, ::hasPhoto) }
         val orgs = inputs.mapNotNull { firstOf(it, Mime.ORGANIZATION, ::hasOrg) }.distinctBy(::orgKey)
         return MergeConflicts(
             names = if (names.size > 1) names else emptyList(),
@@ -84,14 +101,29 @@ object ContactMerge {
     private fun isInternational(number: String?): Boolean = number?.trim()?.startsWith("+") == true
 
     /**
-     * Phones clustered by [Repo.numbersMatch]; each cluster keeps one row,
+     * The post-dial part of a number (extension, pauses: everything from the
+     * first ',', ';', 'p' or 'w'), lowercased and without spaces.
+     */
+    fun postDial(raw: String): String =
+        raw.substring(Repo.networkPortion(raw).length).lowercase(Locale.ROOT).filterNot { it.isWhitespace() }
+
+    /**
+     * One stored number for merge purposes: the same line ([Repo.numbersMatch])
+     * AND the same extension — "+1 212 555 1234" and "+1 212 555 1234,22"
+     * reach different people.
+     */
+    fun sameStoredNumber(a: String, b: String): Boolean =
+        Repo.numbersMatch(a, b) && postDial(a) == postDial(b)
+
+    /**
+     * Phones clustered by [sameStoredNumber]; each cluster keeps one row,
      * preferring the international (E.164) spelling, else the first seen.
      */
     fun dedupePhones(rows: List<DataRow>): List<CombinedPhone> {
         val clusters = mutableListOf<MutableList<DataRow>>()
         rows.filter { it.mimetype == Mime.PHONE && it.data1 != null }.forEach { row ->
             val n = row.data1!!
-            val cluster = clusters.firstOrNull { c -> c.any { Repo.numbersMatch(it.data1!!, n) } }
+            val cluster = clusters.firstOrNull { c -> c.any { sameStoredNumber(it.data1!!, n) } }
             if (cluster != null) cluster += row else clusters += mutableListOf(row)
         }
         return clusters.map { c ->
@@ -143,8 +175,8 @@ object ContactMerge {
         fun of(m: String) = all.filter { it.mimetype == m && it.data1 != null }
         return CombinedContact(
             name = pick(inputs, choices.nameRaw, Mime.NAME) { it.data1 != null },
-            organization = pick(inputs, choices.orgRaw, Mime.ORGANIZATION, ::hasOrg),
-            photo = pick(inputs, choices.photoRaw, Mime.PHOTO) { true },
+            organizations = combineOrgs(inputs, choices.orgRaw),
+            photo = pick(inputs, choices.photoRaw, Mime.PHOTO, ::hasPhoto),
             phones = dedupePhones(all),
             emails = of(Mime.EMAIL).distinctBy { norm(it.data1) },
             events = of(Mime.EVENT).distinctBy {
@@ -158,6 +190,45 @@ object ContactMerge {
             labels = combineLabels(inputs.flatMap { it.labels }),
         )
     }
+
+    /**
+     * Every distinct organization row (company + title + department). The
+     * chosen part's row comes first and is marked primary; the rest are
+     * kept as secondary rows rather than dropped.
+     */
+    private fun combineOrgs(inputs: List<MergeInput>, chosenRaw: Long?): List<DataRow> {
+        val first = pick(inputs, chosenRaw, Mime.ORGANIZATION, ::hasOrg)
+        val all = inputs.flatMap { it.rows }.filter { it.mimetype == Mime.ORGANIZATION && hasAnyOrg(it) }
+        val ordered = (listOfNotNull(first) + all).distinctBy(::orgFullKey)
+        if (ordered.size < 2) return ordered
+        return ordered.mapIndexed { i, row -> withPrimary(row, i == 0) }
+    }
+
+    private fun withPrimary(row: DataRow, primary: Boolean): DataRow {
+        val values = row.values.toMutableMap()
+        values[Cols.IS_PRIMARY] = if (primary) 1L else 0L
+        if (!primary) values[Cols.IS_SUPER_PRIMARY] = 0L
+        return row.copy(values = values)
+    }
+
+    /**
+     * Raw-contact flags of the merged part ([parts] = kept part first):
+     * favorite and send-to-voicemail if ANY part had them (a caller sent to
+     * voicemail must not start ringing), the first ringtone set.
+     */
+    fun combineFlags(parts: List<PartFlags>): PartFlags = PartFlags(
+        starred = parts.any { it.starred },
+        ringtone = parts.firstNotNullOfOrNull { it.ringtone },
+        sendToVoicemail = parts.any { it.sendToVoicemail },
+    )
+
+    /**
+     * App/sync-private rows (non-standard mimetypes: custom fields, app
+     * actions) held by the parts a merge deletes — everything but
+     * [keptRaw]. These aren't copied, so the merge loses them.
+     */
+    fun uncopiedRows(inputs: List<MergeInput>, keptRaw: Long?): Int =
+        inputs.filter { it.rawId != keptRaw }.sumOf { input -> input.rows.count { it.mimetype !in Mime.STANDARD } }
 }
 
 // ---- duplicate detection ---------------------------------------------------
@@ -218,7 +289,12 @@ object DuplicateFinder {
 
     private fun tokens(n: String) = n.split(' ').filter { it.isNotEmpty() }
 
-    /** Same name modulo case/accents/order, an initial ("Alice M"), or a typo. */
+    /**
+     * Same name modulo case/accents/token order ("Smith John"), an initial
+     * ("A. Martin", "Alice M"), or ONE typo in a token of 5+ letters
+     * ("Jonathon"). Short tokens must match exactly: "Mark Smith" and
+     * "Mary Smith" are different people.
+     */
     fun similarNames(a: String, b: String): Boolean =
         similarNormalized(normalizeName(a), normalizeName(b))
 
@@ -237,27 +313,43 @@ object DuplicateFinder {
         val ta = tokens(na)
         val tb = tokens(nb)
         if (ta.sorted() == tb.sorted()) return true
-        if (ta.size == tb.size && ta.size > 1) {
-            var full = 0
-            val ok = ta.indices.all { i ->
-                val x = ta[i]
-                val y = tb[i]
+        return tokensMatch(ta, tb)
+    }
+
+    /**
+     * Pairs every token of [ta] with a distinct token of [tb] (any order):
+     * equal, initial-vs-full, or — at most once overall — one edit apart
+     * when both tokens have 5+ letters. At least one token must match in
+     * full (3+ letters), so initials alone ("A B") never match.
+     */
+    private fun tokensMatch(ta: List<String>, tb: List<String>): Boolean {
+        if (ta.size != tb.size || ta.isEmpty() || ta.size > 6) return false
+        val used = BooleanArray(tb.size)
+        fun go(i: Int, typos: Int, full: Int): Boolean {
+            if (i == ta.size) return full >= 1
+            val x = ta[i]
+            for (j in tb.indices) {
+                if (used[j]) continue
+                val y = tb[j]
+                var typo = 0
+                var whole = 0
                 when {
-                    x == y -> { if (x.length >= 3) full++; true }
-                    x.length == 1 && y.startsWith(x) -> true
-                    y.length == 1 && x.startsWith(y) -> true
-                    else -> false
+                    x == y -> whole = if (x.length >= 3) 1 else 0
+                    (x.length == 1 && y.length > 1 && y.startsWith(x)) ||
+                        (y.length == 1 && x.length > 1 && x.startsWith(y)) -> Unit
+                    typos == 0 && x.length >= 5 && y.length >= 5 && levenshtein(x, y, 1) <= 1 -> {
+                        typo = 1
+                        whole = 1
+                    }
+                    else -> continue
                 }
+                used[j] = true
+                if (go(i + 1, typos + typo, full + whole)) return true
+                used[j] = false
             }
-            if (ok && full >= 1) return true
+            return false
         }
-        val shorter = minOf(na.length, nb.length)
-        val allowed = when {
-            shorter >= 10 -> 2
-            shorter >= 5 -> 1
-            else -> 0
-        }
-        return allowed > 0 && levenshtein(na, nb, allowed) <= allowed
+        return go(0, 0, 0)
     }
 
     /** Order-independent identity of a group, persisted for "not duplicates". */
@@ -289,7 +381,10 @@ object DuplicateFinder {
      * All duplicate groups. Candidate pairs come from indexes — number key,
      * lowercased email, sorted-token name — plus edit-distance checks only
      * inside first-letter name buckets, so 2k contacts stay well under a
-     * second. Pairs are unioned into groups; [dismissed] signatures drop.
+     * second. Only strong pairs (same number / email) are unioned into
+     * groups; a name-only pair is weak evidence and never chains — it
+     * stays a 2-member group of its own (one per pair of groups it joins).
+     * [dismissed] signatures drop.
      */
     fun findGroups(all: List<DupCandidate>, dismissed: Set<String> = emptySet()): List<DupGroup> {
         val n = all.size
@@ -303,13 +398,18 @@ object DuplicateFinder {
             return r
         }
         val edges = HashMap<Pair<Int, Int>, DupMatch>()
+        val nameEdges = LinkedHashMap<Pair<Int, Int>, DupMatch>()
         fun consider(i: Int, j: Int) {
             if (i == j) return
             val key = if (i < j) i to j else j to i
-            if (key in edges) return
+            if (key in edges || key in nameEdges) return
             val m = match(all[key.first], all[key.second], names[key.first], names[key.second]) ?: return
-            edges[key] = m
-            parent[find(key.first)] = find(key.second)
+            if (m.reason == DupReason.NAME) {
+                nameEdges[key] = m
+            } else {
+                edges[key] = m
+                parent[find(key.first)] = find(key.second)
+            }
         }
         fun pairsIn(bucket: Collection<Int>) {
             val list = bucket.distinct()
@@ -346,12 +446,25 @@ object DuplicateFinder {
         edges.keys.forEach { (i, j) ->
             members.getOrPut(find(i)) { mutableListOf() }.apply { add(i); add(j) }
         }
-        return members.values.mapNotNull { idx ->
+        val strong = members.values.mapNotNull { idx ->
             val ids = idx.distinct().sorted()
             val groupEdges = edges.filterKeys { it.first in ids }
             val best = groupEdges.values.minByOrNull { it.reason.ordinal } ?: return@mapNotNull null
             DupGroup(ids.map { all[it] }, best.reason, best.detail)
-        }.filter { it.signature !in dismissed }
+        }
+        // Name-only pairs: skipped inside one strong group, otherwise their
+        // own pair — the first one seen between any two groups.
+        val joined = HashSet<Pair<Int, Int>>()
+        val weak = nameEdges.mapNotNull { (key, m) ->
+            val ra = find(key.first)
+            val rb = find(key.second)
+            if (ra == rb) return@mapNotNull null
+            val group = DupGroup(listOf(all[key.first], all[key.second]), m.reason, m.detail)
+            if (group.signature in dismissed) return@mapNotNull null
+            if (!joined.add(if (ra < rb) ra to rb else rb to ra)) return@mapNotNull null
+            group
+        }
+        return (strong + weak).filter { it.signature !in dismissed }
             .sortedWith(compareBy<DupGroup> { it.reason.ordinal }.thenBy { normalizeName(it.members.first().name) })
     }
 }

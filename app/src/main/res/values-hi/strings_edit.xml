@@ -42,6 +42,9 @@
     <string name="cform_change">बदलें</string>
     <string name="cform_read_only">%1$s: केवल पढ़ने के लिए, यहाँ नहीं दिखाया गया</string>
     <string name="cform_need_name_or_number">पहले कोई नाम या नंबर जोड़ें</string>
+    <string name="cform_unsupported_title">फ़ील्ड हटाएँ?</string>
+    <string name="cform_unsupported_message">%1$s ये सेव नहीं कर सकता: %2$s। इन्हें हटाएँ?</string>
+    <string name="cform_photo_failed">सेव हो गया, लेकिन फ़ोटो सेव नहीं हो सकी।</string>
     <string name="cform_done">हो गया</string>
 
     <!-- Name details page -->

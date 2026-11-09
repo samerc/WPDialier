@@ -12,6 +12,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -51,9 +52,12 @@ fun ContactTile(
     // thumbnail URI, so the cache can't key on the URI alone).
     val generation by ContactThumbs.generation.collectAsState()
     // Seeded from the cache: a row scrolled back into view shows its photo
-    // on the first frame instead of flashing the initials.
-    val photo by produceState(ContactThumbs.cachedPhoto(photoUri, px), photoUri, px, generation) {
-        value = ContactThumbs.photo(context, photoUri, px)
+    // on the first frame instead of flashing the initials. Keyed on the URI so
+    // a recycled slot drops the previous contact's photo at once.
+    val photo by key(photoUri, px) {
+        produceState(ContactThumbs.cachedPhoto(photoUri, px), photoUri, px, generation) {
+            value = ContactThumbs.photo(context, photoUri, px)
+        }
     }
     Box(
         modifier.size(size).background(accent),
@@ -95,8 +99,10 @@ fun CallerTile(
 ) {
     val context = LocalContext.current
     val generation by ContactThumbs.generation.collectAsState()
-    val thumb by produceState(ContactThumbs.cachedNumberThumb(number), number, generation) {
-        value = ContactThumbs.numberThumb(context, number)
+    val thumb by key(number) {
+        produceState(ContactThumbs.cachedNumberThumb(number), number, generation) {
+            value = ContactThumbs.numberThumb(context, number)
+        }
     }
     val photoUri = thumb
     if (name.isNullOrBlank() && photoUri == null) {
@@ -202,24 +208,25 @@ object ContactThumbs {
         }
     }
 
+    // Marked only after a successful registration: without READ_CONTACTS it
+    // throws, and a later call (permission granted) must try again.
     private fun observe(context: Context) {
         if (observing) return
         synchronized(this) {
             if (observing) return
-            observing = true
-        }
-        runCatching {
-            context.applicationContext.contentResolver.registerContentObserver(
-                ContactsContract.AUTHORITY_URI,
-                true,
-                object : android.database.ContentObserver(handler) {
-                    override fun onChange(selfChange: Boolean) {
-                        // Syncs fire bursts of changes — reload once they settle.
-                        handler.removeCallbacks(flush)
-                        handler.postDelayed(flush, 800)
-                    }
-                },
-            )
+            runCatching {
+                context.applicationContext.contentResolver.registerContentObserver(
+                    ContactsContract.AUTHORITY_URI,
+                    true,
+                    object : android.database.ContentObserver(handler) {
+                        override fun onChange(selfChange: Boolean) {
+                            // Syncs fire bursts of changes — reload once they settle.
+                            handler.removeCallbacks(flush)
+                            handler.postDelayed(flush, 800)
+                        }
+                    },
+                )
+            }.onSuccess { observing = true }
         }
     }
 }

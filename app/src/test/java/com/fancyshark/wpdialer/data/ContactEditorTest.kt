@@ -31,6 +31,23 @@ class ContactEditorTest {
     // ---- dates ----
 
     @Test
+    fun yearlessLeapDayRoundTripsThroughThePicker() {
+        // Opens on a leap seed year, so Feb 29 isn't rolled to Mar 1.
+        assertEquals(EventDate(EventDates.PICKER_SEED_YEAR, 2, 29), EventDates.pickerStart("--02-29"))
+        // OK without touching the year keeps it yearless.
+        assertEquals("--02-29", EventDates.picked("--02-29", EventDates.PICKER_SEED_YEAR, 2, 29))
+        assertEquals("--03-04", EventDates.picked("--02-29", EventDates.PICKER_SEED_YEAR, 3, 4))
+        // An explicit year is stored.
+        assertEquals("1992-02-29", EventDates.picked("--02-29", 1992, 2, 29))
+        // Dated (or new) values keep the picked year, even the seed year.
+        assertEquals("2000-05-06", EventDates.picked("2000-05-06", 2000, 5, 6))
+        assertEquals("2000-05-06", EventDates.picked("", 2000, 5, 6))
+        assertEquals(EventDate(1993, 3, 4), EventDates.pickerStart("1993-03-04"))
+        assertEquals(EventDate(1993, 2, 28), EventDates.pickerStart("1993-02-29"))
+        assertNull(EventDates.pickerStart(""))
+    }
+
+    @Test
     fun parsesDatesWithAndWithoutYear() {
         assertEquals(EventDate(1993, 3, 4), EventDates.parse("1993-03-04"))
         assertEquals(EventDate(1993, 3, 4), EventDates.parse("19930304"))
@@ -158,11 +175,107 @@ class ContactEditorTest {
         val after = before.copy(name = before.name.copy(prefix = "Dr.", display = ""))
         val update = ContactEditor.planChanges(before, after).single() as RowChange.Update
         assertEquals(101L, update.dataId)
+        // Every part travels with the null display, so the provider rejoins from all of them.
         assertEquals(
-            mapOf(StructuredName.DISPLAY_NAME to null, StructuredName.PREFIX to "Dr."),
+            mapOf(
+                StructuredName.DISPLAY_NAME to null,
+                StructuredName.PREFIX to "Dr.",
+                StructuredName.GIVEN_NAME to "Alice",
+                StructuredName.MIDDLE_NAME to null,
+                StructuredName.FAMILY_NAME to "Martin",
+                StructuredName.SUFFIX to null,
+                StructuredName.PHONETIC_GIVEN_NAME to null,
+                StructuredName.PHONETIC_FAMILY_NAME to null,
+            ),
             update.values,
         )
         assertEquals("Dr. Alice Martin", after.name.composed())
+    }
+
+    @Test
+    fun phoneticOnlyEditStillCarriesEveryStructuredPart() {
+        val before = raw(1)
+        val after = before.copy(name = before.name.copy(phoneticGiven = "a-ri-su", display = ""))
+        val update = ContactEditor.planChanges(before, after).single() as RowChange.Update
+        val structured = listOf(
+            StructuredName.PREFIX, StructuredName.GIVEN_NAME, StructuredName.MIDDLE_NAME,
+            StructuredName.FAMILY_NAME, StructuredName.SUFFIX,
+        )
+        structured.forEach { assertTrue(it, update.values.containsKey(it)) }
+        assertEquals("Alice", update.values[StructuredName.GIVEN_NAME])
+        assertEquals("Martin", update.values[StructuredName.FAMILY_NAME])
+        assertEquals("a-ri-su", update.values[StructuredName.PHONETIC_GIVEN_NAME])
+        assertTrue(update.values.containsKey(StructuredName.DISPLAY_NAME))
+        assertNull(update.values[StructuredName.DISPLAY_NAME])
+    }
+
+    // ---- addresses ----
+
+    private val gouraud = EditAddress(
+        31, "12 Rue Gouraud, Beirut 1100, Lebanon", StructuredPostal.TYPE_HOME,
+        parts = mapOf(
+            StructuredPostal.STREET to "12 Rue Gouraud",
+            StructuredPostal.CITY to "Beirut",
+            StructuredPostal.POSTCODE to "1100",
+            StructuredPostal.COUNTRY to "Lebanon",
+        ),
+    )
+
+    @Test
+    fun addressTypeChangeLeavesTextAndPartsAlone() {
+        val before = raw(1).copy(addresses = listOf(gouraud))
+        val after = before.copy(addresses = listOf(gouraud.copy(type = StructuredPostal.TYPE_WORK)))
+        assertEquals(
+            listOf(RowChange.Update(31, mapOf(StructuredPostal.TYPE to StructuredPostal.TYPE_WORK))),
+            ContactEditor.planChanges(before, after),
+        )
+    }
+
+    @Test
+    fun addressTypoFixKeepsTheStructuredParts() {
+        val before = raw(1).copy(addresses = listOf(gouraud))
+        val fixed = "Apt 3, 12 Rue Gouraud, Beirut 1100, Lebanon"
+        val after = before.copy(addresses = listOf(gouraud.copy(formatted = fixed)))
+        val update = ContactEditor.planChanges(before, after).single() as RowChange.Update
+        assertEquals(fixed, update.values[StructuredPostal.FORMATTED_ADDRESS])
+        assertEquals("12 Rue Gouraud", update.values[StructuredPostal.STREET])
+        assertEquals("Beirut", update.values[StructuredPostal.CITY])
+        assertEquals("1100", update.values[StructuredPostal.POSTCODE])
+        assertEquals("Lebanon", update.values[StructuredPostal.COUNTRY])
+        // Parts the row never had are written as null, never left stale.
+        assertTrue(update.values.containsKey(StructuredPostal.REGION))
+        assertNull(update.values[StructuredPostal.REGION])
+    }
+
+    @Test
+    fun rewrittenAddressClearsEveryStructuredPart() {
+        val before = raw(1).copy(addresses = listOf(gouraud))
+        val after = before.copy(addresses = listOf(gouraud.copy(formatted = "5 Main St, Tripoli")))
+        val update = ContactEditor.planChanges(before, after).single() as RowChange.Update
+        assertEquals("5 Main St, Tripoli", update.values[StructuredPostal.FORMATTED_ADDRESS])
+        listOf(
+            StructuredPostal.STREET, StructuredPostal.POBOX, StructuredPostal.NEIGHBORHOOD,
+            StructuredPostal.CITY, StructuredPostal.REGION, StructuredPostal.POSTCODE,
+            StructuredPostal.COUNTRY,
+        ).forEach { col ->
+            assertTrue(col, update.values.containsKey(col))
+            assertNull(col, update.values[col])
+        }
+        assertFalse(update.values.containsKey(StructuredPostal.TYPE))
+    }
+
+    // ---- photo ----
+
+    @Test
+    fun newPhotoIsSuperPrimaryOnItsOwnRawContact() {
+        val before = raw(1)
+        val after = before.copy(newPhoto = byteArrayOf(1, 2, 3))
+        val changes = ContactEditor.planChanges(before, after)
+        val photo = ContactsContract.CommonDataKinds.Photo.CONTENT_ITEM_TYPE
+        assertEquals(RowChange.DeleteWhere(photo), changes[0])
+        val insert = changes[1] as RowChange.Insert
+        assertEquals(photo, insert.mime)
+        assertEquals(1, insert.values[ContactsContract.Data.IS_SUPER_PRIMARY])
     }
 
     @Test
@@ -246,5 +359,31 @@ class ContactEditorTest {
     fun preferredTargetIsFirstSyncedAccount() {
         assertEquals(1, EditableContact(1, listOf(raw(1, local), raw(2, google))).preferredTarget())
         assertEquals(0, EditableContact(1, listOf(raw(1, local))).preferredTarget())
+    }
+
+    @Test
+    fun preferredTargetPutsSimLast() {
+        val sim = ContactAccount("SIM1", "vnd.sec.contact.sim")
+        assertEquals(1, EditableContact(1, listOf(raw(1, sim), raw(2, google))).preferredTarget())
+        assertEquals(1, EditableContact(1, listOf(raw(1, sim), raw(2, local))).preferredTarget())
+        assertEquals(2, EditableContact(1, listOf(raw(1, sim), raw(2, local), raw(3, exchange))).preferredTarget())
+        assertEquals(0, EditableContact(1, listOf(raw(1, sim))).preferredTarget())
+    }
+
+    @Test
+    fun switchingToSimDropsWhatItCantStore() {
+        val sim = ContactEditor.supportedKinds(ContactAccount("SIM1", "vnd.sec.contact.sim"))
+        val draft = ContactEditor.blankRaw(google).copy(
+            phones = listOf(phone(null, "123")),
+            addresses = listOf(EditAddress(null, "12 Rue Gouraud")),
+            events = listOf(EditEvent(null, "", ContactsContract.CommonDataKinds.Event.TYPE_BIRTHDAY)),
+            note = "hi",
+        )
+        // A blank date row isn't input worth a confirm.
+        assertEquals(listOf(FieldKind.ADDRESS, FieldKind.NOTE), draft.unsupportedFilled(sim))
+        val kept = draft.keepingOnly(sim)
+        assertEquals(listOf("123"), kept.phones.map { it.number })
+        assertTrue(kept.addresses.isEmpty() && kept.events.isEmpty() && kept.note.isEmpty())
+        assertTrue(draft.unsupportedFilled(FieldKind.entries.toSet()).isEmpty())
     }
 }

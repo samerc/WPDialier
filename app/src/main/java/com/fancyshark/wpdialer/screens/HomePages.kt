@@ -830,7 +830,7 @@ fun SpeedDialPage(
                 ) { onRemoveNumber(number) }
             }
         }
-        items(starredRows.size) { rowIndex ->
+        items(starredRows.size, key = { "star_" + starredRows[it].first().id }) { rowIndex ->
             val row = starredRows[rowIndex]
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -959,7 +959,18 @@ fun PeoplePage(
                 .then(feather.settleModifier { listState.firstVisibleItemIndex }),
             contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 20.dp, end = 20.dp, top = 6.dp, bottom = 20.dp),
         ) {
-            items(list.size) { i ->
+            // Stable keys: per-row state (tile photo, continuum anchor)
+            // follows its contact instead of the slot position.
+            items(
+                list.size,
+                key = { i ->
+                    when (val e = list[i]) {
+                        is ContactItem -> "c_${e.id}"
+                        else -> "h_${i}_$e"
+                    }
+                },
+                contentType = { if (list[it] is ContactItem) 1 else 0 },
+            ) { i ->
                 when (val entry = list[i]) {
                     is String -> {
                         Box(

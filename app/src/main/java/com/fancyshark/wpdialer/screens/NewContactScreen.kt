@@ -30,7 +30,12 @@ import com.fancyshark.wpdialer.data.ContactEditor
 import com.fancyshark.wpdialer.data.Countries
 import com.fancyshark.wpdialer.data.EditPhone
 import com.fancyshark.wpdialer.data.EditableContact
+import com.fancyshark.wpdialer.data.FieldKind
+import com.fancyshark.wpdialer.data.SaveResult
+import com.fancyshark.wpdialer.data.keepingOnly
+import com.fancyshark.wpdialer.data.unsupportedFilled
 import com.fancyshark.wpdialer.ui.Metro
+import com.fancyshark.wpdialer.ui.MetroConfirm
 import com.fancyshark.wpdialer.ui.MetroTextBox
 import com.fancyshark.wpdialer.ui.MetroToast
 import kotlinx.coroutines.launch
@@ -88,11 +93,28 @@ fun NewContactScreen(
     var saveFailed by remember { mutableStateOf(false) }
     var showAccountPicker by rememberSaveable { mutableStateOf(false) }
     var showCountryPicker by rememberSaveable { mutableStateOf(false) }
+    // A "save to" switch waiting on the remove-unsupported-fields confirm.
+    var pendingAccount by rememberSaveable(stateSaver = ContactAccountSaver) {
+        mutableStateOf<ContactAccount?>(null)
+    }
     val needNameOrNumber = stringResource(R.string.cform_need_name_or_number)
+    val photoFailed = stringResource(R.string.cform_photo_failed)
 
     fun update(transform: (EditableContact) -> EditableContact) {
         val current = (formState ?: base).let { f -> f.copy(raws = f.raws.map { it.copy(account = chosen) }) }
         formState = transform(current)
+    }
+
+    /**
+     * Moves the draft to [account]: labels belong to the old account, and
+     * fields the new one can't store (SIM: no address, notes, ...) go.
+     */
+    fun switchAccount(account: ContactAccount) {
+        if (account != chosen) {
+            val kinds = ContactEditor.supportedKinds(account) - FieldKind.LABELS
+            update { c -> c.copy(raws = c.raws.map { it.keepingOnly(kinds) }) }
+        }
+        selectedAccount = account
     }
 
     ContactFormScaffold(
@@ -122,8 +144,10 @@ fun NewContactScreen(
                         emails = raw.emails.map { it.copy(address = it.address.trim()) },
                         note = raw.note.trim(),
                     )
-                    val ok = ContactEditor.create(context, prepared)
-                    if (ok) {
+                    val result = ContactEditor.create(context, prepared)
+                    if (result != SaveResult.FAILED) {
+                        // The contact exists; only the photo batch failed.
+                        if (result == SaveResult.PHOTO_FAILED) MetroToast.show(photoFailed)
                         onDone()
                     } else {
                         saving = false
@@ -147,7 +171,7 @@ fun NewContactScreen(
                 accent = accent,
             ) { showCountryPicker = true }
         },
-        extraOverlayOpen = showAccountPicker || showCountryPicker,
+        extraOverlayOpen = showAccountPicker || showCountryPicker || pendingAccount != null,
         extraOverlays = {
             if (showAccountPicker) {
                 FullScreenPicker(
@@ -160,17 +184,10 @@ fun NewContactScreen(
                             Modifier
                                 .fillMaxWidth()
                                 .clickable {
-                                    if (account != chosen) {
-                                        // Labels belong to an account — drop the old account's.
-                                        update { c ->
-                                            c.copy(
-                                                raws = c.raws.map {
-                                                    it.copy(groupIds = emptySet(), newGroups = emptyList())
-                                                },
-                                            )
-                                        }
-                                    }
-                                    selectedAccount = account
+                                    val lost = if (account == chosen) emptyList()
+                                    else form.raws.first().unsupportedFilled(ContactEditor.supportedKinds(account))
+                                    // Removing typed input is destructive: confirm first.
+                                    if (lost.isEmpty()) switchAccount(account) else pendingAccount = account
                                     showAccountPicker = false
                                 }
                                 .padding(vertical = 10.dp),
@@ -231,6 +248,46 @@ fun NewContactScreen(
                     }
                 }
             }
+
+            pendingAccount?.let { next ->
+                val lost = form.raws.first().unsupportedFilled(ContactEditor.supportedKinds(next))
+                    .map { fieldKindName(it) }
+                MetroConfirm(
+                    title = stringResource(R.string.cform_unsupported_title),
+                    message = stringResource(
+                        R.string.cform_unsupported_message,
+                        accountKindLabel(next.kindLabel),
+                        lost.joinToString(", "),
+                    ),
+                    confirmLabel = stringResource(R.string.ui_remove),
+                    cancelLabel = stringResource(R.string.editcontact_cancel),
+                    onConfirm = {
+                        pendingAccount = null
+                        switchAccount(next)
+                    },
+                    // Cancel keeps the old account and every field.
+                    onCancel = { pendingAccount = null },
+                )
+            }
         },
     )
 }
+
+/** The form's name for a field kind, as in its section headers. */
+@Composable
+private fun fieldKindName(kind: FieldKind): String = stringResource(
+    when (kind) {
+        FieldKind.PHONE -> R.string.cform_section_phone
+        FieldKind.EMAIL -> R.string.cform_section_email
+        FieldKind.ADDRESS -> R.string.cform_section_address
+        FieldKind.DATE -> R.string.cform_section_dates
+        FieldKind.WEBSITE -> R.string.cform_website
+        FieldKind.RELATION -> R.string.cform_relationship
+        FieldKind.SIP -> R.string.cform_internet_call
+        FieldKind.IM -> R.string.cform_chat
+        FieldKind.NICKNAME -> R.string.cform_nickname
+        FieldKind.WORK -> R.string.cform_section_work
+        FieldKind.NOTE -> R.string.cform_notes
+        FieldKind.LABELS -> R.string.cform_labels
+    },
+)

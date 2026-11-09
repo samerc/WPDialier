@@ -183,6 +183,7 @@ private fun rawToJson(r: EditRawContact): JSONObject = JSONObject().apply {
     putList("addresses", r.addresses) { a ->
         JSONObject().putId("id", a.dataId).apply {
             put("v", a.formatted); put("type", a.type); put("custom", a.customLabel)
+            put("parts", JSONObject().apply { a.parts.forEach { (k, v) -> put(k, v) } })
         }
     }
     putList("relations", r.relations) { x ->
@@ -234,7 +235,11 @@ private fun rawFromJson(o: JSONObject): EditRawContact {
         emails = o.list("emails") { EditEmail(it.id("id"), it.str("v"), it.getInt("type"), it.str("custom")) },
         events = o.list("events") { EditEvent(it.id("id"), it.str("v"), it.getInt("type"), it.str("custom")) },
         addresses = o.list("addresses") {
-            EditAddress(it.id("id"), it.str("v"), it.getInt("type"), it.str("custom"))
+            val parts = it.optJSONObject("parts")
+            EditAddress(
+                it.id("id"), it.str("v"), it.getInt("type"), it.str("custom"),
+                parts?.keys()?.asSequence()?.associateWith { k -> parts.getString(k) }.orEmpty(),
+            )
         },
         nicknameDataId = o.id("nickId"),
         nickname = o.str("nick"),
@@ -441,16 +446,16 @@ internal fun DateField(
             .heightIn(min = 46.dp)
             .border(2.dp, Metro.Foreground)
             .clickable(role = Role.Button) {
-                val cal = Calendar.getInstance()
-                EventDates.parse(value)?.let { (y, m, d) ->
-                    cal.set(y ?: cal.get(Calendar.YEAR), m - 1, d)
-                }
+                // Yearless dates open on a leap seed year (Feb 29 survives) and
+                // stay yearless unless the user moves the year off it.
+                val today = Calendar.getInstance()
+                val start = EventDates.pickerStart(value)
                 val dialog = DatePickerDialog(
                     context,
-                    { _, y, m, day -> onPicked(EventDates.format(EventDate(y, m + 1, day))) },
-                    cal.get(Calendar.YEAR),
-                    cal.get(Calendar.MONTH),
-                    cal.get(Calendar.DAY_OF_MONTH),
+                    { _, y, m, day -> onPicked(EventDates.picked(value, y, m + 1, day)) },
+                    start?.year ?: today.get(Calendar.YEAR),
+                    start?.let { it.month - 1 } ?: today.get(Calendar.MONTH),
+                    start?.day ?: today.get(Calendar.DAY_OF_MONTH),
                 )
                 dialog.setButton(DialogInterface.BUTTON_NEUTRAL, noYear) { _, _ ->
                     val picker = dialog.datePicker

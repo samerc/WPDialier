@@ -42,6 +42,9 @@
     <string name="cform_change">تغيير</string>
     <string name="cform_read_only">%1$s: للقراءة فقط، غير معروض هنا</string>
     <string name="cform_need_name_or_number">أضف اسماً أو رقماً أولاً</string>
+    <string name="cform_unsupported_title">إزالة حقول؟</string>
+    <string name="cform_unsupported_message">لا يستطيع %1$s حفظ: %2$s. هل تريد إزالتها؟</string>
+    <string name="cform_photo_failed">تم الحفظ، لكن تعذّر حفظ الصورة.</string>
     <string name="cform_done">تم</string>
 
     <!-- Name details page -->

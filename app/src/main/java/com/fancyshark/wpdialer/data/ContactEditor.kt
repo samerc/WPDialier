@@ -48,6 +48,9 @@ data class ContactAccount(val name: String?, val type: String?) {
 /** The field kinds the editor can add ("+ add another field"). */
 enum class FieldKind { PHONE, EMAIL, ADDRESS, DATE, WEBSITE, RELATION, SIP, IM, NICKNAME, WORK, NOTE, LABELS }
 
+/** Outcome of a contact save: [PHOTO_FAILED] = everything but the photo was written. */
+enum class SaveResult { SAVED, PHOTO_FAILED, FAILED }
+
 /**
  * StructuredName parts. [display] is DISPLAY_NAME as loaded; edits clear it
  * so the provider re-joins the parts (locale-aware ordering) on save.
@@ -118,11 +121,28 @@ data class EditEvent(
     val customLabel: String = "",
 )
 
+/**
+ * [parts] are the row's structured columns as loaded (StructuredPostal
+ * column -> value, blanks left out). The editor only edits [formatted];
+ * the parts are carried so a text edit can keep them (see planChanges).
+ */
 data class EditAddress(
     val dataId: Long?,
     val formatted: String,
     val type: Int = StructuredPostal.TYPE_HOME,
     val customLabel: String = "",
+    val parts: Map<String, String> = emptyMap(),
+)
+
+/** The StructuredPostal columns split out of FORMATTED_ADDRESS. */
+internal val POSTAL_PARTS = listOf(
+    StructuredPostal.STREET,
+    StructuredPostal.POBOX,
+    StructuredPostal.NEIGHBORHOOD,
+    StructuredPostal.CITY,
+    StructuredPostal.REGION,
+    StructuredPostal.POSTCODE,
+    StructuredPostal.COUNTRY,
 )
 
 data class EditRelation(
@@ -223,6 +243,33 @@ object EventDates {
             String.format(Locale.ROOT, "%04d-%02d-%02d", date.year, date.month, date.day)
         }
 
+    /**
+     * Year the date picker opens on for a yearless date: a leap year, so a
+     * yearless Feb 29 isn't rolled to Mar 1 by the (lenient) calendar.
+     */
+    const val PICKER_SEED_YEAR = 2000
+
+    /** Where the picker opens for [value]; null = today (empty or unparseable). */
+    fun pickerStart(value: String): EventDate? {
+        val d = parse(value) ?: return null
+        val year = d.year ?: return d.copy(year = PICKER_SEED_YEAR)
+        // A stored Feb 29 in a common year would roll over too.
+        val leap = (year % 4 == 0 && year % 100 != 0) || year % 400 == 0
+        return if (d.month == 2 && d.day == 29 && !leap) d.copy(day = 28) else d
+    }
+
+    /**
+     * The value stored for an OK press on the picker opened on [original]:
+     * a yearless original stays yearless while the year is left on the
+     * seed; any other year the user picks is stored.
+     */
+    fun picked(original: String, year: Int, month: Int, day: Int): String {
+        val o = parse(original)
+        val wasYearless = o != null && o.year == null
+        val y = if (wasYearless && year == PICKER_SEED_YEAR) null else year
+        return format(EventDate(y, month, day))
+    }
+
     private val monthDays = intArrayOf(31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
 
     private fun valid(year: Int?, month: Int, day: Int): EventDate? =
@@ -280,9 +327,62 @@ fun EditableContact.withContactWide(
     return copy(raws = raws.mapIndexed { i, r -> if (i in holders) apply(r) else r })
 }
 
-/** Default raw contact for new fields: the first synced account, else the first. */
-fun EditableContact.preferredTarget(): Int =
-    raws.indexOfFirst { it.account.type != null }.takeIf { it >= 0 } ?: 0
+/**
+ * Default raw contact for new fields: the first sync account (Google,
+ * Exchange, ...), else local phone storage, and a SIM card only as a last
+ * resort — SIMs can't store most fields.
+ */
+fun EditableContact.preferredTarget(): Int {
+    fun rank(a: ContactAccount): Int = when {
+        ContactEditor.isSim(a) -> 2
+        ContactEditor.isLocal(a) -> 1
+        else -> 0
+    }
+    return raws.indices.minByOrNull { rank(raws[it].account) } ?: 0
+}
+
+/**
+ * Field kinds holding non-blank input that an account limited to [kinds]
+ * can't store, in form order. Labels are left out: they belong to one
+ * account and are dropped on any account change anyway.
+ */
+fun EditRawContact.unsupportedFilled(kinds: Set<FieldKind>): List<FieldKind> {
+    val filled = linkedMapOf(
+        FieldKind.WORK to (company.isNotBlank() || jobTitle.isNotBlank()),
+        FieldKind.PHONE to phones.any { it.number.isNotBlank() },
+        FieldKind.EMAIL to emails.any { it.address.isNotBlank() },
+        FieldKind.ADDRESS to addresses.any { it.formatted.isNotBlank() },
+        FieldKind.DATE to events.any { it.startDate.isNotBlank() },
+        FieldKind.WEBSITE to websites.any { it.value.isNotBlank() },
+        FieldKind.RELATION to relations.any { it.name.isNotBlank() },
+        FieldKind.SIP to sips.any { it.value.isNotBlank() },
+        FieldKind.IM to ims.any { it.handle.isNotBlank() },
+        FieldKind.NICKNAME to nickname.isNotBlank(),
+        FieldKind.NOTE to note.isNotBlank(),
+    )
+    return filled.filter { (kind, has) -> has && kind !in kinds }.keys.toList()
+}
+
+/** This raw contact without the fields an account limited to [kinds] can't store. */
+fun EditRawContact.keepingOnly(kinds: Set<FieldKind>): EditRawContact {
+    fun has(k: FieldKind) = k in kinds
+    return copy(
+        company = if (has(FieldKind.WORK)) company else "",
+        jobTitle = if (has(FieldKind.WORK)) jobTitle else "",
+        phones = if (has(FieldKind.PHONE)) phones else emptyList(),
+        emails = if (has(FieldKind.EMAIL)) emails else emptyList(),
+        addresses = if (has(FieldKind.ADDRESS)) addresses else emptyList(),
+        events = if (has(FieldKind.DATE)) events else emptyList(),
+        websites = if (has(FieldKind.WEBSITE)) websites else emptyList(),
+        relations = if (has(FieldKind.RELATION)) relations else emptyList(),
+        sips = if (has(FieldKind.SIP)) sips else emptyList(),
+        ims = if (has(FieldKind.IM)) ims else emptyList(),
+        nickname = if (has(FieldKind.NICKNAME)) nickname else "",
+        note = if (has(FieldKind.NOTE)) note else "",
+        groupIds = if (has(FieldKind.LABELS)) groupIds else emptySet(),
+        newGroups = if (has(FieldKind.LABELS)) newGroups else emptyList(),
+    )
+}
 
 object ContactEditor {
 
@@ -350,6 +450,8 @@ object ContactEditor {
                 ContactsContract.Data.DATA9,
                 ContactsContract.Data.DATA15,
                 ContactsContract.Data.IS_SUPER_PRIMARY,
+                // After the flag so the DATAn = n + 1 indexing above holds.
+                ContactsContract.Data.DATA10,
             ),
             "${ContactsContract.Data.RAW_CONTACT_ID} = ?",
             arrayOf(rawContactId.toString()),
@@ -386,8 +488,15 @@ object ContactEditor {
                         emails += EditEmail(id, s(1), i(2, Email.TYPE_OTHER), s(3))
                     Event.CONTENT_ITEM_TYPE ->
                         events += EditEvent(id, s(1), i(2, Event.TYPE_OTHER), s(3))
-                    StructuredPostal.CONTENT_ITEM_TYPE ->
-                        addresses += EditAddress(id, s(1), i(2, StructuredPostal.TYPE_HOME), s(3))
+                    StructuredPostal.CONTENT_ITEM_TYPE -> {
+                        // STREET..POSTCODE are DATA4..DATA9; COUNTRY (DATA10) is column 13.
+                        val parts = linkedMapOf<String, String>()
+                        POSTAL_PARTS.forEachIndexed { k, col ->
+                            val v = (if (k < 6) c.getString(k + 5) else c.getString(13))?.trim()
+                            if (!v.isNullOrEmpty()) parts[col] = v
+                        }
+                        addresses += EditAddress(id, s(1), i(2, StructuredPostal.TYPE_HOME), s(3), parts)
+                    }
                     Website.CONTENT_ITEM_TYPE ->
                         websites += EditValue(id, s(1), i(2, Website.TYPE_OTHER))
                     Relation.CONTENT_ITEM_TYPE ->
@@ -435,6 +544,10 @@ object ContactEditor {
     internal fun planChanges(orig: EditRawContact, edited: EditRawContact): List<RowChange> {
         val out = mutableListOf<RowChange>()
 
+        // The provider rebuilds DISPLAY_NAME only when an update carries a
+        // structured part, so a written name row always carries ALL parts
+        // (+ phonetic) with a null display — a phonetic-only edit must not
+        // null the display name.
         diffSingle(
             out, StructuredName.CONTENT_ITEM_TYPE, edited.nameDataId,
             if (edited.name.sameParts(orig.name) && edited.name.display == orig.name.display) {
@@ -443,6 +556,7 @@ object ContactEditor {
                 nameValues(orig.name) to nameValues(edited.name)
             },
             newBlank = edited.name.isBlank,
+            wholeRow = true,
         )
         diffSingle(
             out, Nickname.CONTENT_ITEM_TYPE, edited.nicknameDataId,
@@ -487,9 +601,19 @@ object ContactEditor {
                 )
             },
         )
+        // Address text vs structured parts. An update carrying only
+        // FORMATTED_ADDRESS makes the provider re-split it (all text into
+        // STREET, city/postcode/country nulled). So:
+        //  - text unchanged (type/label edits): text and parts untouched;
+        //  - text changed and it still contains every loaded part (a typo
+        //    fixed elsewhere): the loaded parts are written back with it;
+        //  - otherwise (really rewritten): every part is written as null,
+        //    and the provider splits the new text itself.
         diffList(
             out, StructuredPostal.CONTENT_ITEM_TYPE, orig.addresses, edited.addresses,
-            id = { it.dataId }, blank = { it.formatted.isBlank() },
+            // An address stored only as parts (no formatted text) isn't blank.
+            id = { it.dataId },
+            blank = { it.formatted.isBlank() && it.parts.values.all { v -> v.isBlank() } },
             values = { a ->
                 mapOf(
                     StructuredPostal.FORMATTED_ADDRESS to a.formatted,
@@ -497,6 +621,13 @@ object ContactEditor {
                     StructuredPostal.LABEL to
                         customLabel(a.type == StructuredPostal.TYPE_CUSTOM, a.customLabel),
                 )
+            },
+            update = { before, after, changed ->
+                if (StructuredPostal.FORMATTED_ADDRESS !in changed) {
+                    changed
+                } else {
+                    changed + postalParts(before.parts, after.formatted)
+                }
             },
         )
         diffList(
@@ -567,10 +698,19 @@ object ContactEditor {
             .forEach { out += RowChange.JoinNewGroup(it) }
 
         // Photo replacement: drop any existing photo rows on this raw
-        // contact, then insert the newly picked bytes.
+        // contact, then insert the newly picked bytes as the contact's
+        // super-primary photo (so the aggregate shows it over other
+        // accounts' photos). save/create apply these in a separate batch.
         if (edited.newPhoto != null) {
             out += RowChange.DeleteWhere(Photo.CONTENT_ITEM_TYPE)
-            out += RowChange.Insert(Photo.CONTENT_ITEM_TYPE, mapOf(Photo.PHOTO to edited.newPhoto))
+            out += RowChange.Insert(
+                Photo.CONTENT_ITEM_TYPE,
+                mapOf(
+                    Photo.PHOTO to edited.newPhoto,
+                    ContactsContract.Data.IS_PRIMARY to 1,
+                    ContactsContract.Data.IS_SUPER_PRIMARY to 1,
+                ),
+            )
         }
         // Keyboards leave trailing spaces after suggestions — never store them.
         return out.map { c ->
@@ -588,9 +728,19 @@ object ContactEditor {
     private fun customLabel(isCustom: Boolean, label: String): String? =
         if (isCustom) label.ifBlank { "custom" } else null
 
+    /**
+     * Postal parts written with a changed address text: the loaded [parts]
+     * when [text] still contains each of them (case-insensitive), else all
+     * null. Every part column is always present, so nothing stale survives.
+     */
+    internal fun postalParts(parts: Map<String, String>, text: String): Map<String, Any?> {
+        val keep = parts.isNotEmpty() && parts.values.all { text.contains(it.trim(), ignoreCase = true) }
+        return POSTAL_PARTS.associateWith { col -> if (keep) parts[col] else null }
+    }
+
     private fun nameValues(n: EditName): Map<String, Any?> = linkedMapOf(
-        // Null display + parts: the provider joins the parts itself.
-        StructuredName.DISPLAY_NAME to n.display.ifBlank { null },
+        // Null display + every part: the provider joins the parts itself.
+        StructuredName.DISPLAY_NAME to null,
         StructuredName.PREFIX to n.prefix.trim().ifEmpty { null },
         StructuredName.GIVEN_NAME to n.given.trim().ifEmpty { null },
         StructuredName.MIDDLE_NAME to n.middle.trim().ifEmpty { null },
@@ -622,7 +772,8 @@ object ContactEditor {
 
     /**
      * Single-row field: [values] is (before, after) or null when unchanged.
-     * Blank after = delete the row; no row yet = insert.
+     * Blank after = delete the row; no row yet = insert. [wholeRow] updates
+     * write every column of after, not only the changed ones.
      */
     private fun diffSingle(
         out: MutableList<RowChange>,
@@ -631,11 +782,13 @@ object ContactEditor {
         values: Pair<Map<String, Any?>, Map<String, Any?>>?,
         newBlank: Boolean,
         insertExtras: Map<String, Any?> = emptyMap(),
+        wholeRow: Boolean = false,
     ) {
         val (before, after) = values ?: return
         when {
             dataId != null && newBlank -> out += RowChange.Delete(dataId)
-            dataId != null -> changedColumns(before, after).takeIf { it.isNotEmpty() }
+            dataId != null -> (if (wholeRow) after else changedColumns(before, after))
+                .takeIf { it.isNotEmpty() }
                 ?.let { out += RowChange.Update(dataId, it) }
             !newBlank -> out += RowChange.Insert(mime, after.filterValues { it != null } + insertExtras)
         }
@@ -650,6 +803,8 @@ object ContactEditor {
         blank: (T) -> Boolean,
         values: (T) -> Map<String, Any?>,
         insertValues: (T) -> Map<String, Any?> = values,
+        /** Final update columns from (before, after, changed columns); non-empty changed only. */
+        update: (T, T, Map<String, Any?>) -> Map<String, Any?> = { _, _, changed -> changed },
     ) {
         edited.forEach { row ->
             val dataId = id(row)
@@ -661,7 +816,7 @@ object ContactEditor {
                     out += RowChange.Delete(dataId)
                 } else {
                     changedColumns(values(before), values(row)).takeIf { it.isNotEmpty() }
-                        ?.let { out += RowChange.Update(dataId, it) }
+                        ?.let { out += RowChange.Update(dataId, update(before, row, it)) }
                 }
             }
         }
@@ -682,22 +837,30 @@ object ContactEditor {
      * the data row of its own raw contact, so each edit is written back to
      * the account (Google, OneDrive, phone, ...) the contact came from.
      */
-    suspend fun save(context: Context, original: EditableContact, edited: EditableContact): Boolean =
+    suspend fun save(context: Context, original: EditableContact, edited: EditableContact): SaveResult =
         withContext(Dispatchers.IO) {
             val ops = arrayListOf<ContentProviderOperation>()
+            val photoOps = arrayListOf<ContentProviderOperation>()
             edited.raws.forEach { raw ->
                 val orig = original.raws.firstOrNull { it.rawContactId == raw.rawContactId }
                     ?: return@forEach
-                appendOps(ops, planChanges(orig, raw), raw.account, rawId = raw.rawContactId)
+                val (photo, rest) = planChanges(orig, raw).partition { isPhotoChange(it) }
+                appendOps(ops, rest, raw.account, rawId = raw.rawContactId)
+                appendOps(photoOps, photo, raw.account, rawId = raw.rawContactId)
             }
-            if (ops.isEmpty()) return@withContext true
-            runCatching {
+            val saved = ops.isEmpty() || runCatching {
                 context.contentResolver.applyBatch(ContactsContract.AUTHORITY, ops)
-            }.isSuccess.also { Repo.invalidateCaches() }
+            }.isSuccess
+            val result = when {
+                !saved -> SaveResult.FAILED
+                else -> applyPhotoOps(context, photoOps)
+            }
+            Repo.invalidateCaches()
+            result
         }
 
     /** Inserts [raw] as a brand-new raw contact in its account. */
-    suspend fun create(context: Context, raw: EditRawContact): Boolean =
+    suspend fun create(context: Context, raw: EditRawContact): SaveResult =
         withContext(Dispatchers.IO) {
             val ops = arrayListOf<ContentProviderOperation>()
             ops += ContentProviderOperation
@@ -705,11 +868,43 @@ object ContactEditor {
                 .withValue(ContactsContract.RawContacts.ACCOUNT_NAME, raw.account.name)
                 .withValue(ContactsContract.RawContacts.ACCOUNT_TYPE, raw.account.type)
                 .build()
-            appendOps(ops, planChanges(blankRaw(raw.account), raw), raw.account, rawBackRef = 0)
-            runCatching {
-                context.contentResolver.applyBatch(ContactsContract.AUTHORITY, ops)
-            }.isSuccess.also { Repo.invalidateCaches() }
+            val (photo, rest) = planChanges(blankRaw(raw.account), raw).partition { isPhotoChange(it) }
+            appendOps(ops, rest, raw.account, rawBackRef = 0)
+            val rawId = runCatching {
+                val results = context.contentResolver.applyBatch(ContactsContract.AUTHORITY, ops)
+                results.firstOrNull()?.uri?.let { android.content.ContentUris.parseId(it) }
+            }.getOrNull()
+            val result = when {
+                rawId == null -> SaveResult.FAILED
+                photo.isEmpty() -> SaveResult.SAVED
+                else -> {
+                    val photoOps = arrayListOf<ContentProviderOperation>()
+                    appendOps(photoOps, photo, raw.account, rawId = rawId)
+                    applyPhotoOps(context, photoOps)
+                }
+            }
+            Repo.invalidateCaches()
+            result
         }
+
+    /**
+     * Photo rows go in their own batch after the main one: a large photo
+     * can exceed the binder limit, and that must not lose the other edits.
+     */
+    private fun applyPhotoOps(context: Context, photoOps: ArrayList<ContentProviderOperation>): SaveResult =
+        if (photoOps.isEmpty()) {
+            SaveResult.SAVED
+        } else if (runCatching { context.contentResolver.applyBatch(ContactsContract.AUTHORITY, photoOps) }.isSuccess) {
+            SaveResult.SAVED
+        } else {
+            SaveResult.PHOTO_FAILED
+        }
+
+    private fun isPhotoChange(c: RowChange): Boolean = when (c) {
+        is RowChange.Insert -> c.mime == Photo.CONTENT_ITEM_TYPE
+        is RowChange.DeleteWhere -> c.mime == Photo.CONTENT_ITEM_TYPE
+        else -> false
+    }
 
     /** Turns planned [changes] into provider ops for an existing ([rawId]) or new ([rawBackRef]) raw contact. */
     private fun appendOps(
@@ -831,6 +1026,16 @@ object ContactEditor {
 
     private val ALL_KINDS = FieldKind.entries.toSet()
     private val SIM_TYPE = Regex("""(^|[._])u?sim($|[._])""")
+
+    /** A SIM card "account" (vnd.sec.contact.sim, com.android.sim, ...). */
+    fun isSim(account: ContactAccount): Boolean =
+        account.type?.lowercase()?.let { SIM_TYPE.containsMatchIn(it) } == true
+
+    /** Local phone storage: no account, or an OEM local-phone type. */
+    fun isLocal(account: ContactAccount): Boolean {
+        val t = account.type?.lowercase() ?: return true
+        return t.contains("local") || t.endsWith(".phone")
+    }
 
     /**
      * Field kinds [account] can store, by account-type heuristics: SIM

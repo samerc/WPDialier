@@ -173,8 +173,20 @@ internal fun ContactFormScaffold(
         if (uri != null) {
             scope.launch {
                 val bytes = loadPhotoBytes(context, uri) ?: return@launch
+                // Only the target raw contact gets the photo (written as the
+                // super-primary one): copying it into every account could
+                // overflow the save's binder transaction.
                 update { c ->
-                    c.withContactWide(target, { it.hasPhoto }) { it.copy(newPhoto = bytes) }
+                    val ti = target.coerceIn(c.raws.indices)
+                    c.copy(
+                        raws = c.raws.mapIndexed { i, r ->
+                            when {
+                                i == ti -> r.copy(newPhoto = bytes)
+                                r.newPhoto != null -> r.copy(newPhoto = null)
+                                else -> r
+                            }
+                        },
+                    )
                 }
             }
         }
@@ -202,9 +214,9 @@ internal fun ContactFormScaffold(
     val preview by produceState<ImageBitmap?>(null, photoBytes) { value = decodePhotoPreview(photoBytes) }
 
     val workRaws = raws.indices.filter { raws[it].hasOrg }
-        .ifEmpty { if ("work" in revealed) listOf(targetIndex) else emptyList() }
+        .ifEmpty { if ("work" in revealed && FieldKind.WORK in targetKinds) listOf(targetIndex) else emptyList() }
     val noteRaws = raws.indices.filter { raws[it].hasNote }
-        .ifEmpty { if ("notes" in revealed) listOf(targetIndex) else emptyList() }
+        .ifEmpty { if ("notes" in revealed && FieldKind.NOTE in targetKinds) listOf(targetIndex) else emptyList() }
     val labelRaws = raws.indices.filter { FieldKind.LABELS in ContactEditor.supportedKinds(raws[it].account) }
     val labelsVisible = labelRaws.isNotEmpty() &&
         (raws.any { it.hasLabels } || "labels" in revealed)
@@ -403,7 +415,9 @@ internal fun ContactFormScaffold(
                 } else if (allPhones >= 2) {
                     HintLine(stringResource(R.string.cform_default_none), top = 8.dp)
                 }
-                AddLink(stringResource(R.string.editcontact_add_phone), accent) { addPhone() }
+                if (FieldKind.PHONE in targetKinds) {
+                    AddLink(stringResource(R.string.editcontact_add_phone), accent) { addPhone() }
+                }
 
                 // ---- email ----
                 FormSectionHeader(stringResource(R.string.cform_section_email))
@@ -440,7 +454,9 @@ internal fun ContactFormScaffold(
                         }
                     }
                 }
-                AddLink(stringResource(R.string.editcontact_add_email), accent) { addEmail() }
+                if (FieldKind.EMAIL in targetKinds) {
+                    AddLink(stringResource(R.string.editcontact_add_email), accent) { addEmail() }
+                }
 
                 // ---- address ----
                 if (raws.any { it.addresses.isNotEmpty() }) {
@@ -504,7 +520,10 @@ internal fun ContactFormScaffold(
                             )
                         }
                     }
-                    AddLink(stringResource(R.string.cform_add_address), accent) { addAddress() }
+                    // Inline add links only for kinds the target account can store.
+                    if (FieldKind.ADDRESS in targetKinds) {
+                        AddLink(stringResource(R.string.cform_add_address), accent) { addAddress() }
+                    }
                 }
 
                 // ---- dates ----
@@ -544,7 +563,9 @@ internal fun ContactFormScaffold(
                         }
                     }
                     HintLine(stringResource(R.string.cform_year_optional), top = 8.dp)
-                    AddLink(stringResource(R.string.editcontact_add_date), accent) { addDate() }
+                    if (FieldKind.DATE in targetKinds) {
+                        AddLink(stringResource(R.string.editcontact_add_date), accent) { addDate() }
+                    }
                 }
 
                 // ---- more ----
@@ -795,7 +816,10 @@ internal fun ContactFormScaffold(
                 onDone = { name, nick ->
                     if (name != nameRaw.name) {
                         update { c ->
-                            c.withContactWide(target, { it.hasName }) { it.copy(name = name.copy(display = "")) }
+                            // Raw contacts already holding these parts stay untouched (no-op write).
+                            c.withContactWide(target, { it.hasName }) {
+                                if (it.name.sameParts(name)) it else it.copy(name = name.copy(display = ""))
+                            }
                         }
                     }
                     if (nick != nickname) {

@@ -34,6 +34,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
@@ -143,6 +144,8 @@ fun MergeScreen(
     val targetLabel = rememberAccountLabel(target)
     val accountOf: (Long) -> RawSource? = { id -> raws.firstOrNull { it.rawId == id } }
     val toDelete = writableAll.filter { it.rawId != kept?.rawId }
+    // App-specific rows of the deleted copies aren't copied — say so.
+    val lostRows = remember(inputs, kept) { ContactMerge.uncopiedRows(inputs, kept?.rawId) }
 
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize().hiddenFromAccessibility(pickAccount || confirm || busy)) {
@@ -344,6 +347,13 @@ fun MergeScreen(
                         style = Metro.Type.Small,
                     )
                 }
+                if (lostRows > 0) {
+                    Text(
+                        pluralStringResource(R.plurals.acc_private_rows, lostRows, lostRows),
+                        color = Metro.Subtle,
+                        style = Metro.Type.Small,
+                    )
+                }
             }
             Row(
                 Modifier.padding(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 20.dp),
@@ -394,6 +404,7 @@ fun MergeScreen(
             val keptMsg = stringResource(R.string.acc_merged_partial)
             val failMsg = stringResource(R.string.acc_merge_failed)
             val deletesLine = toDelete.map { accountLine(rememberAccountLabel(it.account), it.account) }.distinct()
+            val lostLine = if (lostRows > 0) pluralStringResource(R.plurals.acc_private_rows, lostRows, lostRows) else null
             MetroConfirm(
                 title = stringResource(
                     if (writableAll.isEmpty()) R.string.acc_link_confirm_title else R.string.acc_merge_confirm_title,
@@ -407,6 +418,7 @@ fun MergeScreen(
                         deletesLine.takeIf { it.isNotEmpty() }?.let {
                             stringResource(R.string.acc_merge_confirm_deletes, it.joinToString(stringResource(R.string.acc_list_sep)))
                         },
+                        lostLine,
                         stringResource(R.string.acc_move_confirm_safe),
                     ).joinToString("\n\n")
                 },

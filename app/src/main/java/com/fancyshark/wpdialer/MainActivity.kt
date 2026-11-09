@@ -292,9 +292,6 @@ class MainActivity : ComponentActivity() {
     // Hardware digit/CALL keys act as dial shortcuts only on Home/Dialpad —
     // from an editor they would destroy the back stack (and unsaved edits).
     private val hardwareDialSafe = MutableStateFlow(true)
-    // Bumped per dial request so the dialpad's saved state can't shadow the
-    // requested number when the navigation key happens to be identical.
-    private val dialNonce = MutableStateFlow(0)
     private val refreshTick = MutableStateFlow(0)
     // An open contact editor holding unsaved input — a dial intent must not
     // wipe it by clearing the back stack.
@@ -771,7 +768,14 @@ class MainActivity : ComponentActivity() {
         // screen is pushed on top of it.
         val screenStateHolder =
             androidx.compose.runtime.saveable.rememberSaveableStateHolder()
-        val nonce by dialNonce.collectAsState()
+        // Bumped per dial request so the dialpad's saved state can't shadow
+        // the requested number when the navigation key happens to be
+        // identical. Saved with the back stack: after recreation the keys
+        // must still match (typed number kept) and keep increasing (a new
+        // request can't land on a stale saved key).
+        var nonce by androidx.compose.runtime.saveable.rememberSaveable {
+            androidx.compose.runtime.mutableIntStateOf(0)
+        }
         fun stateKeyOf(index: Int, screen: Screen): String =
             if (screen is Screen.Dialpad) "$index|$screen|$nonce" else "$index|$screen"
         // How the next back-stack change animates: WP turnstile between
@@ -870,11 +874,22 @@ class MainActivity : ComponentActivity() {
             val keepEditor = editorDirty.value &&
                 backStack.any { it is Screen.EditContact || it is Screen.NewContact }
             if (!keepEditor) while (backStack.size > 1) popTop()
+            val topIndex = backStack.lastIndex
+            val oldTop = backStack[topIndex]
+            val oldKey = stateKeyOf(topIndex, oldTop)
             // Fresh state-holder key: otherwise a Dialpad entry equal to
             // the previous one restores the old typed number instead of
             // this request's.
-            dialNonce.value += 1
-            push(Screen.Dialpad(number))
+            nonce += 1
+            if (keepEditor && oldTop is Screen.Dialpad) {
+                // A dialpad already open above the kept editor is replaced
+                // in place (same animKey: no second dialpad composed).
+                navMotion = NavMotion.None
+                backStack[topIndex] = Screen.Dialpad(number)
+                screenStateHolder.removeState(oldKey)
+            } else {
+                push(Screen.Dialpad(number))
+            }
             dialRequest.value = null
         }
         // Shortcut / contact-tile navigation, same rules as a dial request.
@@ -969,7 +984,27 @@ class MainActivity : ComponentActivity() {
                     topScreen, stateKeyOf(backStack.lastIndex, topScreen), backStack.lastIndex,
                 )
                 // The outgoing page stays composed (under its own saved-state
-                // key) while it turnstiles / slides away.
+                // key) while it turnstiles / slides away. Its BackHandlers get
+                // these unconnected dispatchers so they can't catch a back
+                // meant for the new top. Both locals: BackHandler prefers the
+                // NavigationEvent owner and only falls back to the legacy one.
+                val detachedBack = remember {
+                    object :
+                        androidx.activity.OnBackPressedDispatcherOwner,
+                        androidx.navigationevent.NavigationEventDispatcherOwner {
+                        override val onBackPressedDispatcher =
+                            androidx.activity.OnBackPressedDispatcher()
+                        override val navigationEventDispatcher =
+                            androidx.navigationevent.NavigationEventDispatcher()
+                        override val lifecycle: androidx.lifecycle.Lifecycle
+                            get() = this@MainActivity.lifecycle
+                    }
+                }
+                val detachedBackLocals = arrayOf<androidx.compose.runtime.ProvidedValue<*>>(
+                    androidx.activity.compose.LocalOnBackPressedDispatcherOwner provides detachedBack,
+                    androidx.navigationevent.compose.LocalNavigationEventDispatcherOwner provides
+                        detachedBack,
+                )
                 AnimatedContent(
                     targetState = entry,
                     modifier = Modifier.fillMaxSize(),
@@ -987,7 +1022,33 @@ class MainActivity : ComponentActivity() {
                     label = "nav",
                 ) { shown ->
                 val top = shown.screen
+                // Navigation from a page only acts while it's still the stack
+                // top — a tap on a page that is animating out must not pop
+                // (or push over) the page that replaced it.
+                fun isTop() = backStack.lastIndex == shown.index &&
+                    stateKeyOf(shown.index, backStack.last()) == shown.key
+                fun pagePush(screen: Screen) {
+                    if (isTop()) push(screen)
+                }
+                fun pagePop() {
+                    if (isTop()) popTop()
+                }
+                fun pagePopAndRefresh() {
+                    if (isTop()) popAndRefresh()
+                }
+                fun pageFinishOp(oldIds: Collection<Long>, newId: Long?) {
+                    if (isTop()) finishContactOp(oldIds, newId)
+                }
                 Box(Modifier.fillMaxSize().then(transition.navPageModifier(navMotion))) {
+                CompositionLocalProvider(
+                    *(
+                        if (isTop()) {
+                            emptyArray<androidx.compose.runtime.ProvidedValue<*>>()
+                        } else {
+                            detachedBackLocals
+                        }
+                    ),
+                ) {
                 screenStateHolder.SaveableStateProvider(shown.key) {
                     when (top) {
                         Screen.Home -> Column(Modifier.fillMaxSize()) {
@@ -1072,18 +1133,18 @@ class MainActivity : ComponentActivity() {
                                             accent = accent.color,
                                             onCall = { placeCall(it) },
                                             onText = { sendText(it) },
-                                            onSave = { push(Screen.NewContact(it)) },
+                                            onSave = { pagePush(Screen.NewContact(it)) },
                                             onProfile = { number ->
                                                 uiScope.launch {
                                                     val id = Repo.contactIdFor(this@MainActivity, number)
-                                                    if (id != null) push(Screen.Contact(id))
-                                                    else push(Screen.NewContact(number))
+                                                    if (id != null) pagePush(Screen.Contact(id))
+                                                    else pagePush(Screen.NewContact(number))
                                                 }
                                             },
                                             onDelete = { group -> confirmDeleteGroup = group },
                                             onBlock = { number -> confirmBlock = number },
                                             onDetails = { item ->
-                                                push(Screen.CallDetails(item.number, item.name))
+                                                pagePush(Screen.CallDetails(item.number, item.name))
                                             },
                                             onAddSpeedDial = { number ->
                                                 com.fancyshark.wpdialer.data.AppPrefs
@@ -1096,7 +1157,7 @@ class MainActivity : ComponentActivity() {
                                             contacts = contacts,
                                             loading = contactsOrNull == null,
                                             accent = accent.color,
-                                            onOpen = { push(Screen.Contact(it.id)) },
+                                            onOpen = { pagePush(Screen.Contact(it.id)) },
                                             onCallNumber = { placeCall(it) },
                                             onRemoveNumber = { confirmRemoveSpeedDial = it },
                                         )
@@ -1107,7 +1168,7 @@ class MainActivity : ComponentActivity() {
                                             accent.color,
                                             loading = contactsOrNull == null,
                                         ) {
-                                            push(Screen.Contact(it.id))
+                                            pagePush(Screen.Contact(it.id))
                                         }
                                     },
                                 ),
@@ -1119,17 +1180,17 @@ class MainActivity : ComponentActivity() {
                                         callVoicemail()
                                     },
                                     AppBarAction(Icons.Filled.Dialpad, stringResource(R.string.main_action_keypad)) {
-                                        push(Screen.Dialpad(""))
+                                        pagePush(Screen.Dialpad(""))
                                     },
                                     AppBarAction(Icons.Filled.Search, stringResource(R.string.main_action_search)) {
-                                        push(Screen.Search)
+                                        pagePush(Screen.Search)
                                     },
                                     AppBarAction(Icons.Filled.Add, stringResource(R.string.main_action_new)) {
-                                        push(Screen.NewContact())
+                                        pagePush(Screen.NewContact())
                                     },
                                 ),
                                 menu = listOf(
-                                    stringResource(R.string.main_menu_settings) to { push(Screen.Settings) },
+                                    stringResource(R.string.main_menu_settings) to { pagePush(Screen.Settings) },
                                     stringResource(
                                         if (missedOnly) R.string.main_menu_all_calls
                                         else R.string.main_menu_missed_only,
@@ -1148,7 +1209,7 @@ class MainActivity : ComponentActivity() {
                             initial = top.initial,
                             accent = accent.color,
                             onCall = { number, onPlaced -> placeCall(number, onPlaced) },
-                            onSave = { push(Screen.NewContact(it)) },
+                            onSave = { pagePush(Screen.NewContact(it)) },
                             onVoicemail = { callVoicemail() },
                             onSpecialCode = { code ->
                                 when (code) {
@@ -1167,11 +1228,11 @@ class MainActivity : ComponentActivity() {
                             history = history,
                             onCall = { placeCall(it) },
                             onText = { sendText(it) },
-                            onEdit = { push(Screen.EditContact(it)) },
-                            onDeleted = { popAndRefresh() },
-                            onLink = { push(Screen.LinkContact(it)) },
+                            onEdit = { pagePush(Screen.EditContact(it)) },
+                            onDeleted = { pagePopAndRefresh() },
+                            onLink = { pagePush(Screen.LinkContact(it)) },
                             onMoveTo = { contactId, rawId, copy ->
-                                push(Screen.MoveTo(contactId, rawId, copy))
+                                pagePush(Screen.MoveTo(contactId, rawId, copy))
                             },
                             onReachDown = if (reachEnabled) {
                                 { triggerReach(contentHeightPx * 0.42f) }
@@ -1183,14 +1244,14 @@ class MainActivity : ComponentActivity() {
                         is Screen.EditContact -> EditContactScreen(
                             contactId = top.id,
                             accent = accent.color,
-                            onDone = { popAndRefresh() },
+                            onDone = { pagePopAndRefresh() },
                             onDirtyChange = { editorDirty.value = it },
                         )
 
                         is Screen.NewContact -> NewContactScreen(
                             accent = accent.color,
                             initialNumber = top.initialNumber,
-                            onDone = { popAndRefresh() },
+                            onDone = { pagePopAndRefresh() },
                             onDirtyChange = { editorDirty.value = it },
                         )
 
@@ -1207,17 +1268,17 @@ class MainActivity : ComponentActivity() {
                             contacts,
                             accent.color,
                             history = history,
-                            onOpenCall = { push(Screen.CallDetails(it.number, it.name)) },
+                            onOpenCall = { pagePush(Screen.CallDetails(it.number, it.name)) },
                         ) {
-                            push(Screen.Contact(it.id))
+                            pagePush(Screen.Contact(it.id))
                         }
 
                         Screen.Settings -> SettingsScreen(
                             accent = accent,
                             isDefaultDialer = default,
                             onRequestDefault = { requestDefaultDialer() },
-                            onAbout = { push(Screen.About) },
-                            onFindDuplicates = { push(Screen.Duplicates) },
+                            onAbout = { pagePush(Screen.About) },
+                            onFindDuplicates = { pagePush(Screen.Duplicates) },
                             onRerunSetup = {
                                 wizardRerun = true
                                 com.fancyshark.wpdialer.data.AppPrefs
@@ -1230,25 +1291,27 @@ class MainActivity : ComponentActivity() {
                         is Screen.LinkContact -> com.fancyshark.wpdialer.screens.LinkContactScreen(
                             contactId = top.contactId,
                             accent = accent.color,
-                            onLinked = { newId -> finishContactOp(listOf(top.contactId), newId) },
+                            onLinked = { newId -> pageFinishOp(listOf(top.contactId), newId) },
                             onMerge = { ids ->
                                 // The merge preview replaces the link picker.
-                                popTop()
-                                push(Screen.Merge(ids))
+                                if (isTop()) {
+                                    popTop()
+                                    push(Screen.Merge(ids))
+                                }
                             },
                         )
 
                         is Screen.Merge -> com.fancyshark.wpdialer.screens.MergeScreen(
                             contactIds = top.contactIds,
                             accent = accent.color,
-                            onMerged = { newId -> finishContactOp(top.contactIds, newId) },
-                            onCancel = { popTop() },
+                            onMerged = { newId -> pageFinishOp(top.contactIds, newId) },
+                            onCancel = { pagePop() },
                         )
 
                         Screen.Duplicates -> com.fancyshark.wpdialer.screens.DuplicatesScreen(
                             accent = accent.color,
                             refreshKey = tick,
-                            onOpen = { ids -> push(Screen.Merge(ids)) },
+                            onOpen = { ids -> pagePush(Screen.Merge(ids)) },
                         )
 
                         is Screen.MoveTo -> com.fancyshark.wpdialer.screens.MoveToScreen(
@@ -1256,9 +1319,10 @@ class MainActivity : ComponentActivity() {
                             rawId = top.rawId,
                             copy = top.copy,
                             accent = accent.color,
-                            onDone = { newId -> finishContactOp(listOf(top.contactId), newId) },
+                            onDone = { newId -> pageFinishOp(listOf(top.contactId), newId) },
                         )
                     }
+                }
                 }
                 }
                 }

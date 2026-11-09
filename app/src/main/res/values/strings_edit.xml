@@ -42,6 +42,9 @@
     <string name="cform_change">change</string>
     <string name="cform_read_only">%1$s: read only, not shown here</string>
     <string name="cform_need_name_or_number">add a name or a number first</string>
+    <string name="cform_unsupported_title">remove fields?</string>
+    <string name="cform_unsupported_message">%1$s can\'t store %2$s — remove them?</string>
+    <string name="cform_photo_failed">Saved, but the photo couldn\'t be saved.</string>
     <string name="cform_done">done</string>
 
     <!-- Name details page -->
