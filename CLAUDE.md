@@ -68,6 +68,13 @@ purge it).
   2026-08-25: FSI wizard auto-skip, banner/answer, setAudioRoute+mute
   via CallAudioState, DTMF echo, missed-call flow, what's-new,
   missed-only filter, hold-1 voicemail, Hindi rendering.
+- **Before raising targetSdk to 37:** submit the Play Console Contacts
+  Permission declaration (App content > Contacts Permission) — Play
+  enforces it from 2027-01-27 on apps targeting 37+ that hold
+  READ_CONTACTS; the form only appears once a target-37 build is
+  uploaded. Use case: default dialer — caller ID, history names, T9,
+  contacts list/editor, duplicates; on-device only. Contact Picker is
+  not viable for a dialer. (Email received 2026-11-16.)
 - minSdk 33, target/compile 36. Android 13 support (2026-08-12): audio
   routing goes through the platform-neutral `AudioRoute` enum in
   CallManager — fed by CallEndpoint callbacks on 34+ (raw endpoints kept
