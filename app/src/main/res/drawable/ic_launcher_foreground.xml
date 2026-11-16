@@ -1,27 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Dialer 8 logo: the WP dialpad (3x4 keys) with the "8" key lit.
+     Grid = 10dp keys, 2dp gaps, centered; its half-diagonal (~28.6dp)
+     stays inside the 33dp adaptive-icon safe circle. The 8 is CUT OUT of
+     the lit key (evenOdd rings) rather than painted in blue, so the same
+     drawable works as the monochrome (themed-icon) layer. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- White WP-style handset glyph, offset slightly left to make room
-         for the "8" mark at the lower right. -->
-    <group
-        android:scaleX="1.9"
-        android:scaleY="1.9"
-        android:translateX="24"
-        android:translateY="26">
-        <path
-            android:fillColor="#FFFFFF"
-            android:pathData="M6.62,10.79c1.44,2.83 3.76,5.14 6.59,6.59l2.2,-2.2c0.27,-0.27 0.67,-0.36 1.02,-0.24 1.12,0.37 2.33,0.57 3.57,0.57 0.55,0 1,0.45 1,1V20c0,0.55 -0.45,1 -1,1 -9.39,0 -17,-7.61 -17,-17 0,-0.55 0.45,-1 1,-1h3.5c0.55,0 1,0.45 1,1 0,1.25 0.2,2.45 0.57,3.57 0.11,0.35 0.03,0.74 -0.25,1.02l-2.2,2.2z" />
-    </group>
-    <!-- "8" built from two stroked circles, Metro-thin -->
+    <!-- 11 dim keys -->
     <path
-        android:strokeColor="#FFFFFF"
-        android:strokeWidth="2.6"
-        android:pathData="M73.4,52 a3.6,3.6 0 1,1 7.2,0 a3.6,3.6 0 1,1 -7.2,0" />
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.28"
+        android:pathData="M37,31h10v10h-10z M49,31h10v10h-10z M61,31h10v10h-10z M37,43h10v10h-10z M49,43h10v10h-10z M61,43h10v10h-10z M37,55h10v10h-10z M61,55h10v10h-10z M37,67h10v10h-10z M49,67h10v10h-10z M61,67h10v10h-10z" />
+    <!-- Lit 8 key: square, then each loop of the 8 as outer + inner
+         circle; evenOdd leaves the ring between them transparent. The two
+         loops are exactly tangent at y=59.6 (no overlap = no artifact). -->
     <path
-        android:strokeColor="#FFFFFF"
-        android:strokeWidth="2.6"
-        android:pathData="M72.6,59.6 a4.4,4.4 0 1,1 8.8,0 a4.4,4.4 0 1,1 -8.8,0" />
+        android:fillColor="#FFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="M49,55h10v10h-10z M52.4,58a1.6,1.6 0 1,0 3.2,0a1.6,1.6 0 1,0 -3.2,0z M53.15,58a0.85,0.85 0 1,0 1.7,0a0.85,0.85 0 1,0 -1.7,0z M52,61.6a2,2 0 1,0 4,0a2,2 0 1,0 -4,0z M52.8,61.6a1.2,1.2 0 1,0 2.4,0a1.2,1.2 0 1,0 -2.4,0z" />
 </vector>
