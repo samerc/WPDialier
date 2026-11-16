@@ -11,3 +11,5 @@ captures/
 *.apk
 *.keystore
 keystore.properties
+# Play publishing API key (service account) - NEVER commit
+play-service-account.json

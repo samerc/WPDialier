@@ -4,6 +4,7 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
+    id("com.github.triplet.play")
 }
 
 // Release signing lives in keystore.properties (untracked, next to the
@@ -90,6 +91,19 @@ android {
             enableSplit = false
         }
     }
+}
+
+// Play publishing: `.\gradlew.bat publishReleaseBundle` builds the signed
+// AAB and uploads it to the closed testing track with the release notes in
+// src/main/play/release-notes. Key = untracked play-service-account.json
+// (service account; NEVER commit). Without the key the tasks stay disabled.
+val playKey = rootProject.file("play-service-account.json")
+play {
+    enabled.set(playKey.exists())
+    if (playKey.exists()) serviceAccountCredentials.set(playKey)
+    track.set("Dialer 8 - Beta")  // custom closed track (API name)
+    defaultToAppBundles.set(true)
+    releaseStatus.set(com.github.triplet.gradle.androidpublisher.ReleaseStatus.COMPLETED)
 }
 
 // Kotlin 2.x compilerOptions DSL (kotlinOptions was removed in Kotlin 2.4).

@@ -42,6 +42,12 @@ purge it).
   builds an R8 smoke-test variant (`.r8test` appId suffix, debug-signed)
   installable NEXT TO the daily app, so minification testing never requires
   uninstalling (= wiping) the real install.
+- Play publishing (2026-11-16): gradle-play-publisher 4.1.1. `publishReleaseBundle` uploads the signed AAB to the closed track "Dialer 8 - Beta"
+  (custom track; API name differs from the built-in alpha/beta) with notes from
+  app/src/main/play/release-notes/en-US/default.txt (update per release).
+  Key: untracked `play-service-account.json` (gitignored, NEVER commit); the
+  service account has testing-track rights only — no production. ALWAYS ask the
+  user before uploading. Declarations/forms stay manual in the Console.
 - Test device: user's OnePlus 10 Pro (NE2213, Android 16) over USB. Screenshots via
   `adb shell screencap` + `adb pull` (PowerShell `>` redirection corrupts binary).
   Downscale screenshots before Reading them (System.Drawing) to save context.

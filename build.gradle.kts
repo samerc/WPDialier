@@ -5,4 +5,6 @@ plugins {
     // Kotlin 2.3+ required by Play Billing 9.x artifacts.
     id("org.jetbrains.kotlin.android") version "2.4.21" apply false
     id("org.jetbrains.kotlin.plugin.compose") version "2.4.21" apply false
+    // Play publishing API (uploads to testing tracks). 4.x = AGP 9 line.
+    id("com.github.triplet.play") version "4.1.1" apply false
 }

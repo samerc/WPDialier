@@ -1,0 +1,8 @@
+- New contact page: everything about a person, plus quick action tiles
+- Move or copy contacts between accounts, link them, or merge duplicates
+- Find duplicate contacts from Settings
+- Edit every contact field
+- Windows Phone motion: page turns, swivels and flipping tiles
+- Call timer in the status bar; tap the notification to return to your call
+- Pin contacts to Start, call screening, call-back reminders, call notes
+- Hold 2-9 for speed dial, pause/wait dialing, secret codes
