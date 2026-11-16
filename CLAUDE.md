@@ -48,6 +48,9 @@ purge it).
   Key: untracked `play-service-account.json` (gitignored, NEVER commit); the
   service account has testing-track rights only — no production. ALWAYS ask the
   user before uploading. Declarations/forms stay manual in the Console.
+  Second closed track "AppHive" (created 2026-11-16, tester-exchange
+  testers) gets the SAME build: after publishing, run `promoteReleaseArtifact
+  --from-track "Dialer 8 - Beta" --promote-track AppHive`.
 - Test device: user's OnePlus 10 Pro (NE2213, Android 16) over USB. Screenshots via
   `adb shell screencap` + `adb pull` (PowerShell `>` redirection corrupts binary).
   Downscale screenshots before Reading them (System.Drawing) to save context.
