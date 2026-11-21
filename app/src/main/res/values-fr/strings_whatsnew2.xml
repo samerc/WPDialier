@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="whatsnew_2_whatsapp">discutez sur WhatsApp avec les numéros non enregistrés, depuis votre historique</string>
     <string name="whatsnew_2_contact">une nouvelle fiche contact avec tout sur la personne, et des vignettes d\'action rapide</string>
     <string name="whatsnew_2_accounts">déplacez ou copiez des contacts entre comptes, liez-les ou fusionnez les doublons</string>
     <string name="whatsnew_2_duplicates">trouvez les contacts en double depuis les paramètres</string>

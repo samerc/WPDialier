@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- What's new in 1.2 (screens/WhatsNewScreen.kt) -->
+    <string name="whatsnew_2_whatsapp">chat with unsaved numbers on WhatsApp, right from your call history</string>
     <string name="whatsnew_2_contact">a new contact page with everything about a person, plus quick action tiles</string>
     <string name="whatsnew_2_accounts">move or copy contacts between accounts, link them, or merge duplicates</string>
     <string name="whatsnew_2_duplicates">find duplicate contacts from Settings</string>

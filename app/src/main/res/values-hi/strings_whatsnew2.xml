@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="whatsnew_2_whatsapp">कॉल हिस्ट्री से ही सेव न किए गए नंबरों से WhatsApp पर चैट करें</string>
     <string name="whatsnew_2_contact">नया संपर्क पेज जिसमें व्यक्ति की पूरी जानकारी और त्वरित कार्य टाइलें हैं</string>
     <string name="whatsnew_2_accounts">संपर्कों को खातों के बीच ले जाएँ या कॉपी करें, उन्हें लिंक करें या डुप्लिकेट मर्ज करें</string>
     <string name="whatsnew_2_duplicates">सेटिंग्स से डुप्लिकेट संपर्क खोजें</string>

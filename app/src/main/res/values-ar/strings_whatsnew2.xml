@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="whatsnew_2_whatsapp">راسل الأرقام غير المحفوظة على واتساب مباشرةً من سجل المكالمات</string>
     <string name="whatsnew_2_contact">صفحة جهة اتصال جديدة تعرض كل شيء عن الشخص، مع مربعات إجراءات سريعة</string>
     <string name="whatsnew_2_accounts">انقل جهات الاتصال أو انسخها بين الحسابات، واربطها أو ادمج المكررة</string>
     <string name="whatsnew_2_duplicates">اعثر على جهات الاتصال المكررة من الإعدادات</string>

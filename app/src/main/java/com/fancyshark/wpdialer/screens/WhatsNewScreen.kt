@@ -56,6 +56,7 @@ fun WhatsNewScreen(accent: Color, versionName: String, onDone: () -> Unit) {
         )
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
             listOf(
+                R.string.whatsnew_2_whatsapp,
                 R.string.whatsnew_2_contact,
                 R.string.whatsnew_2_accounts,
                 R.string.whatsnew_2_duplicates,
