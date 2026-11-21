@@ -12,6 +12,8 @@
     <string name="home_call">call</string>
     <string name="home_text">text</string>
     <string name="home_save">save</string>
+    <!-- Brand name: same in every language. -->
+    <string name="home_whatsapp" translatable="false">WhatsApp</string>
     <string name="home_profile">profile</string>
     <string name="home_details_app_header">PHONE</string>
     <string name="home_details_duration">"  ·  Duration %1$s"</string>

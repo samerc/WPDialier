@@ -2,7 +2,9 @@
 
 import androidx.compose.foundation.background
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.automirrored.filled.Message
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.material.icons.automirrored.filled.StickyNote2
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Delete
@@ -471,8 +473,11 @@ private fun HistoryList(
                 if (expanded) {
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(18.dp),
-                        // Indented past the thumbnail, under the name.
-                        modifier = Modifier.padding(start = 70.dp, top = 10.dp, bottom = 4.dp),
+                        // Indented past the thumbnail, under the name. Scrolls
+                        // if the actions outgrow a narrow screen (up to six).
+                        modifier = Modifier
+                            .horizontalScroll(androidx.compose.foundation.rememberScrollState())
+                            .padding(start = 70.dp, top = 10.dp, bottom = 4.dp),
                     ) {
                         if (item.number.isNotBlank()) {
                             HistoryAction(
@@ -488,6 +493,23 @@ private fun HistoryList(
                                     Icons.Filled.PersonAdd,
                                     stringResource(com.fancyshark.wpdialer.R.string.home_save), accent,
                                 ) { onSave(item.number) }
+                                // Unsaved number: chat on WhatsApp via wa.me
+                                // (only when installed and the number resolves).
+                                val waIntent = remember(item.number) {
+                                    com.fancyshark.wpdialer.data.WhatsApp.chatIntent(context, item.number)
+                                }
+                                if (waIntent != null) {
+                                    HistoryAction(
+                                        Icons.AutoMirrored.Filled.Chat,
+                                        stringResource(com.fancyshark.wpdialer.R.string.home_whatsapp), accent,
+                                    ) {
+                                        try {
+                                            context.startActivity(waIntent)
+                                        } catch (_: android.content.ActivityNotFoundException) {
+                                            // Uninstalled since the row expanded.
+                                        }
+                                    }
+                                }
                             } else {
                                 HistoryAction(
                                     Icons.Filled.Person,
