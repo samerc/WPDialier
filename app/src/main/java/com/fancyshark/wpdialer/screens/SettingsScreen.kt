@@ -178,20 +178,9 @@ fun SettingsScreen(
     var confirmUnblock by androidx.compose.runtime.remember {
         androidx.compose.runtime.mutableStateOf<Pair<Long, String>?>(null)
     }
-    val localeManager = androidx.compose.runtime.remember {
-        if (android.os.Build.VERSION.SDK_INT >= 33) {
-            context.getSystemService(android.app.LocaleManager::class.java)
-        } else {
-            null
-        }
-    }
     var currentLangTag by androidx.compose.runtime.remember {
         androidx.compose.runtime.mutableStateOf(
-            if (android.os.Build.VERSION.SDK_INT >= 33) {
-                localeManager?.applicationLocales?.toLanguageTags().orEmpty()
-            } else {
-                ""
-            },
+            com.fancyshark.wpdialer.data.AppLanguage.get(context),
         )
     }
     // Language names are shown as endonyms on purpose — never translated.
@@ -334,7 +323,7 @@ fun SettingsScreen(
 
         // Per-app languages need Android 13's LocaleManager; older phones
         // simply follow the system language.
-        if (localeManager != null) {
+        if (com.fancyshark.wpdialer.data.AppLanguage.supported) {
             Spacer(Modifier.height(30.dp))
             Text(
                 stringResource(R.string.settings_language_title),
@@ -940,13 +929,7 @@ fun SettingsScreen(
                         .fillMaxWidth()
                         .clickable {
                             currentLangTag = tag
-                            if (android.os.Build.VERSION.SDK_INT >= 33) {
-                                localeManager?.applicationLocales = if (tag.isEmpty()) {
-                                    android.os.LocaleList.getEmptyLocaleList()
-                                } else {
-                                    android.os.LocaleList.forLanguageTags(tag)
-                                }
-                            }
+                            com.fancyshark.wpdialer.data.AppLanguage.set(context, tag)
                             showLanguagePicker = false
                         }
                         .padding(vertical = 10.dp),
