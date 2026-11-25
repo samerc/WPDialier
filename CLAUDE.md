@@ -84,7 +84,7 @@ purge it).
   uploaded. Use case: default dialer — caller ID, history names, T9,
   contacts list/editor, duplicates; on-device only. Contact Picker is
   not viable for a dialer. (Email received 2026-11-16.)
-- minSdk 33, target/compile 36. Android 13 support (2026-08-12): audio
+- target/compile 36. Android 13 support (2026-08-12): audio
   routing goes through the platform-neutral `AudioRoute` enum in
   CallManager — fed by CallEndpoint callbacks on 34+ (raw endpoints kept
   privately for requestCallEndpointChange) and by the legacy
@@ -93,9 +93,16 @@ purge it).
   canUseFullScreenIntent + its settings deep link are 34-guarded (on 33
   FSI is install-time granted → wizard step auto-skips). The 33 route
   path is UNTESTED on hardware — the Android-13 beta tester is the test
-  vehicle (user's OnePlus is Android 16). Android 13 is the floor —
-  going lower loses per-app languages etc. Cat S22 Flip tester
-  (Android 11) stays out of reach.
+  vehicle (user's OnePlus is Android 16).
+- **minSdk lowered to 29 (Android 10) on 2026-11-25, v1.2.2** (AppHive
+  testers on older phones). Below-33 fallbacks: language picker hidden
+  (<33, no LocaleManager), plain ongoing-call notification (<31, no
+  CallStyle), STIR badge + Telecom contactDisplayName (<30), Call.state
+  (<31), Geocoder blocking call (<33), network/GPS requestSingleUpdate
+  (<30; fused only 31+), Vibrator (<31), POST_NOTIFICATIONS only asked
+  on 33+. Lint NewApi keeps these honest — lintRelease must stay at 0.
+  Android 10 emulator image: system-images;android-29;google_apis;x86_64
+  (sdkmanager via cmd needs the package id QUOTED — ';' splits it).
 
 ## Workflow rules (user-established)
 
