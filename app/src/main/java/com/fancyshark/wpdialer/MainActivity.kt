@@ -554,15 +554,21 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun corePermissions(): Array<String> {
-        return arrayOf(
+        val base = arrayOf(
             Manifest.permission.CALL_PHONE,
             Manifest.permission.READ_CONTACTS,
             Manifest.permission.WRITE_CONTACTS,
             Manifest.permission.READ_CALL_LOG,
             Manifest.permission.WRITE_CALL_LOG,
             Manifest.permission.READ_PHONE_STATE,
-            Manifest.permission.POST_NOTIFICATIONS,
         )
+        // Notifications became a runtime permission in Android 13; below it
+        // the permission doesn't exist and would read as forever denied.
+        return if (android.os.Build.VERSION.SDK_INT >= 33) {
+            base + Manifest.permission.POST_NOTIFICATIONS
+        } else {
+            base
+        }
     }
 
     private fun updatePermissionState() {

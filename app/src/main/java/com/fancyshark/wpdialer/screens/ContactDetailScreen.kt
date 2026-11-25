@@ -1173,10 +1173,13 @@ private fun RingtoneRow(contactId: Long, accentText: Color) {
         androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult(),
     ) { result ->
         if (result.resultCode == android.app.Activity.RESULT_OK) {
-            val uri = result.data?.getParcelableExtra(
-                android.media.RingtoneManager.EXTRA_RINGTONE_PICKED_URI,
-                android.net.Uri::class.java,
-            )?.toString()
+            val uri = result.data?.let {
+                androidx.core.content.IntentCompat.getParcelableExtra(
+                    it,
+                    android.media.RingtoneManager.EXTRA_RINGTONE_PICKED_URI,
+                    android.net.Uri::class.java,
+                )
+            }?.toString()
             ringtoneUri = uri
             scope.launch { Repo.setContactRingtone(context, contactId, uri) }
         }

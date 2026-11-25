@@ -30,8 +30,8 @@ class VoicemailReceiver : BroadcastReceiver() {
         if (intent.action != TelephonyManager.ACTION_SHOW_VOICEMAIL_NOTIFICATION) return
         val nm = context.getSystemService(NotificationManager::class.java) ?: return
         val handle = runCatching {
-            intent.getParcelableExtra(
-                TelephonyManager.EXTRA_PHONE_ACCOUNT_HANDLE, PhoneAccountHandle::class.java,
+            androidx.core.content.IntentCompat.getParcelableExtra(
+                intent, TelephonyManager.EXTRA_PHONE_ACCOUNT_HANDLE, PhoneAccountHandle::class.java,
             )
         }.getOrNull()
         // One notice per SIM: a dual-SIM phone has a voicemail box on each.

@@ -179,11 +179,19 @@ fun SettingsScreen(
         androidx.compose.runtime.mutableStateOf<Pair<Long, String>?>(null)
     }
     val localeManager = androidx.compose.runtime.remember {
-        context.getSystemService(android.app.LocaleManager::class.java)
+        if (android.os.Build.VERSION.SDK_INT >= 33) {
+            context.getSystemService(android.app.LocaleManager::class.java)
+        } else {
+            null
+        }
     }
     var currentLangTag by androidx.compose.runtime.remember {
         androidx.compose.runtime.mutableStateOf(
-            localeManager?.applicationLocales?.toLanguageTags().orEmpty(),
+            if (android.os.Build.VERSION.SDK_INT >= 33) {
+                localeManager?.applicationLocales?.toLanguageTags().orEmpty()
+            } else {
+                ""
+            },
         )
     }
     // Language names are shown as endonyms on purpose — never translated.
@@ -324,25 +332,29 @@ fun SettingsScreen(
             )
         }
 
-        Spacer(Modifier.height(30.dp))
-        Text(
-            stringResource(R.string.settings_language_title),
-            color = accentText,
-            style = Metro.Type.Small,
-            fontWeight = FontWeight.SemiBold,
-            letterSpacing = 1.sp,
-        )
-        Text(
-            languageOptions.firstOrNull { langSelected(it.first) }?.second
-                ?: stringResource(R.string.settings_language_system),
-            color = Metro.Foreground,
-            style = Metro.Type.Large,
-            fontWeight = FontWeight.Light,
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { showLanguagePicker = true }
-                .padding(vertical = 8.dp),
-        )
+        // Per-app languages need Android 13's LocaleManager; older phones
+        // simply follow the system language.
+        if (localeManager != null) {
+            Spacer(Modifier.height(30.dp))
+            Text(
+                stringResource(R.string.settings_language_title),
+                color = accentText,
+                style = Metro.Type.Small,
+                fontWeight = FontWeight.SemiBold,
+                letterSpacing = 1.sp,
+            )
+            Text(
+                languageOptions.firstOrNull { langSelected(it.first) }?.second
+                    ?: stringResource(R.string.settings_language_system),
+                color = Metro.Foreground,
+                style = Metro.Type.Large,
+                fontWeight = FontWeight.Light,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { showLanguagePicker = true }
+                    .padding(vertical = 8.dp),
+            )
+        }
 
         Spacer(Modifier.height(30.dp))
         Text(
@@ -928,10 +940,12 @@ fun SettingsScreen(
                         .fillMaxWidth()
                         .clickable {
                             currentLangTag = tag
-                            localeManager?.applicationLocales = if (tag.isEmpty()) {
-                                android.os.LocaleList.getEmptyLocaleList()
-                            } else {
-                                android.os.LocaleList.forLanguageTags(tag)
+                            if (android.os.Build.VERSION.SDK_INT >= 33) {
+                                localeManager?.applicationLocales = if (tag.isEmpty()) {
+                                    android.os.LocaleList.getEmptyLocaleList()
+                                } else {
+                                    android.os.LocaleList.forLanguageTags(tag)
+                                }
                             }
                             showLanguagePicker = false
                         }

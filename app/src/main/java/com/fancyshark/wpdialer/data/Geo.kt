@@ -20,6 +20,15 @@ object Geo {
             withTimeoutOrNull(8_000) {
                 runCatching {
                     val geocoder = Geocoder(context, Locale.getDefault())
+                    if (android.os.Build.VERSION.SDK_INT < 33) {
+                        // Pre-13 only has the blocking call; we're on IO already.
+                        @Suppress("DEPRECATION")
+                        return@runCatching geocoder.getFromLocation(lat, lon, 1)
+                            ?.firstOrNull()?.let { a ->
+                                (0..a.maxAddressLineIndex)
+                                    .joinToString(", ") { a.getAddressLine(it) }
+                            }
+                    }
                     suspendCancellableCoroutine { cont ->
                         geocoder.getFromLocation(
                             lat, lon, 1,
@@ -61,15 +70,44 @@ object Geo {
                 }
                 // Cancel the provider request when the timeout aborts us, so
                 // the fused provider doesn't keep running (battery).
-                val signal = android.os.CancellationSignal()
-                cont.invokeOnCancellation { runCatching { signal.cancel() } }
-                runCatching {
-                    manager.getCurrentLocation(
-                        LocationManager.FUSED_PROVIDER,
-                        signal,
-                        context.mainExecutor,
-                    ) { location -> if (cont.isActive) cont.resume(location) }
-                }.onFailure { if (cont.isActive) cont.resume(null) }
+                // The fused provider is Android 12+; older phones use the
+                // network provider (cell/Wi-Fi), else GPS.
+                val provider = when {
+                    android.os.Build.VERSION.SDK_INT >= 31 -> LocationManager.FUSED_PROVIDER
+                    runCatching { manager.isProviderEnabled(LocationManager.NETWORK_PROVIDER) }
+                        .getOrDefault(false) -> LocationManager.NETWORK_PROVIDER
+                    else -> LocationManager.GPS_PROVIDER
+                }
+                if (android.os.Build.VERSION.SDK_INT >= 30) {
+                    val signal = android.os.CancellationSignal()
+                    cont.invokeOnCancellation { runCatching { signal.cancel() } }
+                    runCatching {
+                        manager.getCurrentLocation(
+                            provider,
+                            signal,
+                            context.mainExecutor,
+                        ) { location -> if (cont.isActive) cont.resume(location) }
+                    }.onFailure { if (cont.isActive) cont.resume(null) }
+                } else {
+                    val listener = object : android.location.LocationListener {
+                        override fun onLocationChanged(location: Location) {
+                            if (cont.isActive) cont.resume(location)
+                        }
+                        @Deprecated("Deprecated in Java")
+                        override fun onStatusChanged(p: String?, s: Int, e: android.os.Bundle?) {}
+                        override fun onProviderEnabled(p: String) {}
+                        override fun onProviderDisabled(p: String) {
+                            if (cont.isActive) cont.resume(null)
+                        }
+                    }
+                    cont.invokeOnCancellation { runCatching { manager.removeUpdates(listener) } }
+                    runCatching {
+                        @Suppress("DEPRECATION")
+                        manager.requestSingleUpdate(
+                            provider, listener, android.os.Looper.getMainLooper(),
+                        )
+                    }.onFailure { if (cont.isActive) cont.resume(null) }
+                }
             }
         }
 }

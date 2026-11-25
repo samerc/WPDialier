@@ -203,7 +203,9 @@ object CallManager {
         }
     }
 
-    fun stateOf(call: Call): Int = call.details.state
+    @Suppress("DEPRECATION")
+    fun stateOf(call: Call): Int =
+        if (Build.VERSION.SDK_INT >= 31) call.details.state else call.state
 
     private fun captureEndReason(call: Call) {
         val cause = call.details.disconnectCause
@@ -231,8 +233,8 @@ object CallManager {
     fun accountChoices(call: Call?): List<PhoneAccountHandle> {
         val extras = call?.details?.intentExtras ?: return emptyList()
         return runCatching {
-            extras.getParcelableArrayList(
-                Call.AVAILABLE_PHONE_ACCOUNTS, PhoneAccountHandle::class.java,
+            androidx.core.os.BundleCompat.getParcelableArrayList(
+                extras, Call.AVAILABLE_PHONE_ACCOUNTS, PhoneAccountHandle::class.java,
             ).orEmpty()
         }.getOrDefault(emptyList())
     }
@@ -262,7 +264,9 @@ object CallManager {
      */
     fun telecomName(call: Call?): String? {
         val d = call?.details ?: return null
-        d.contactDisplayName?.takeIf { it.isNotBlank() }?.let { return it }
+        if (Build.VERSION.SDK_INT >= 30) {
+            d.contactDisplayName?.takeIf { it.isNotBlank() }?.let { return it }
+        }
         val cnap = d.callerDisplayName
         return if (!cnap.isNullOrBlank() &&
             d.callerDisplayNamePresentation == android.telecom.TelecomManager.PRESENTATION_ALLOWED
@@ -279,7 +283,8 @@ object CallManager {
      * verified either way (show nothing).
      */
     fun callerVerified(call: Call?): Boolean? =
-        when (runCatching { call?.details?.callerNumberVerificationStatus }.getOrNull()) {
+        if (Build.VERSION.SDK_INT < 30) null
+        else when (runCatching { call?.details?.callerNumberVerificationStatus }.getOrNull()) {
             android.telecom.Connection.VERIFICATION_STATUS_PASSED -> true
             android.telecom.Connection.VERIFICATION_STATUS_FAILED -> false
             else -> null

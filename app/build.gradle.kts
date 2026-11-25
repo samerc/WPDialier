@@ -27,10 +27,10 @@ android {
         // 33 floor: Android 13 keeps per-app languages, notification
         // permission, and themed icons. Audio routing has a CallAudioState
         // compat path for 33 (CallEndpoint is 34+).
-        minSdk = 33
+        minSdk = 29
         targetSdk = 36
-        versionCode = 7
-        versionName = "1.2.1"
+        versionCode = 8
+        versionName = "1.2.2"
     }
 
     signingConfigs {

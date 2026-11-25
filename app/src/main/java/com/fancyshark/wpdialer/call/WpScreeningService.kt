@@ -54,7 +54,11 @@ class WpScreeningService : CallScreeningService() {
         }
         val number = callDetails.handle?.schemeSpecificPart
         val presentation = callDetails.handlePresentation
-        val verification = callDetails.callerNumberVerificationStatus
+        val verification = if (android.os.Build.VERSION.SDK_INT >= 30) {
+            callDetails.callerNumberVerificationStatus
+        } else {
+            android.telecom.Connection.VERIFICATION_STATUS_NOT_VERIFIED
+        }
         // Everything but "silence unknown" decides without I/O.
         val quick = ScreeningPolicy.decide(
             settings.copy(silenceUnknown = false), direction, number, presentation,

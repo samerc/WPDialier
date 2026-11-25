@@ -1,7 +1,6 @@
-- New: chat with unsaved numbers on WhatsApp, right from your call history
+- Now works on Android 10, 11 and 12 (previously Android 13 and up)
+- Chat with unsaved numbers on WhatsApp, right from your call history
 - New app icon
 - Contact page with everything about a person, plus quick action tiles
 - Move or copy contacts between accounts, link them, or merge duplicates
-- Edit every contact field; find duplicates from Settings
 - Call timer in the status bar; tap the notification to return to your call
-- Windows Phone motion, pin contacts to Start, call screening, reminders

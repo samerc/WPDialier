@@ -128,9 +128,15 @@ object SettingsBackup {
                 val text = context.contentResolver.openInputStream(uri)!!.use {
                     // Bounded read: a huge or endless stream (wrong file,
                     // misbehaving provider) must not OOM the app.
-                    val bytes = it.readNBytes((MAX_BYTES + 1).toInt())
-                    if (bytes.size > MAX_BYTES) return@withContext null
-                    bytes.toString(Charsets.UTF_8)
+                    val out = java.io.ByteArrayOutputStream()
+                    val chunk = ByteArray(8192)
+                    while (true) {
+                        val n = it.read(chunk)
+                        if (n < 0) break
+                        out.write(chunk, 0, n)
+                        if (out.size() > MAX_BYTES) return@withContext null
+                    }
+                    out.toByteArray().toString(Charsets.UTF_8)
                 }
                 val o = JSONObject(text)
                 if (o.optString("app") != APP_ID) return@withContext null

@@ -44,8 +44,11 @@ object Haptics {
         val power = context.getSystemService(PowerManager::class.java)
         if (power?.isPowerSaveMode == true) return
         runCatching {
-            val vibrator = context.getSystemService(VibratorManager::class.java)
-                ?.defaultVibrator ?: return
+            val vibrator = if (android.os.Build.VERSION.SDK_INT >= 31) {
+                context.getSystemService(VibratorManager::class.java)?.defaultVibrator
+            } else {
+                context.getSystemService(android.os.Vibrator::class.java)
+            } ?: return
             val effect = if (vibrator.hasAmplitudeControl()) {
                 val (duration, amplitude) = when (_level.value) {
                     0 -> 10L to 50

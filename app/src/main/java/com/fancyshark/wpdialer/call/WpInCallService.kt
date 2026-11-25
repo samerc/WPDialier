@@ -225,7 +225,27 @@ class WpInCallService : InCallService() {
             .apply { if (number.isNotBlank()) setUri("tel:$number") }
             .build()
         com.fancyshark.wpdialer.ui.AccentStore.init(this)
-        val notification = Notification.Builder(this, ONGOING_CHANNEL_ID)
+        // CallStyle is Android 12+; below it the plain ongoing notification
+        // (title, "return to call", end-call action) is the foreground one.
+        val plain = Notification.Builder(this, ONGOING_CHANNEL_ID)
+            .setSmallIcon(com.fancyshark.wpdialer.R.drawable.ic_notification)
+            .setColor(com.fancyshark.wpdialer.ui.AccentStore.accent.value.color.toArgb())
+            .setContentTitle(display)
+            .setContentText(getString(com.fancyshark.wpdialer.R.string.main_return_to_call))
+            .setCategory(Notification.CATEGORY_CALL)
+            .setOngoing(true)
+            .setContentIntent(open)
+            .addAction(
+                Notification.Action.Builder(
+                    null, getString(com.fancyshark.wpdialer.R.string.call_end_call), hangup,
+                ).build(),
+            )
+            .apply {
+                if (since > 0) setWhen(since).setShowWhen(true).setUsesChronometer(true)
+            }
+            .build()
+        val notification = if (android.os.Build.VERSION.SDK_INT < 31) plain
+        else Notification.Builder(this, ONGOING_CHANNEL_ID)
             .setSmallIcon(
                 android.graphics.drawable.Icon.createWithResource(
                     this, com.fancyshark.wpdialer.R.drawable.ic_notification,
@@ -255,23 +275,6 @@ class WpInCallService : InCallService() {
             // CallStyle without a foreground service is rejected outright, so
             // the fallback is a plain ongoing notification — the user must
             // always have a way back to the call from the shade.
-            val plain = Notification.Builder(this, ONGOING_CHANNEL_ID)
-                .setSmallIcon(com.fancyshark.wpdialer.R.drawable.ic_notification)
-                .setColor(com.fancyshark.wpdialer.ui.AccentStore.accent.value.color.toArgb())
-                .setContentTitle(display)
-                .setContentText(getString(com.fancyshark.wpdialer.R.string.main_return_to_call))
-                .setCategory(Notification.CATEGORY_CALL)
-                .setOngoing(true)
-                .setContentIntent(open)
-                .addAction(
-                    Notification.Action.Builder(
-                        null, getString(com.fancyshark.wpdialer.R.string.call_end_call), hangup,
-                    ).build(),
-                )
-                .apply {
-                    if (since > 0) setWhen(since).setShowWhen(true).setUsesChronometer(true)
-                }
-                .build()
             runCatching { nm.notify(ONGOING_NOTIFICATION_ID, plain) }
         }
     }
