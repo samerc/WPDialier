@@ -91,4 +91,23 @@
     <string name="type_rel_manager">manager</string>
     <string name="type_rel_assistant">assistant</string>
     <string name="type_rel_referred_by">referred by</string>
+    <!-- Field checks and save errors (contact editor) -->
+    <string name="cform_err_name_or_number">add a name or a phone number</string>
+    <string name="cform_err_phone">this doesn\'t look like a phone number — use digits, spaces and + * #</string>
+    <string name="cform_err_email">this doesn\'t look like an email address (like name@example.com)</string>
+    <plurals name="cform_fields_need_fixing">
+        <item quantity="one">%d field needs fixing — it\'s marked in red</item>
+        <item quantity="other">%d fields need fixing — they\'re marked in red</item>
+    </plurals>
+    <string name="cform_save_err_title_new">couldn\'t save the contact</string>
+    <string name="cform_save_err_title_edit">couldn\'t save your changes</string>
+    <string name="cform_save_err_permission">Dialer 8 isn\'t allowed to change your contacts. Turn on the Contacts permission for Dialer 8, then try again. Nothing you typed is lost.</string>
+    <string name="cform_save_err_account_new">%1$s didn\'t accept the new contact. Choose another place under \"Save to\" and try again. Nothing you typed is lost.</string>
+    <string name="cform_save_err_account_edit">%1$s didn\'t accept these changes. Contacts that sync from some apps can only be changed in those apps.</string>
+    <string name="cform_save_err_storage">Your phone\'s storage is full. Free up some space, then try again.</string>
+    <string name="cform_save_err_too_large">This contact is too big to save in one go. Try a smaller photo or fewer fields.</string>
+    <string name="cform_save_err_unknown">Something went wrong and nothing was saved. What you typed is still here, so you can try again. If it keeps happening, tap \"Report a problem\" in Settings › about this app.</string>
+    <string name="cform_open_settings">open settings</string>
+    <string name="cform_choose_another">choose another</string>
+    <string name="cform_try_again">try again</string>
 </resources>

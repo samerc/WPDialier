@@ -316,6 +316,81 @@ internal fun HintLine(text: String, top: Dp = 6.dp) {
     )
 }
 
+/** The reason under an invalid field, in red. */
+@Composable
+internal fun ErrorLine(text: String) {
+    Text(
+        text,
+        color = Metro.Red,
+        style = Metro.Type.Small,
+        modifier = Modifier.padding(top = 4.dp),
+    )
+}
+
+@Composable
+internal fun fieldErrorText(error: com.fancyshark.wpdialer.data.FieldError): String = stringResource(
+    when (error) {
+        com.fancyshark.wpdialer.data.FieldError.NEED_NAME_OR_NUMBER -> R.string.cform_err_name_or_number
+        com.fancyshark.wpdialer.data.FieldError.BAD_PHONE -> R.string.cform_err_phone
+        com.fancyshark.wpdialer.data.FieldError.BAD_EMAIL -> R.string.cform_err_email
+    },
+)
+
+/**
+ * Explains a failed save in plain words, with the one action that helps:
+ * open the app's permission settings, pick another account (new contacts),
+ * or simply try again. The typed form is never lost.
+ */
+@Composable
+internal fun SaveErrorDialog(
+    error: com.fancyshark.wpdialer.data.SaveError,
+    account: String,
+    isNew: Boolean,
+    accent: Color,
+    onRetry: () -> Unit,
+    onChooseAnother: (() -> Unit)?,
+    onDismiss: () -> Unit,
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val message = when (error) {
+        com.fancyshark.wpdialer.data.SaveError.NO_PERMISSION -> stringResource(R.string.cform_save_err_permission)
+        com.fancyshark.wpdialer.data.SaveError.ACCOUNT_REJECTED -> if (isNew) {
+            stringResource(R.string.cform_save_err_account_new, account)
+        } else {
+            stringResource(R.string.cform_save_err_account_edit, account)
+        }
+        com.fancyshark.wpdialer.data.SaveError.STORAGE_FULL -> stringResource(R.string.cform_save_err_storage)
+        com.fancyshark.wpdialer.data.SaveError.TOO_LARGE -> stringResource(R.string.cform_save_err_too_large)
+        com.fancyshark.wpdialer.data.SaveError.UNKNOWN -> stringResource(R.string.cform_save_err_unknown)
+    }
+    val (actionLabel, action) = when {
+        error == com.fancyshark.wpdialer.data.SaveError.NO_PERMISSION -> stringResource(R.string.cform_open_settings) to {
+            onDismiss()
+            runCatching {
+                context.startActivity(
+                    android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                        .setData(android.net.Uri.fromParts("package", context.packageName, null)),
+                )
+            }
+            Unit
+        }
+        error == com.fancyshark.wpdialer.data.SaveError.ACCOUNT_REJECTED && onChooseAnother != null ->
+            stringResource(R.string.cform_choose_another) to onChooseAnother
+        else -> stringResource(R.string.cform_try_again) to onRetry
+    }
+    com.fancyshark.wpdialer.ui.MetroConfirm(
+        title = stringResource(
+            if (isNew) R.string.cform_save_err_title_new else R.string.cform_save_err_title_edit,
+        ),
+        message = message,
+        confirmLabel = actionLabel,
+        cancelLabel = stringResource(R.string.ui_close),
+        onConfirm = action,
+        onCancel = onDismiss,
+        confirmFill = accent,
+    )
+}
+
 @Composable
 internal fun AddLink(text: String, accent: Color, onClick: () -> Unit) {
     Spacer(Modifier.height(10.dp))

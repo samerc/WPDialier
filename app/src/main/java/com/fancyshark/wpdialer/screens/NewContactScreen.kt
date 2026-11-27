@@ -12,6 +12,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -31,6 +32,8 @@ import com.fancyshark.wpdialer.data.Countries
 import com.fancyshark.wpdialer.data.EditPhone
 import com.fancyshark.wpdialer.data.EditableContact
 import com.fancyshark.wpdialer.data.FieldKind
+import com.fancyshark.wpdialer.data.ContactValidation
+import com.fancyshark.wpdialer.data.SaveError
 import com.fancyshark.wpdialer.data.SaveResult
 import com.fancyshark.wpdialer.data.keepingOnly
 import com.fancyshark.wpdialer.data.unsupportedFilled
@@ -57,15 +60,19 @@ fun NewContactScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val accentText = Metro.textAccent(accent)
-    val accounts by produceState(listOf(ContactAccount(null, null))) {
-        value = ContactEditor.listAccounts(context)
+    // Accounts plus the phone's preferred one for new contacts (Android 16+
+    // setting; phone storage otherwise).
+    val accountsAndDefault by produceState(listOf(ContactAccount(null, null)) to ContactAccount(null, null)) {
+        val list = ContactEditor.listAccounts(context)
+        value = list to ContactEditor.defaultAccount(context, list)
     }
+    val accounts = accountsAndDefault.first
     // Form state is saveable: the photo/map/location round trips can cost
     // the process, and the typed input must survive that.
     var selectedAccount by rememberSaveable(stateSaver = ContactAccountSaver) {
         mutableStateOf<ContactAccount?>(null)
     }
-    val chosen = selectedAccount ?: accounts.first()
+    val chosen = selectedAccount ?: accountsAndDefault.second
 
     val regions = remember { Countries.all() }
     var regionCode by rememberSaveable { mutableStateOf(Countries.defaultRegionCode(context)) }
@@ -90,14 +97,16 @@ fun NewContactScreen(
     LaunchedEffect(dirty) { onDirtyChange(dirty) }
 
     var saving by remember { mutableStateOf(false) }
-    var saveFailed by remember { mutableStateOf(false) }
+    var saveError by remember { mutableStateOf<SaveError?>(null) }
+    // Field checks start after the first save attempt, then follow typing.
+    var showErrors by rememberSaveable { mutableStateOf(false) }
+    var errorTick by remember { mutableIntStateOf(0) }
     var showAccountPicker by rememberSaveable { mutableStateOf(false) }
     var showCountryPicker by rememberSaveable { mutableStateOf(false) }
     // A "save to" switch waiting on the remove-unsupported-fields confirm.
     var pendingAccount by rememberSaveable(stateSaver = ContactAccountSaver) {
         mutableStateOf<ContactAccount?>(null)
     }
-    val needNameOrNumber = stringResource(R.string.cform_need_name_or_number)
     val photoFailed = stringResource(R.string.cform_photo_failed)
 
     fun update(transform: (EditableContact) -> EditableContact) {
@@ -127,14 +136,21 @@ fun NewContactScreen(
         update = { update(it) },
         dirty = dirty,
         saving = saving,
-        saveFailedText = if (saveFailed) stringResource(R.string.newcontact_save_failed) else null,
+        fieldErrors = if (showErrors) ContactValidation.validate(form, requireNameOrNumber = true) else emptyMap(),
+        scrollToErrorTick = errorTick,
+        saveError = saveError,
+        saveErrorAccount = accountKindLabel(chosen.kindLabel),
+        isNew = true,
+        onSaveErrorDismiss = { saveError = null },
+        onChooseAnotherAccount = { showAccountPicker = true },
         onSave = {
             val raw = form.raws.first()
-            if (raw.name.isBlank && raw.phones.none { it.number.isNotBlank() }) {
-                MetroToast.show(needNameOrNumber)
+            if (ContactValidation.validate(form, requireNameOrNumber = true).isNotEmpty()) {
+                showErrors = true
+                errorTick++
             } else {
                 saving = true
-                saveFailed = false
+                saveError = null
                 scope.launch {
                     val prepared = raw.copy(
                         account = chosen,
@@ -144,14 +160,16 @@ fun NewContactScreen(
                         emails = raw.emails.map { it.copy(address = it.address.trim()) },
                         note = raw.note.trim(),
                     )
-                    val result = ContactEditor.create(context, prepared)
-                    if (result != SaveResult.FAILED) {
-                        // The contact exists; only the photo batch failed.
-                        if (result == SaveResult.PHOTO_FAILED) MetroToast.show(photoFailed)
-                        onDone()
-                    } else {
-                        saving = false
-                        saveFailed = true
+                    when (val result = ContactEditor.create(context, prepared)) {
+                        is SaveResult.Failed -> {
+                            saving = false
+                            saveError = result.error
+                        }
+                        else -> {
+                            // The contact exists; only the photo batch may have failed.
+                            if (result == SaveResult.PhotoFailed) MetroToast.show(photoFailed)
+                            onDone()
+                        }
                     }
                 }
             }
@@ -161,7 +179,7 @@ fun NewContactScreen(
             FieldLabel(stringResource(R.string.newcontact_save_to), top = 18.dp)
             MetroSelector(
                 primary = accountKindLabel(chosen.kindLabel),
-                secondary = chosen.name,
+                secondary = chosen.shownName,
                 accent = accent,
             ) { showAccountPicker = true }
             FieldLabel(stringResource(R.string.newcontact_country))
@@ -197,9 +215,9 @@ fun NewContactScreen(
                                 color = if (selected) accentText else Metro.Foreground,
                                 style = Metro.Type.SubHeader,
                             )
-                            if (!account.name.isNullOrBlank()) {
+                            account.shownName?.let { shown ->
                                 Text(
-                                    account.name,
+                                    shown,
                                     color = Metro.Subtle,
                                     style = Metro.Type.Small,
                                     fontWeight = FontWeight.Light,

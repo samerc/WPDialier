@@ -91,4 +91,27 @@
     <string name="type_rel_manager">المدير</string>
     <string name="type_rel_assistant">المساعد</string>
     <string name="type_rel_referred_by">بتوصية من</string>
+    <!-- Field checks and save errors (contact editor) -->
+    <string name="cform_err_name_or_number">أضف اسماً أو رقم هاتف</string>
+    <string name="cform_err_phone">هذا لا يبدو رقم هاتف — استخدم الأرقام والمسافات و+ * #</string>
+    <string name="cform_err_email">هذا لا يبدو عنوان بريد إلكتروني (مثل name@example.com)</string>
+    <plurals name="cform_fields_need_fixing">
+        <item quantity="zero">لا توجد حقول تحتاج إلى تصحيح</item>
+        <item quantity="one">حقل واحد يحتاج إلى تصحيح — وهو باللون الأحمر</item>
+        <item quantity="two">حقلان يحتاجان إلى تصحيح — وهما باللون الأحمر</item>
+        <item quantity="few">%d حقول تحتاج إلى تصحيح — وهي باللون الأحمر</item>
+        <item quantity="many">%d حقلاً يحتاج إلى تصحيح — وهي باللون الأحمر</item>
+        <item quantity="other">%d حقل يحتاج إلى تصحيح — وهي باللون الأحمر</item>
+    </plurals>
+    <string name="cform_save_err_title_new">تعذّر حفظ جهة الاتصال</string>
+    <string name="cform_save_err_title_edit">تعذّر حفظ التغييرات</string>
+    <string name="cform_save_err_permission">لا يملك Dialer 8 إذناً بتعديل جهات الاتصال. فعّل إذن جهات الاتصال لـ Dialer 8 ثم حاول مرة أخرى. لم يضِع شيء مما كتبته.</string>
+    <string name="cform_save_err_account_new">لم يقبل %1$s جهة الاتصال الجديدة. اختر مكاناً آخر ضمن «حفظ في» وحاول مرة أخرى. لم يضِع شيء مما كتبته.</string>
+    <string name="cform_save_err_account_edit">لم يقبل %1$s هذه التغييرات. جهات الاتصال التي تتم مزامنتها من بعض التطبيقات لا يمكن تعديلها إلا داخل تلك التطبيقات.</string>
+    <string name="cform_save_err_storage">مساحة التخزين في هاتفك ممتلئة. أفرغ بعض المساحة ثم حاول مرة أخرى.</string>
+    <string name="cform_save_err_too_large">جهة الاتصال هذه كبيرة جداً لحفظها دفعة واحدة. جرّب صورة أصغر أو حقولاً أقل.</string>
+    <string name="cform_save_err_unknown">حدث خطأ ولم يُحفظ شيء. ما كتبته لا يزال هنا ويمكنك المحاولة مرة أخرى. إذا تكرر ذلك، اضغط «الإبلاغ عن مشكلة» في الإعدادات › حول هذا التطبيق.</string>
+    <string name="cform_open_settings">فتح الإعدادات</string>
+    <string name="cform_choose_another">اختيار مكان آخر</string>
+    <string name="cform_try_again">إعادة المحاولة</string>
 </resources>

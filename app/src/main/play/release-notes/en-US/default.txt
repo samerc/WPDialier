@@ -1,6 +1,6 @@
 - Now works on Android 10, 11 and 12 (previously Android 13 and up)
 - Fixed: Settings no longer closes on Android 10-12
+- Contact editor: mistakes are marked in red with a short explanation
+- Clearer messages when a contact can't be saved, with what to do next
+- Saving to phone storage now uses your phone's own storage (Samsung and others)
 - Chat with unsaved numbers on WhatsApp, right from your call history
-- New app icon
-- Contact page with everything about a person, plus quick action tiles
-- Call timer in the status bar; tap the notification to return to your call

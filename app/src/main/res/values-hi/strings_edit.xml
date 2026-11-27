@@ -91,4 +91,23 @@
     <string name="type_rel_manager">मैनेजर</string>
     <string name="type_rel_assistant">सहायक</string>
     <string name="type_rel_referred_by">द्वारा रेफ़र किया गया</string>
+    <!-- Field checks and save errors (contact editor) -->
+    <string name="cform_err_name_or_number">कोई नाम या फ़ोन नंबर जोड़ें</string>
+    <string name="cform_err_phone">यह फ़ोन नंबर जैसा नहीं लगता — अंक, स्पेस और + * # का उपयोग करें</string>
+    <string name="cform_err_email">यह ईमेल पता जैसा नहीं लगता (जैसे name@example.com)</string>
+    <plurals name="cform_fields_need_fixing">
+        <item quantity="one">%d फ़ील्ड ठीक करनी है — वह लाल रंग में है</item>
+        <item quantity="other">%d फ़ील्ड ठीक करनी हैं — वे लाल रंग में हैं</item>
+    </plurals>
+    <string name="cform_save_err_title_new">संपर्क सेव नहीं हो सका</string>
+    <string name="cform_save_err_title_edit">आपके बदलाव सेव नहीं हो सके</string>
+    <string name="cform_save_err_permission">Dialer 8 को आपके संपर्क बदलने की अनुमति नहीं है। Dialer 8 के लिए संपर्क (Contacts) की अनुमति चालू करें, फिर दोबारा कोशिश करें। आपका लिखा कुछ भी नहीं खोया।</string>
+    <string name="cform_save_err_account_new">%1$s ने नया संपर्क स्वीकार नहीं किया। \"इसमें सेव करें\" में कोई दूसरी जगह चुनें और दोबारा कोशिश करें। आपका लिखा कुछ भी नहीं खोया।</string>
+    <string name="cform_save_err_account_edit">%1$s ने ये बदलाव स्वीकार नहीं किए। कुछ ऐप से सिंक होने वाले संपर्क सिर्फ़ उन्हीं ऐप में बदले जा सकते हैं।</string>
+    <string name="cform_save_err_storage">आपके फ़ोन का स्टोरेज भर गया है। थोड़ी जगह खाली करें, फिर दोबारा कोशिश करें।</string>
+    <string name="cform_save_err_too_large">यह संपर्क एक बार में सेव करने के लिए बहुत बड़ा है। छोटी फ़ोटो या कम फ़ील्ड आज़माएँ।</string>
+    <string name="cform_save_err_unknown">कुछ गड़बड़ हो गई और कुछ भी सेव नहीं हुआ। आपका लिखा अभी भी यहीं है, आप दोबारा कोशिश कर सकते हैं। अगर ऐसा बार-बार हो, तो सेटिंग्स › इस ऐप के बारे में में \"समस्या की रिपोर्ट करें\" पर टैप करें।</string>
+    <string name="cform_open_settings">सेटिंग्स खोलें</string>
+    <string name="cform_choose_another">दूसरी जगह चुनें</string>
+    <string name="cform_try_again">दोबारा कोशिश करें</string>
 </resources>

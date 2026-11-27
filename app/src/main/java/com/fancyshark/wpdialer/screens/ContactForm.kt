@@ -25,6 +25,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -35,6 +38,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -51,10 +55,12 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.error
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -75,7 +81,10 @@ import com.fancyshark.wpdialer.data.EditRawContact
 import com.fancyshark.wpdialer.data.EditRelation
 import com.fancyshark.wpdialer.data.EditValue
 import com.fancyshark.wpdialer.data.EditableContact
+import com.fancyshark.wpdialer.data.FieldError
 import com.fancyshark.wpdialer.data.FieldKind
+import com.fancyshark.wpdialer.data.FieldRef
+import com.fancyshark.wpdialer.data.SaveError
 import com.fancyshark.wpdialer.data.defaultPhone
 import com.fancyshark.wpdialer.data.preferredTarget
 import com.fancyshark.wpdialer.data.withContactWide
@@ -110,6 +119,7 @@ private fun String.revealedSet(): Set<String> = split(',').filter { it.isNotEmpt
  * draw over everything, with [extraOverlayOpen] hiding the form from
  * TalkBack while one is up.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun ContactFormScaffold(
     caption: String,
@@ -118,12 +128,22 @@ internal fun ContactFormScaffold(
     update: ((EditableContact) -> EditableContact) -> Unit,
     dirty: Boolean,
     saving: Boolean,
-    saveFailedText: String?,
     onSave: () -> Unit,
     onDone: () -> Unit,
     header: @Composable () -> Unit = {},
     extraOverlayOpen: Boolean = false,
     extraOverlays: @Composable () -> Unit = {},
+    /** Invalid fields, in form order; drawn red with a reason underneath. */
+    fieldErrors: Map<FieldRef, FieldError> = emptyMap(),
+    /** Bumped by a blocked save: scrolls the first invalid field into view. */
+    scrollToErrorTick: Int = 0,
+    /** A failed save to explain; [saveErrorAccount] names where it went. */
+    saveError: SaveError? = null,
+    saveErrorAccount: String = "",
+    isNew: Boolean = false,
+    onSaveErrorDismiss: () -> Unit = {},
+    /** New contacts only: reopen "save to" after an account refused the save. */
+    onChooseAnotherAccount: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -239,7 +259,19 @@ internal fun ContactFormScaffold(
     }
 
     val anyOverlay = showName || showAddField || showLabels || showNewLabel || showTarget ||
-        relationRaw >= 0 || mapRaw >= 0 || confirmDiscard || extraOverlayOpen
+        relationRaw >= 0 || mapRaw >= 0 || confirmDiscard || extraOverlayOpen || saveError != null
+
+    // One requester per field that can be invalid; a blocked save brings the
+    // first invalid one into view.
+    val requesters = remember { mutableMapOf<FieldRef, BringIntoViewRequester>() }
+    fun requester(ref: FieldRef) = requesters.getOrPut(ref) { BringIntoViewRequester() }
+    val firstError = fieldErrors.keys.firstOrNull()
+    LaunchedEffect(scrollToErrorTick) {
+        if (scrollToErrorTick > 0 && firstError != null) {
+            runCatching { requester(firstError).bringIntoView() }
+        }
+    }
+    val nameError = fieldErrors[FieldRef("name", 0, 0)]?.let { fieldErrorText(it) }
 
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize().hiddenFromAccessibility(anyOverlay)) {
@@ -270,9 +302,14 @@ internal fun ContactFormScaffold(
                         Row(
                             Modifier
                                 .fillMaxWidth()
+                                .bringIntoViewRequester(requester(FieldRef("name", 0, 0)))
                                 .heightIn(min = 46.dp)
-                                .border(2.dp, Metro.Foreground)
+                                .border(
+                                    if (nameError != null) 3.dp else 2.dp,
+                                    if (nameError != null) Metro.Red else Metro.Foreground,
+                                )
                                 .clickable(role = Role.Button) { showName = true }
+                                .semantics { if (nameError != null) error(nameError) }
                                 .padding(horizontal = 10.dp, vertical = 10.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
@@ -291,6 +328,7 @@ internal fun ContactFormScaffold(
                                 ?.let { stringResource(R.string.cform_nickname_quoted, it.trim()) },
                             nameRaw.name.phonetic.takeIf { it.isNotEmpty() },
                         )
+                        if (nameError != null) ErrorLine(nameError)
                         if (extras.isNotEmpty()) HintLine(extras.joinToString(" · "), top = 6.dp)
                         HintLine(stringResource(R.string.cform_name_hint), top = 2.dp)
                     }
@@ -338,10 +376,13 @@ internal fun ContactFormScaffold(
                             haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                         }
                         val currentToggle by rememberUpdatedState(toggleDefault)
+                        val phoneRef = FieldRef("phone", ri, pi)
+                        val phoneError = fieldErrors[phoneRef]?.let { fieldErrorText(it) }
                         FieldRow(
                             squareOf(raw),
                             onRemove = { updateRaw(ri) { r -> r.copy(phones = r.phones.without(pi)) } },
                             modifier = Modifier
+                                .bringIntoViewRequester(requester(phoneRef))
                                 .semantics {
                                     customActions = listOf(
                                         CustomAccessibilityAction(setDefaultLabel) {
@@ -382,6 +423,7 @@ internal fun ContactFormScaffold(
                                 modifier = Modifier
                                     .weight(1f)
                                     .observeLongPress(ri to pi) { currentToggle() },
+                                errorText = phoneError,
                             )
                             if (phone.isDefault) {
                                 Text(
@@ -392,6 +434,7 @@ internal fun ContactFormScaffold(
                                 )
                             }
                         }
+                        if (phoneError != null) ErrorLine(phoneError)
                         if (phone.type == Phone.TYPE_CUSTOM) {
                             CustomLabelBox(phone.customLabel.orEmpty(), accent) { v ->
                                 updateRaw(ri) { r -> r.copy(phones = r.phones.replaced(pi) { it.copy(customLabel = v) }) }
@@ -423,9 +466,12 @@ internal fun ContactFormScaffold(
                 FormSectionHeader(stringResource(R.string.cform_section_email))
                 raws.forEachIndexed { ri, raw ->
                     raw.emails.forEachIndexed { ei, email ->
+                        val emailRef = FieldRef("email", ri, ei)
+                        val emailError = fieldErrors[emailRef]?.let { fieldErrorText(it) }
                         FieldRow(
                             squareOf(raw),
                             onRemove = { updateRaw(ri) { r -> r.copy(emails = r.emails.without(ei)) } },
+                            modifier = Modifier.bringIntoViewRequester(requester(emailRef)),
                         ) {
                             TypePicker(
                                 types = ContactEditor.EMAIL_TYPES,
@@ -445,8 +491,10 @@ internal fun ContactFormScaffold(
                                 placeholder = stringResource(R.string.editcontact_email_address),
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                                 modifier = Modifier.weight(1f),
+                                errorText = emailError,
                             )
                         }
+                        if (emailError != null) ErrorLine(emailError)
                         if (email.type == Email.TYPE_CUSTOM) {
                             CustomLabelBox(email.customLabel, accent) { v ->
                                 updateRaw(ri) { r -> r.copy(emails = r.emails.replaced(ei) { it.copy(customLabel = v) }) }
@@ -782,7 +830,9 @@ internal fun ContactFormScaffold(
 
             val status = when {
                 saving -> stringResource(R.string.editcontact_saving)
-                saveFailedText != null -> saveFailedText
+                fieldErrors.isNotEmpty() -> pluralStringResource(
+                    R.plurals.cform_fields_need_fixing, fieldErrors.size, fieldErrors.size,
+                )
                 else -> null
             }
             if (status != null) {
@@ -807,6 +857,25 @@ internal fun ContactFormScaffold(
         }
 
         // ---- overlays ----
+        if (saveError != null) {
+            SaveErrorDialog(
+                error = saveError,
+                account = saveErrorAccount,
+                isNew = isNew,
+                accent = accent,
+                onRetry = {
+                    onSaveErrorDismiss()
+                    onSave()
+                },
+                onChooseAnother = onChooseAnotherAccount?.let { choose ->
+                    {
+                        onSaveErrorDismiss()
+                        choose()
+                    }
+                },
+                onDismiss = onSaveErrorDismiss,
+            )
+        }
         if (showName) {
             NameDetailsPage(
                 initial = nameRaw.name,

@@ -41,15 +41,48 @@ data class ContactAccount(val name: String?, val type: String?) {
             else -> type.substringAfterLast('.')
         }
 
+    /** The account name worth showing: none for phone storage, whose "name" is an internal id. */
+    val shownName: String?
+        get() {
+            val t = type?.lowercase() ?: return null
+            return if (t.contains("local") || t.endsWith(".phone")) null else name?.takeIf { it.isNotBlank() }
+        }
+
     val fullLabel: String
-        get() = if (name.isNullOrBlank()) kindLabel else "$kindLabel · $name"
+        get() = shownName?.let { "$kindLabel · $it" } ?: kindLabel
 }
 
 /** The field kinds the editor can add ("+ add another field"). */
 enum class FieldKind { PHONE, EMAIL, ADDRESS, DATE, WEBSITE, RELATION, SIP, IM, NICKNAME, WORK, NOTE, LABELS }
 
-/** Outcome of a contact save: [PHOTO_FAILED] = everything but the photo was written. */
-enum class SaveResult { SAVED, PHOTO_FAILED, FAILED }
+/** Why a save failed — each maps to its own user-facing explanation. */
+enum class SaveError { NO_PERMISSION, ACCOUNT_REJECTED, STORAGE_FULL, TOO_LARGE, UNKNOWN }
+
+/** Outcome of a contact save: [PhotoFailed] = everything but the photo was written. */
+sealed interface SaveResult {
+    data object Saved : SaveResult
+    data object PhotoFailed : SaveResult
+    data class Failed(val error: SaveError) : SaveResult
+}
+
+/** Maps a provider exception (or one it wraps) to a [SaveError]. */
+internal fun classifySaveError(e: Throwable?): SaveError {
+    var t = e
+    var depth = 0
+    while (t != null && depth++ < 8) {
+        when {
+            t is SecurityException -> return SaveError.NO_PERMISSION
+            t.javaClass.name == "android.database.sqlite.SQLiteFullException" -> return SaveError.STORAGE_FULL
+            t.javaClass.name == "android.os.TransactionTooLargeException" -> return SaveError.TOO_LARGE
+            // The provider rejects inserts into accounts it won't take
+            // (e.g. the local account when the phone requires a cloud one).
+            t is IllegalArgumentException || t is UnsupportedOperationException ->
+                return SaveError.ACCOUNT_REJECTED
+        }
+        t = t.cause
+    }
+    return SaveError.UNKNOWN
+}
 
 /**
  * StructuredName parts. [display] is DISPLAY_NAME as loaded; edits clear it
@@ -848,11 +881,18 @@ object ContactEditor {
                 appendOps(ops, rest, raw.account, rawId = raw.rawContactId)
                 appendOps(photoOps, photo, raw.account, rawId = raw.rawContactId)
             }
-            val saved = ops.isEmpty() || runCatching {
-                context.contentResolver.applyBatch(ContactsContract.AUTHORITY, ops)
-            }.isSuccess
+            val failure = if (ops.isEmpty()) {
+                null
+            } else {
+                runCatching {
+                    context.contentResolver.applyBatch(ContactsContract.AUTHORITY, ops)
+                }.exceptionOrNull()
+            }
             val result = when {
-                !saved -> SaveResult.FAILED
+                failure != null -> {
+                    CrashLog.note(context, "contact edit save", failure, edited.raws.map { it.account.type })
+                    SaveResult.Failed(classifySaveError(failure))
+                }
                 else -> applyPhotoOps(context, photoOps)
             }
             Repo.invalidateCaches()
@@ -870,13 +910,18 @@ object ContactEditor {
                 .build()
             val (photo, rest) = planChanges(blankRaw(raw.account), raw).partition { isPhotoChange(it) }
             appendOps(ops, rest, raw.account, rawBackRef = 0)
-            val rawId = runCatching {
+            val attempt = runCatching {
                 val results = context.contentResolver.applyBatch(ContactsContract.AUTHORITY, ops)
                 results.firstOrNull()?.uri?.let { android.content.ContentUris.parseId(it) }
-            }.getOrNull()
+            }
+            val rawId = attempt.getOrNull()
             val result = when {
-                rawId == null -> SaveResult.FAILED
-                photo.isEmpty() -> SaveResult.SAVED
+                rawId == null -> {
+                    val e = attempt.exceptionOrNull()
+                    CrashLog.note(context, "contact create", e, listOf(raw.account.type))
+                    SaveResult.Failed(if (e == null) SaveError.UNKNOWN else classifySaveError(e))
+                }
+                photo.isEmpty() -> SaveResult.Saved
                 else -> {
                     val photoOps = arrayListOf<ContentProviderOperation>()
                     appendOps(photoOps, photo, raw.account, rawId = rawId)
@@ -893,11 +938,17 @@ object ContactEditor {
      */
     private fun applyPhotoOps(context: Context, photoOps: ArrayList<ContentProviderOperation>): SaveResult =
         if (photoOps.isEmpty()) {
-            SaveResult.SAVED
-        } else if (runCatching { context.contentResolver.applyBatch(ContactsContract.AUTHORITY, photoOps) }.isSuccess) {
-            SaveResult.SAVED
+            SaveResult.Saved
         } else {
-            SaveResult.PHOTO_FAILED
+            val e = runCatching {
+                context.contentResolver.applyBatch(ContactsContract.AUTHORITY, photoOps)
+            }.exceptionOrNull()
+            if (e == null) {
+                SaveResult.Saved
+            } else {
+                CrashLog.note(context, "contact photo save", e, emptyList())
+                SaveResult.PhotoFailed
+            }
         }
 
     private fun isPhotoChange(c: RowChange): Boolean = when (c) {
@@ -1097,17 +1148,7 @@ object ContactEditor {
     suspend fun listAccounts(context: Context): List<ContactAccount> =
         withContext(Dispatchers.IO) {
             val adapters = contactSyncAdapters()
-            val accounts = LinkedHashSet<ContactAccount>()
-            accounts += ContactAccount(null, null)
-            runCatching {
-                // Contacts-syncing account types are visible without
-                // GET_ACCOUNTS to an app holding READ_CONTACTS.
-                android.accounts.AccountManager.get(context).accounts.forEach { a ->
-                    if (adapters[a.type] == true && !isReadOnly(a.type, adapters)) {
-                        accounts += ContactAccount(a.name, a.type)
-                    }
-                }
-            }
+            val seen = LinkedHashSet<ContactAccount>()
             runCatching {
                 context.contentResolver.query(
                     ContactsContract.RawContacts.CONTENT_URI,
@@ -1122,11 +1163,61 @@ object ContactEditor {
                     while (c.moveToNext()) {
                         val type = c.getString(1) ?: continue
                         if (isReadOnly(type, adapters)) continue
-                        accounts += ContactAccount(c.getString(0), type)
+                        seen += ContactAccount(c.getString(0), type)
                     }
                 }
             }
+            // One "phone" entry: the brand's own phone storage when there is
+            // one (Samsung, ...), which a no-account insert may not reach.
+            val local = localAccount(context, seen)
+            val accounts = LinkedHashSet<ContactAccount>()
+            accounts += local
+            runCatching {
+                // Contacts-syncing account types are visible without
+                // GET_ACCOUNTS to an app holding READ_CONTACTS.
+                android.accounts.AccountManager.get(context).accounts.forEach { a ->
+                    if (adapters[a.type] == true && !isReadOnly(a.type, adapters)) {
+                        accounts += ContactAccount(a.name, a.type)
+                    }
+                }
+            }
+            seen.forEach { if (!isLocal(it) || it == local) accounts += it }
             accounts.toList()
+        }
+
+    /**
+     * The phone's own contact storage: the OEM-declared local account on
+     * Android 12+, else an OEM phone type already holding contacts
+     * (Samsung's vnd.sec.contact.phone), else the no-account default.
+     */
+    private fun localAccount(context: Context, seen: Collection<ContactAccount>): ContactAccount {
+        if (android.os.Build.VERSION.SDK_INT >= 31) {
+            runCatching {
+                val type = ContactsContract.RawContacts.getLocalAccountType(context)
+                if (type != null) {
+                    return ContactAccount(ContactsContract.RawContacts.getLocalAccountName(context), type)
+                }
+            }
+        }
+        return seen.firstOrNull { it.type != null && isLocal(it) && !isSim(it) }
+            ?: ContactAccount(null, null)
+    }
+
+    /**
+     * Where a new contact should go by default: on Android 16+ the phone's
+     * own "default account for new contacts" setting (a cloud account there
+     * means local saves may be refused), otherwise phone storage.
+     */
+    suspend fun defaultAccount(context: Context, accounts: List<ContactAccount>): ContactAccount =
+        withContext(Dispatchers.IO) {
+            val fallback = accounts.first()
+            if (android.os.Build.VERSION.SDK_INT < 36) return@withContext fallback
+            runCatching {
+                val d = ContactsContract.RawContacts.DefaultAccount
+                    .getDefaultAccountForNewContacts(context.contentResolver)
+                val a = d.account
+                if (a != null) accounts.firstOrNull { it.name == a.name && it.type == a.type } else null
+            }.getOrNull() ?: fallback
         }
 
     // ---- Type tables (keys are English data; display via typeKeyLabel) --

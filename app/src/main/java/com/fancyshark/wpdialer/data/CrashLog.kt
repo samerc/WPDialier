@@ -28,6 +28,21 @@ object CrashLog {
         }
     }
 
+    /**
+     * Journals a handled failure (no crash) so "report a problem" carries
+     * it. [accountTypes] are account TYPES only (com.google, ...) — never
+     * names, which are the user's email addresses.
+     */
+    fun note(context: Context, what: String, e: Throwable?, accountTypes: List<String?>) {
+        runCatching {
+            val detail = IllegalStateException(
+                "handled: $what failed; accounts=${accountTypes.map { it ?: "local" }.distinct()}",
+                e,
+            )
+            append(context, Thread.currentThread(), detail)
+        }
+    }
+
     // Synchronized: multiple threads can crash near-simultaneously, and an
     // interleaved read-truncate-write would destroy the journal.
     @Synchronized

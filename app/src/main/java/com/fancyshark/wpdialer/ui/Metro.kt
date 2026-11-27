@@ -36,6 +36,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.error
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -563,12 +564,21 @@ fun MetroTextBox(
     textSize: TextUnit = 18.sp,
     singleLine: Boolean = true,
     minLines: Int = 1,
+    /** Non-null marks the field invalid: red border, announced by TalkBack. */
+    errorText: String? = null,
 ) {
     Box(
         modifier
             .fillMaxWidth()
-            .border(2.dp, Metro.Foreground)
+            .border(if (errorText != null) 3.dp else 2.dp, if (errorText != null) Metro.Red else Metro.Foreground)
             .background(Metro.Background)
+            .then(
+                if (errorText != null) {
+                    Modifier.semantics { error(errorText) }
+                } else {
+                    Modifier
+                },
+            )
             .padding(horizontal = 10.dp, vertical = 10.dp),
     ) {
         if (value.isEmpty() && placeholder.isNotEmpty()) {

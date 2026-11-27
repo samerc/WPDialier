@@ -91,4 +91,24 @@
     <string name="type_rel_manager">responsable</string>
     <string name="type_rel_assistant">assistant</string>
     <string name="type_rel_referred_by">recommandé par</string>
+    <!-- Field checks and save errors (contact editor) -->
+    <string name="cform_err_name_or_number">ajoutez un nom ou un numéro de téléphone</string>
+    <string name="cform_err_phone">ceci ne ressemble pas à un numéro — utilisez des chiffres, des espaces et + * #</string>
+    <string name="cform_err_email">ceci ne ressemble pas à une adresse e-mail (comme nom@exemple.com)</string>
+    <plurals name="cform_fields_need_fixing">
+        <item quantity="one">%d champ à corriger — il est en rouge</item>
+        <item quantity="many">%d champs à corriger — ils sont en rouge</item>
+        <item quantity="other">%d champs à corriger — ils sont en rouge</item>
+    </plurals>
+    <string name="cform_save_err_title_new">impossible d\'enregistrer le contact</string>
+    <string name="cform_save_err_title_edit">impossible d\'enregistrer vos modifications</string>
+    <string name="cform_save_err_permission">Dialer 8 n\'a pas le droit de modifier vos contacts. Activez l\'autorisation Contacts pour Dialer 8, puis réessayez. Rien de ce que vous avez saisi n\'est perdu.</string>
+    <string name="cform_save_err_account_new">%1$s n\'a pas accepté le nouveau contact. Choisissez un autre emplacement sous « Enregistrer dans » et réessayez. Rien de ce que vous avez saisi n\'est perdu.</string>
+    <string name="cform_save_err_account_edit">%1$s n\'a pas accepté ces modifications. Les contacts synchronisés par certaines applis ne peuvent être modifiés que dans ces applis.</string>
+    <string name="cform_save_err_storage">Le stockage de votre téléphone est plein. Libérez de l\'espace, puis réessayez.</string>
+    <string name="cform_save_err_too_large">Ce contact est trop volumineux pour être enregistré d\'un coup. Essayez une photo plus petite ou moins de champs.</string>
+    <string name="cform_save_err_unknown">Un problème est survenu et rien n\'a été enregistré. Ce que vous avez saisi est toujours là, vous pouvez réessayer. Si cela se reproduit, touchez « Signaler un problème » dans Paramètres › à propos de cette application.</string>
+    <string name="cform_open_settings">ouvrir les paramètres</string>
+    <string name="cform_choose_another">choisir un autre</string>
+    <string name="cform_try_again">réessayer</string>
 </resources>

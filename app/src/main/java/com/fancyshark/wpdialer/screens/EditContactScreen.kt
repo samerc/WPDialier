@@ -6,6 +6,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -21,6 +22,8 @@ import androidx.compose.ui.unit.dp
 import com.fancyshark.wpdialer.R
 import com.fancyshark.wpdialer.data.ContactEditor
 import com.fancyshark.wpdialer.data.EditableContact
+import com.fancyshark.wpdialer.data.ContactValidation
+import com.fancyshark.wpdialer.data.SaveError
 import com.fancyshark.wpdialer.data.SaveResult
 import com.fancyshark.wpdialer.ui.Metro
 import com.fancyshark.wpdialer.ui.MetroToast
@@ -53,7 +56,9 @@ fun EditContactScreen(
         mutableStateOf<EditableContact?>(null)
     }
     var saving by remember { mutableStateOf(false) }
-    var saveFailed by remember { mutableStateOf(false) }
+    var saveError by remember { mutableStateOf<SaveError?>(null) }
+    var showErrors by rememberSaveable { mutableStateOf(false) }
+    var errorTick by remember { mutableIntStateOf(0) }
     val photoFailed = stringResource(R.string.cform_photo_failed)
 
     if (loadFailed) {
@@ -104,19 +109,31 @@ fun EditContactScreen(
         update = { transform -> editedState = transform(editedState ?: loaded) },
         dirty = dirty,
         saving = saving,
-        saveFailedText = if (saveFailed) stringResource(R.string.editcontact_save_failed) else null,
+        fieldErrors = if (showErrors) ContactValidation.validate(edited, requireNameOrNumber = false) else emptyMap(),
+        scrollToErrorTick = errorTick,
+        saveError = saveError,
+        saveErrorAccount = edited.raws.map { accountKindLabel(it.account.kindLabel) }.distinct().joinToString(", "),
+        isNew = false,
+        onSaveErrorDismiss = { saveError = null },
         onSave = {
-            saving = true
-            saveFailed = false
-            scope.launch {
-                val result = ContactEditor.save(context, loaded, editedState ?: loaded)
-                if (result != SaveResult.FAILED) {
-                    // The other edits are in; only the photo batch failed.
-                    if (result == SaveResult.PHOTO_FAILED) MetroToast.show(photoFailed)
-                    onDone()
-                } else {
-                    saving = false
-                    saveFailed = true
+            if (ContactValidation.validate(edited, requireNameOrNumber = false).isNotEmpty()) {
+                showErrors = true
+                errorTick++
+            } else {
+                saving = true
+                saveError = null
+                scope.launch {
+                    when (val result = ContactEditor.save(context, loaded, editedState ?: loaded)) {
+                        is SaveResult.Failed -> {
+                            saving = false
+                            saveError = result.error
+                        }
+                        else -> {
+                            // The other edits are in; only the photo batch may have failed.
+                            if (result == SaveResult.PhotoFailed) MetroToast.show(photoFailed)
+                            onDone()
+                        }
+                    }
                 }
             }
         },
